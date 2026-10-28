@@ -1,7 +1,7 @@
 """Import catchments from the EA's Catchment Data Explorer.
 
-Everything in the catchments and catchment_connections tables comes from here,
-so they never mix EA data with anything entered by hand:
+Everything in the catchments table comes from here, so it never mixes EA data
+with anything entered by hand:
 
 - the waterbody's shapefile (API): its details, catchment boundary and river line;
 - the waterbody's web page: its river length and upstream/downstream waterbodies,
@@ -60,7 +60,7 @@ class Catchment:
     river_length_km: float
     boundary: dict  # GeoJSON geometry, in British National Grid
     river_line: dict  # GeoJSON geometry, in British National Grid
-    upstream: list[tuple[str, str]]  # (waterbody ID, name)
+    upstream: list[tuple[str, str]]  # (waterbody ID, name); only the IDs are saved
     downstream: list[tuple[str, str]]
     raw_files: dict[str, bytes]  # exactly as downloaded, kept for the record
 
@@ -266,9 +266,8 @@ def existing_ids(conn: sa.Connection, schema: Schema, ids: list[str]) -> set[str
 
 
 def save(conn: sa.Connection, schema: Schema, catchments: list[Catchment]) -> None:
-    """Add or update the catchments, and replace their upstream/downstream links."""
+    """Add the catchments, or update them if they're already there."""
     table = schema.metadata.tables["catchments"]
-    connections = schema.metadata.tables["catchment_connections"]
     for c in catchments:
         boundary = sa.func.ST_SetSRID(sa.func.ST_GeomFromGeoJSON(json.dumps(c.boundary)), BNG)
         river_line = sa.func.ST_SetSRID(sa.func.ST_GeomFromGeoJSON(json.dumps(c.river_line)), BNG)
@@ -279,6 +278,8 @@ def save(conn: sa.Connection, schema: Schema, catchments: list[Catchment]) -> No
             "area_ha": sa.func.ST_Area(boundary) / 10_000,  # square metres in British National Grid
             "boundary": sa.func.ST_Multi(sa.func.ST_Transform(boundary, WGS84)),
             "river_line": sa.func.ST_Multi(sa.func.ST_Transform(river_line, WGS84)),
+            "upstream_ids": [waterbody_id for waterbody_id, _ in c.upstream],
+            "downstream_ids": [waterbody_id for waterbody_id, _ in c.downstream],
             "imported_at": sa.func.now(),
         }
         statement = insert(table).values(values)
@@ -286,16 +287,6 @@ def save(conn: sa.Connection, schema: Schema, catchments: list[Catchment]) -> No
             index_elements=[table.c.id],
             set_={column: statement.excluded[column] for column in values if column != "id"},
         ))
-
-    conn.execute(sa.delete(connections).where(connections.c.catchment_id.in_([c.id for c in catchments])))
-    rows = [
-        {"catchment_id": c.id, "direction": direction, "connected_id": other_id, "connected_name": other_name}
-        for c in catchments
-        for direction, links in (("upstream", c.upstream), ("downstream", c.downstream))
-        for other_id, other_name in links
-    ]
-    if rows:
-        conn.execute(sa.insert(connections), rows)
 
 
 def save_raw_files(catchments: list[Catchment], raw_dir: Path) -> Path:

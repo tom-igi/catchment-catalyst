@@ -24,7 +24,7 @@ This document describes how we will rebuild the Catchment Catalyst water quality
 | Principle | What it means |
 |---|---|
 | **Catchment ID is the key to everything** | Every row of data is tied to a catchment ID, which is the official EA WFD waterbody ID (e.g. `GB108050008080`), never to a name. Names drift and clash nationally. Name-keyed source files are converted to IDs on import. |
-| **One shared set of tables for all locations** | National data is loaded once. Location-specific data goes into the same tables. A location is just a list of waterbody IDs. |
+| **One shared set of tables for all locations** | National data is loaded once. Location-specific data goes into the same tables. A location is just a name and a list of catchment IDs. |
 | **Store facts, calculate comparisons** | Anything that depends on which catchments are in a location (rankings such as "68/92", status counts, "% of catchment", densities, "increase needed to reach Good") is calculated per location, not stored. |
 | **Years are rows, not columns** | Source files have `2025 / 2022 / 2019` columns. The database stores one row per year so a new year needs no change to the table design. |
 | **Every conversion is code** | Source files are never in the shape we need, but each source's columns stay the same between downloads. So each dataset gets its own **importer** (a small Python module) rather than a general column-mapping screen. |
@@ -40,10 +40,8 @@ This document describes how we will rebuild the Catchment Catalyst water quality
 
 | Table | Contents | Scope |
 |---|---|---|
-| **catchments** | Catchment ID (EA waterbody ID), name, type, catchment boundary, river line, management / operational catchment and river basin district (EA names and IDs), hydromorphological designation, area, river length. Filled entirely by the catchments importer (§4.3). | National |
-| **catchment_connections** | Upstream and downstream waterbodies of each catchment, from the EA. Filled by the catchments importer. | National |
-| **locations** | URL name (e.g. `north-devon`), display name, intro text, photo, logo and branding, contact email | One per location |
-| **location_catchments** | Which catchments belong to which location (a catchment can be in more than one location) | One per location |
+| **catchments** | Catchment ID (EA waterbody ID), name, type, catchment boundary, river line, management / operational catchment and river basin district (EA names and IDs), hydromorphological designation, area, river length, and the IDs of the waterbodies upstream and downstream (lists; names are looked up in this table). Filled entirely by the catchments importer (§4.3). | National |
+| **locations** | Location ID, name and the list of catchment IDs it includes (a catchment can be in more than one location). Whatever saves a location checks every ID is in `catchments`, because the database can't check IDs inside a list. Anything else about a location (intro text, photo, branding, contact email) goes in its own tables, keyed by location ID (§3.2). The web address (e.g. `/north-devon`) will be generated from the name, or added with the publish step. | One per location |
 | **datasets** | The list of datasets, one row per data table (the tiles on the admin "Choose a table" screen): name, source organisation, date of data, caveats, national or location-specific. Also drives the "i" info buttons. Holds no data itself. | All |
 | **uploads** | Each import run: dataset, raw file, who uploaded it and when, status (preview / approved / rejected), row counts | All |
 
@@ -53,7 +51,7 @@ Every table and column is listed in one master file, `backend/catalyst/db/schema
 
 ### 3.2 Data tables (one per thing shown on the dashboard)
 
-Each dataset has its own table, and each row has a catchment ID (and, once uploads are tracked, the upload it came from). Built so far: `ea_scores` and `habitat_land_use`. There are three kinds:
+Each dataset has its own table, and each row has a catchment ID (and, once uploads are tracked, the upload it came from). Built so far: `ea_scores` and `habitat_land_use`. Data about a whole location (e.g. its intro text) will go in tables keyed by **location ID** instead; the master file's rule will be extended to allow this when the first one is added. Catchment data tables come in three kinds:
 
 - **One row per waterbody:** e.g. number of farms, properties on SWW or private sewerage, risk levels.
 - **Many rows per waterbody:** e.g. EA classification items per year, habitat types, livestock types, phosphate sources, SWW discharge sites per year, asset improvement plans.
@@ -94,12 +92,12 @@ A new type of source file means writing one new importer, which should only happ
 
 ### 4.3 Catchments importer (built)
 
-Fills the `catchments` and `catchment_connections` tables from the EA's Catchment Data Explorer, for a list of catchment IDs in a JSON file (`imports/catchments.json`). For each catchment it downloads:
+Fills the `catchments` table from the EA's Catchment Data Explorer, for a list of catchment IDs in a JSON file (`imports/catchments.json`). For each catchment it downloads:
 
 - the waterbody's **shapefile** from the API: details (name, type, catchment hierarchy names and IDs, hydromorphological designation), catchment boundary and river line, converted from British National Grid to latitude/longitude;
 - the waterbody's **web page**, the only source of its **river length** and **upstream / downstream waterbodies**. If the EA changes the page, the importer stops with a clear error rather than guessing.
 
-The **area** is calculated from the boundary (it matches the EA's figure). The importer checks everything before saving, shows a preview, saves all catchments in one go, and keeps the downloaded files. Running it again updates catchments rather than duplicating them. Only river waterbodies are supported so far. Command: see `imports/README.md`. Later, the admin portal will call the same code.
+The **area** is calculated from the boundary (it matches the EA's figure). Only the IDs of upstream / downstream waterbodies are stored. Some, such as estuaries, aren't imported yet (the importer handles rivers only), so their names can't be looked up until it supports those waterbody types too. The importer checks everything before saving, shows a preview, saves all catchments in one go, and keeps the downloaded files. Running it again updates catchments rather than duplicating them. Only river waterbodies are supported so far. Command: see `imports/README.md`. Later, the admin portal will call the same code.
 ---
 
 ## 5. Architecture
@@ -219,8 +217,8 @@ Later, GitHub can run the tests on every push and do step 3 automatically.
 ## 7. Adding a new location
 
 1. Make sure the national datasets cover the new area. These are already loaded nationally, with boundaries for the whole country.
-2. In the admin portal, create the location: name, URL name, intro text, branding, contact email.
-3. Add its waterbody IDs.
+2. In the admin portal, create the location: its name and catchment IDs. The portal checks each ID is a known catchment.
+3. Add its other details (intro text, photo, branding, contact email) in the location tables.
 4. Upload any location-specific datasets (e.g. FOI responses) and write or upload the per-catchment text.
 5. Publish the location.
 6. Point the new address's domain name at the VM and add it to the web server's list of addresses. The web server gets its HTTPS certificate automatically. This can be done manually.

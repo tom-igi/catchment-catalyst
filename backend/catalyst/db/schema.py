@@ -69,7 +69,7 @@ GEOMETRY_TYPES = {
 }
 TYPE_HELP = (
     "use one of: " + ", ".join(SIMPLE_TYPES)
-    + ", varchar(N), numeric(P,S), geometry(<shape>, <SRID>)"
+    + ", varchar(N), numeric(P,S), geometry(<shape>, <SRID>), or any of these with [] for a list"
 )
 
 
@@ -138,6 +138,11 @@ def build_schema(data: Any) -> Schema:
 
 
 def parse_type(spec: str) -> sa.types.TypeEngine:
+    if spec.strip().endswith("[]"):
+        item_type = parse_type(spec.strip()[:-2])
+        if isinstance(item_type, (Geometry, postgresql.JSONB, postgresql.ARRAY)):
+            raise ValueError(f"bad type '{spec}': lists of this type aren't supported")
+        return postgresql.ARRAY(item_type)
     match = TYPE_RE.match(spec.strip().lower())
     if not match:
         raise ValueError(f"unknown type '{spec}' ({TYPE_HELP})")
@@ -181,7 +186,8 @@ def _build_table(where, name, spec, known_columns, schema: Schema, problems: lis
             continue
         columns.append(column)
         if col_spec.get("index"):
-            using = "gist" if isinstance(column.type, Geometry) else None
+            # Map shapes and lists need their own kinds of index.
+            using = "gist" if isinstance(column.type, Geometry) else "gin" if isinstance(column.type, postgresql.ARRAY) else None
             indexes.append(([col_name], False, using))
 
     for i, idx in enumerate(spec.get("indexes") or []):

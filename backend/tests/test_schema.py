@@ -17,7 +17,8 @@ CATCHMENTS = """
 
 def test_master_file_is_valid():
     schema = load_schema()
-    assert {"catchments", "locations", "location_catchments", "datasets"} <= set(schema.metadata.tables)
+    assert {"catchments", "locations", "datasets"} <= set(schema.metadata.tables)
+    assert list(schema.metadata.tables["locations"].columns.keys()) == ["id", "name", "catchment_ids"]
     assert {"ea_scores", "habitat_land_use"} <= set(schema.data_tables)
     assert "postgis" in schema.extensions
 
@@ -35,6 +36,20 @@ def data_table(column: str) -> str:
         columns:
           {column}
 """
+
+
+def test_list_types():
+    from sqlalchemy.dialects import postgresql
+    schema = make_schema(CATCHMENTS.replace(
+        "id: {type: text, primary_key: true}",
+        "id: {type: text, primary_key: true}\n          tags: {type: \"text[]\", index: true}",
+    ))
+    table = schema.metadata.tables["catchments"]
+    assert isinstance(table.c.tags.type, postgresql.ARRAY)
+    (index,) = table.indexes
+    assert index.dialect_options["postgresql"]["using"] == "gin"
+    with pytest.raises(SchemaError, match="lists of this type aren't supported"):
+        make_schema(CATCHMENTS.replace("{type: text, primary_key: true}", '{type: "jsonb[]", primary_key: true}'))
 
 
 def test_data_tables_must_link_every_row_to_a_catchment():

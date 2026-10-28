@@ -118,19 +118,13 @@ def test_import_fills_the_tables_and_can_be_repeated(engine):
     with engine.connect() as conn:
         rows = conn.execute(sa.text("""
             SELECT id, name, round(area_ha::numeric, 2)::float AS area_ha, river_length_km,
-                   ST_SRID(boundary) AS srid, GeometryType(boundary) AS shape, ST_IsValid(boundary) AS valid
+                   ST_SRID(boundary) AS srid, GeometryType(boundary) AS shape, ST_IsValid(boundary) AS valid,
+                   upstream_ids, downstream_ids
             FROM catchments ORDER BY id
         """)).all()
-        links = conn.execute(sa.text(
-            "SELECT catchment_id, direction, connected_id, connected_name FROM catchment_connections ORDER BY 1"
-        )).all()
     assert [tuple(r) for r in rows] == [
-        (WEST_OKEMENT, "West Okement", 3174.75, 21.13, 4326, "MULTIPOLYGON", True),
-        (EAST_OKEMONT, "East Okemont River", 2061.61, 10.232, 4326, "MULTIPOLYGON", True),
-    ]
-    assert [tuple(r) for r in links] == [
-        (WEST_OKEMENT, "downstream", "GB108050008110", "Middle River Okement"),
-        (EAST_OKEMONT, "downstream", "GB108050008110", "Middle River Okement"),
+        (WEST_OKEMENT, "West Okement", 3174.75, 21.13, 4326, "MULTIPOLYGON", True, [], ["GB108050008110"]),
+        (EAST_OKEMONT, "East Okemont River", 2061.61, 10.232, 4326, "MULTIPOLYGON", True, [], ["GB108050008110"]),
     ]
 
 

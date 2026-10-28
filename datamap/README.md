@@ -38,6 +38,7 @@ not to list it, but anyone who has the link can open it.
 |---|---|
 | `build.py` | Turns the master file into the page |
 | `page.html` | The page layout and styling |
+| `sections.yaml` | The page's sections (Locations, Catchments, …), which tables go in each, and the explanation shown above them |
 | `test_datamap.py` | Checks the page lists every table and column |
 | `site/index.html` | The built page (not kept in git) |
 

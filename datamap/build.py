@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import datetime
 import html
+from dataclasses import dataclass
 from pathlib import Path
 from string import Template
 
 import sqlalchemy as sa
+import yaml
 from geoalchemy2 import Geometry
 from sqlalchemy.dialects import postgresql
 
@@ -26,21 +28,28 @@ MAP_SHAPES = {
     "POLYGON": "Map area", "MULTIPOLYGON": "Map area",
 }
 DEFAULTS = {"now()": "Set automatically to the current time", "true": "Default: Yes", "false": "Default: No"}
-WORDS = {"id": "ID", "ea": "EA", "url": "URL", "ha": "(ha)", "km": "(km)"}
+WORDS = {"id": "ID", "ea": "EA", "url": "URL", "ha": "(ha)", "km": "(km)", "ids": "IDs"}
+PLURALS = {"Text": "text", "Whole number": "whole numbers", "Number": "numbers", "Date": "dates",
+           "Date and time": "dates and times", "Yes / No": "yes / no values", "ID code": "ID codes"}
 
 
-def build(schema: Schema | None = None, out_dir: Path = SITE_DIR) -> Path:
+@dataclass
+class Section:
+    title: str
+    description: str
+    tables: list[sa.Table]
+    data: bool = False  # the data tables section
+
+
+def build(schema: Schema | None = None, out_dir: Path = SITE_DIR, sections_file: Path = HERE / "sections.yaml") -> Path:
     """Write the page to out_dir/index.html and return its path."""
     schema = schema or load_schema()
-    tables = list(schema.metadata.tables.values())
-    core = [t for t in tables if t.name not in schema.data_tables]
-    data = [t for t in tables if t.name in schema.data_tables]
+    sections = _sections(schema, sections_file)
     today = datetime.date.today()
 
     page = Template((HERE / "page.html").read_text(encoding="utf-8")).substitute(
-        tiles=_tiles("Core tables", "Catchments, locations and the list of datasets.", core, data_table=False)
-        + _tiles("Data tables", "One table per dataset.", data, data_table=True),
-        tables="\n".join(_card(t, t.name in schema.data_tables) for t in core + data),
+        sections="\n".join(_section(s) for s in sections),
+        tables="\n".join(_card(t, s) for s in sections for t in s.tables),
         generated=f"{today.day} {today:%B %Y}",
     )
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -49,20 +58,41 @@ def build(schema: Schema | None = None, out_dir: Path = SITE_DIR) -> Path:
     return path
 
 
-def _tiles(heading: str, note: str, tables: list[sa.Table], data_table: bool) -> str:
-    if not tables:
-        return ""
+def _sections(schema: Schema, sections_file: Path) -> list[Section]:
+    """The page's sections, from sections.yaml, with every table in exactly one."""
+    config = yaml.safe_load(Path(sections_file).read_text(encoding="utf-8"))
+    tables = schema.metadata.tables
+    core = [name for name in tables if name not in schema.data_tables]
+    sections, placed = [], set()
+    for entry in config["sections"]:
+        unknown = [name for name in entry["tables"] if name not in core]
+        if unknown:
+            raise ValueError(f"datamap/sections.yaml lists {', '.join(unknown)}, which isn't a core table in schema.yaml")
+        sections.append(Section(entry["title"], entry["description"], [tables[name] for name in entry["tables"]]))
+        placed.update(entry["tables"])
+    others = [tables[name] for name in core if name not in placed]
+    if others:
+        sections.append(Section("Other tables", "Core tables not yet given a section in datamap/sections.yaml.", others))
+    data = config["data_tables"]
+    sections.append(Section(data["title"], data["description"], [tables[n] for n in schema.data_tables], data=True))
+    return [s for s in sections if s.tables]
+
+
+def _section(section: Section) -> str:
     tiles = "".join(
-        f'<a class="tile{" data" if data_table else ""}" href="#{t.name}">'
+        f'<a class="tile" href="#{t.name}">'
         f'<span class="tile-title">{_e(_title(t))}</span>'
         f'<span class="tile-desc">{_e(_first_sentence(t.comment))}</span>'
         f'<span class="tile-meta">{len(t.columns)} columns</span></a>'
-        for t in tables
+        for t in section.tables
     )
-    return f'<section class="group"><h2>{heading}</h2><p class="group-note">{note}</p><div class="tiles">{tiles}</div></section>'
+    return (
+        f'<section class="group"><h2>{_e(section.title)}</h2>'
+        f'<p class="group-note">{_e(section.description)}</p><div class="tiles">{tiles}</div></section>'
+    )
 
 
-def _card(table: sa.Table, data_table: bool) -> str:
+def _card(table: sa.Table, section: Section) -> str:
     columns = list(table.columns)
     headings = "".join(f'<th scope="col"{_catchment_class(c)}>{_e(_label(c))}</th>' for c in columns)
     types = "".join(f"<td>{_type(c)}</td>" for c in columns)
@@ -82,7 +112,7 @@ def _card(table: sa.Table, data_table: bool) -> str:
 <section class="card" id="{table.name}">
   <div class="card-head">
     <h3>{_e(_title(table))}</h3>
-    <span class="tag{' data' if data_table else ''}">{'Data table' if data_table else 'Core table'}</span>
+    <span class="tag{' data' if section.data else ''}">{_e('Data table' if section.data else section.title)}</span>
     <code class="tech">{_e(table.name)}</code>
   </div>
   <p class="card-desc">{_e(table.comment or '')}</p>
@@ -140,7 +170,13 @@ def _is_catchment_id(column: sa.Column) -> bool:
 
 
 def _type(column: sa.Column) -> str:
-    t = column.type
+    return _type_label(column.type)
+
+
+def _type_label(t) -> str:
+    if isinstance(t, sa.ARRAY):
+        item = _type_label(t.item_type)
+        return f"List of {PLURALS.get(item, item.lower())}"
     if isinstance(t, Geometry):
         return MAP_SHAPES.get(t.geometry_type.upper(), "Map shape")
     if isinstance(t, sa.Boolean):

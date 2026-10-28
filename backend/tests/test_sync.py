@@ -53,6 +53,16 @@ def test_adding_a_column_keeps_existing_rows(engine):
     assert plan_changes(engine, schema).changes == []
 
 
+def test_adding_a_unique_column_adds_exactly_one_unique_rule(engine):
+    setup_things(engine, rows=())
+    schema = make_schema(THINGS + "          code: {type: text, required: true, unique: true}\n")
+    apply_changes(engine, schema)
+    with engine.connect() as conn:
+        rules = sa.inspect(conn).get_unique_constraints("things")
+    assert [r["name"] for r in rules] == ["uq_things_code"]
+    assert plan_changes(engine, schema).changes == []
+
+
 def test_renaming_a_column_keeps_its_data(engine):
     setup_things(engine)
     schema = make_schema(THINGS.replace(

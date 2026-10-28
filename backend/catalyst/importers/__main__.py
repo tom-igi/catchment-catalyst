@@ -97,7 +97,7 @@ def _import_catchments(engine: sa.Engine, ids: list[str], yes: bool) -> int:
 
 
 def _names(links: list[tuple[str, str]]) -> str:
-    return ", ".join(name for _, name in links) or "none"
+    return ", ".join(f"{name} ({waterbody_id})" for waterbody_id, name in links) or "none"
 
 
 def _confirm(prompt: str) -> bool:

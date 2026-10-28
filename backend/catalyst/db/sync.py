@@ -240,7 +240,14 @@ def _describe(op) -> Change:
     if isinstance(op, ops.DropTableOp):
         return Change("remove", f"drop table {op.table_name}", data_loss="deletes the table and all its rows", op=op)
     if isinstance(op, ops.AddColumnOp):
-        return Change("add", f"add column {op.table_name}.{op.column.name}", [_column_line(op.column)], op=op)
+        line = _column_line(op.column)
+        if op.column.unique:
+            # Alembic would add an unnamed copy of the unique rule along with the
+            # column. Its own operation in this plan adds the rule, properly named.
+            column = op.column._copy()
+            column.unique = None
+            op = ops.AddColumnOp(op.table_name, column, schema=op.schema)
+        return Change("add", f"add column {op.table_name}.{op.column.name}", [line], op=op)
     if isinstance(op, ops.DropColumnOp):
         return Change("remove", f"drop column {op.table_name}.{op.column_name}",
                       data_loss="deletes every value in the column", op=op)

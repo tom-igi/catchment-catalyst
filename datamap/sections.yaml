@@ -1,0 +1,34 @@
+# The sections of the data map page, in order: the core tables in each, and a
+# short explanation shown above them.
+#
+# The data tables (one per dataset) always come last, in their own section. A
+# core table that isn't listed here still appears, under "Other tables", so
+# nothing is ever left off the page.
+
+sections:
+
+  - title: Locations
+    description: >-
+      Each location, such as North Devon, is a name and a list of catchments.
+      It is published as the same dashboard at its own web address, showing
+      only its own catchments.
+    tables: [locations]
+
+  - title: Catchments
+    description: >-
+      Every catchment's details, outline and river. This table is filled
+      entirely from the Environment Agency's Catchment Data Explorer by the
+      catchments importer, and every other table links to it by Catchment ID.
+    tables: [catchments]
+
+  - title: Datasets
+    description: >-
+      The list of datasets: one row for each data table below, holding each
+      dataset's source and caveats for the dashboard's "i" info buttons.
+    tables: [datasets]
+
+data_tables:
+  title: Data tables
+  description: >-
+    One table per dataset, such as EA scores or habitat. Every row belongs to
+    a catchment, linked by Catchment ID.

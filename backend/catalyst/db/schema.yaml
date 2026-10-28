@@ -28,6 +28,8 @@
 #                    date, timestamptz, jsonb, uuid,
 #                    geometry(<Point | LineString | Polygon | MultiPoint |
 #                             MultiLineString | MultiPolygon>, <SRID>)
+#                  Add [] for a list of values, e.g. text[] (not for
+#                  geometry or jsonb).
 #    description   What the column holds. Saved as a comment in the database.
 #    required      true = must always have a value. Default: false.
 #    primary_key   true = part of the table's primary key (always required).
@@ -144,6 +146,19 @@ tables:
         type: geometry(MultiLineString, 4326)
         example: "(line on the map)"
         description: River line(s) as latitude/longitude (WGS84)
+      upstream_ids:
+        type: text[]
+        example: "(none)"
+        description: >-
+          Catchment IDs of the waterbodies that flow into this one, from the
+          EA. Look their names up in this table.
+      downstream_ids:
+        type: text[]
+        example: GB108050008110
+        description: >-
+          Catchment IDs of the waterbodies this one flows into, from the EA.
+          Look their names up in this table. Some (e.g. estuaries) aren't
+          imported yet, so have no row.
       imported_at:
         type: timestamptz
         example: 2026-10-28 09:00
@@ -151,113 +166,37 @@ tables:
         default: now()
         description: When this catchment was last imported from the EA
 
-  catchment_connections:
-    title: Upstream and downstream
-    description: >-
-      Which waterbodies flow into and out of each catchment, from the EA's
-      Catchment Data Explorer. Filled by the catchments importer.
-    columns:
-      catchment_id:
-        type: text
-        example: GB108050008080
-        primary_key: true
-        references: catchments.id
-        on_delete: cascade
-      direction:
-        type: text
-        example: downstream
-        primary_key: true
-        description: >-
-          upstream (the connected waterbody flows into this catchment) or
-          downstream (this catchment flows into it)
-      connected_id:
-        type: text
-        example: GB108050008110
-        primary_key: true
-        description: EA waterbody ID of the connected waterbody. It may not be in the catchments table.
-      connected_name:
-        type: text
-        example: Middle River Okement
-        required: true
-        description: EA name of the connected waterbody
-
   locations:
     title: Locations
     description: >-
-      One row per dashboard location (e.g. North Devon). Each location is
-      published as the same dashboard at its own URL, showing only its own
-      catchments.
+      One row per dashboard location (e.g. North Devon): its name and the
+      catchments it includes. Each location is published as the same
+      dashboard, showing only its own catchments. Anything else about a
+      location (text, photos, contact details) will go in its own table,
+      linked by location ID.
     columns:
       id:
         type: integer
         example: 1
         primary_key: true
         identity: true
-      slug:
-        type: text
-        example: north-devon
-        required: true
-        unique: true
-        description: URL name, e.g. north-devon
-      display_name:
+        description: Location ID
+      name:
         type: text
         example: North Devon
         required: true
-        description: Name shown on the dashboard
-      intro_text:
-        type: text
-        example: Welcome to the North Devon waterbody dashboard…
-        description: Introduction on the Overview page
-      how_to_use_text:
-        type: text
-        example: Click a catchment on the map to see its details…
-        description: '"Using this dashboard" text on the Overview page'
-      photo_path:
-        type: text
-        example: north-devon/overview.jpg
-        description: Path of the Overview photo in blob storage
-      logo_path:
-        type: text
-        example: north-devon/logo.png
-        description: Path of the logo in blob storage
-      branding:
-        type: jsonb
-        example: "(main colour, logo colours, …)"
-        description: Colours and other branding settings (to be confirmed, PLAN.md 9.3 Q6)
-      contact_email:
-        type: text
-        example: rivers@example.org
-      created_at:
-        type: timestamptz
-        example: 2026-10-28 09:00
+        unique: true
+        description: Name of the location
+      catchment_ids:
+        type: text[]
+        example: "GB108050008080, GB108050008100, …"
         required: true
-        default: now()
-      updated_at:
-        type: timestamptz
-        example: 2026-10-28 09:00
-        required: true
-        default: now()
-
-  location_catchments:
-    title: Location catchments
-    description: >-
-      The catchments included in each location. A catchment can be in more
-      than one location.
-    columns:
-      location_id:
-        type: integer
-        example: 1
-        primary_key: true
-        references: locations.id
-        on_delete: cascade
-        description: The location
-      catchment_id:
-        type: text
-        example: GB108050008080
-        primary_key: true
-        references: catchments.id
         index: true
-        description: A catchment included in the location
+        description: >-
+          Catchment IDs of the catchments in this location. A catchment can be
+          in more than one location. Each ID must be in the catchments table:
+          whatever saves a location checks this, because the database can't
+          check IDs inside a list.
 
   datasets:
     title: Datasets
