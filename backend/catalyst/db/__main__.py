@@ -63,25 +63,26 @@ def main(argv: list[str] | None = None) -> int:
     try:
         plan = plan_changes(engine, schema)
         _print_plan(plan)
-        if not plan.changes or args.command == "plan":
+        if args.command == "plan":
             if plan.changes:
                 print("\nNothing has been changed. Run `apply` to make these changes.")
             return 0
 
-        if plan.data_loss and not args.allow_data_loss:
-            print(
-                f"\nStopped: {len(plan.data_loss)} change(s) would delete data (marked ⚠).\n"
-                "Check that is intended, then run again with --allow-data-loss.",
-                file=sys.stderr,
-            )
-            return 1
-        if not args.yes and not _confirm(f"\nApply {len(plan.changes)} change(s)? [y/N] "):
-            print("Nothing has been changed.")
-            return 1
+        if plan.changes:
+            if plan.data_loss and not args.allow_data_loss:
+                print(
+                    f"\nStopped: {len(plan.data_loss)} change(s) would delete data (marked ⚠).\n"
+                    "Check that is intended, then run again with --allow-data-loss.",
+                    file=sys.stderr,
+                )
+                return 1
+            if not args.yes and not _confirm(f"\nApply {len(plan.changes)} change(s)? [y/N] "):
+                print("Nothing has been changed.")
+                return 1
 
-        apply_changes(engine, schema, expected=plan.summaries, allow_data_loss=args.allow_data_loss)
-        print(f"Done: {len(plan.changes)} change(s) applied.")
-        return 0
+            apply_changes(engine, schema, expected=plan.summaries, allow_data_loss=args.allow_data_loss)
+            print(f"Done: {len(plan.changes)} change(s) applied.")
+        return 0 if _update_data_map(schema) else 1
 
     except (DataLossError, PlanChangedError) as e:
         print(f"\nStopped: {e}. Nothing has been changed.", file=sys.stderr)
@@ -92,6 +93,23 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     finally:
         engine.dispose()
+
+
+def _update_data_map(schema) -> bool:
+    """Rebuild the data map page (the optional datamap/ folder), if it's there."""
+    try:
+        import datamap
+    except ModuleNotFoundError as e:
+        if e.name != "datamap":
+            raise
+        return True
+    try:
+        path = datamap.build(schema)
+    except Exception as e:  # the database is already updated; only the page failed
+        print(f"\nThe database is up to date, but the data map couldn't be rebuilt: {e}", file=sys.stderr)
+        return False
+    print(f"Data map updated: {path.relative_to(os.getcwd())}")
+    return True
 
 
 def _print_plan(plan: Plan) -> None:

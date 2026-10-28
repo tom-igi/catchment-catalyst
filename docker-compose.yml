@@ -54,6 +54,7 @@ services:
       # Use the code and schema.yaml from this folder, so edits don't need a
       # rebuild. A deployed image has its own copy built in.
       - ./backend/catalyst:/app/catalyst:ro
+      - ./datamap:/app/datamap  # data map: rebuilt after each apply (see datamap/README.md)
     depends_on:
       db:
         condition: service_healthy
@@ -71,6 +72,7 @@ services:
     volumes:
       - ./backend/catalyst:/app/catalyst:ro
       - ./backend/tests:/app/tests:ro
+      - ./datamap:/app/datamap:ro  # data map
     depends_on:
       db:
         condition: service_healthy

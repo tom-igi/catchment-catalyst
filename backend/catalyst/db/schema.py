@@ -6,6 +6,7 @@ Other parts of the backend (admin API, importers) should get their tables from
 
 from __future__ import annotations
 
+import datetime
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -29,10 +30,10 @@ NAMING_CONVENTION = {
 }
 
 TOP_LEVEL_OPTIONS = {"extensions", "tables", "data_tables"}
-TABLE_OPTIONS = {"description", "columns", "indexes", "renamed_from"}
+TABLE_OPTIONS = {"title", "description", "columns", "indexes", "renamed_from"}
 COLUMN_OPTIONS = {
     "type", "description", "required", "primary_key", "identity", "unique",
-    "index", "default", "references", "on_delete", "renamed_from",
+    "index", "default", "references", "on_delete", "renamed_from", "example",
 }
 BOOLEAN_OPTIONS = {"required", "primary_key", "identity", "unique", "index"}
 INDEX_OPTIONS = {"columns", "unique", "using"}
@@ -190,7 +191,13 @@ def _build_table(where, name, spec, known_columns, schema: Schema, problems: lis
 
     if not columns:
         return
-    table = sa.Table(name, schema.metadata, *columns, comment=spec.get("description"))
+    if "title" in spec and not isinstance(spec["title"], str):
+        problems.append(f"{where}: 'title' must be text, e.g. title: EA Scores")
+    table = sa.Table(
+        name, schema.metadata, *columns,
+        comment=spec.get("description"),
+        info={"title": spec.get("title")},  # not stored in the database
+    )
     for cols, unique, using in indexes:
         if all(c in table.c for c in cols):
             kwargs = {"postgresql_using": using} if using else {}
@@ -253,6 +260,10 @@ def _build_column(table_where, table, name, spec, known_columns, schema: Schema,
         if _check_name(old, f"{where}.renamed_from", problems):
             schema.column_renames[(table, name)] = old
 
+    example = spec.get("example")
+    if not isinstance(example, (str, int, float, bool, datetime.date, type(None))):
+        problems.append(f"{where}: 'example' must be a single value")
+
     return sa.Column(
         name,
         col_type,
@@ -262,6 +273,7 @@ def _build_column(table_where, table, name, spec, known_columns, schema: Schema,
         unique=spec.get("unique") is True,
         server_default=server_default,
         comment=spec.get("description"),
+        info={"example": example},  # not stored in the database
     )
 
 

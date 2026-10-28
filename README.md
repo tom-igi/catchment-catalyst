@@ -11,6 +11,7 @@ backend/                    all Python code, built into one Docker image
   catalyst/db/schema.py     reads and checks schema.yaml
   catalyst/db/sync.py       compares schema.yaml with the database and applies changes
   tests/
+datamap/                    optional data map page: every table in plain English (see datamap/README.md)
 ```
 
 ## Running locally
