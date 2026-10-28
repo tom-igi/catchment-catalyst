@@ -1,6 +1,7 @@
 # Catchment Catalyst
 
-Water quality dashboard platform. See [PLAN.md](PLAN.md) for the overall design.
+Water quality dashboard platform. See [PLAN.md](PLAN.md) for the overall design, and
+[PROGRESS.md](PROGRESS.md) for where the build is up to.
 
 ## Layout
 
