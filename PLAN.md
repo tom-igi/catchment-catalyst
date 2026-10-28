@@ -1,6 +1,6 @@
 # Catchment Catalyst – Platform Plan
 
-**Status:** High-level plan, agreed in principle. Phase 1 (foundations) in progress: database schema tool and first core tables built.
+**Status:** High-level plan, agreed in principle. Hosting changed to a single Azure VM (28 October 2026). Phase 1 (foundations) in progress: database schema tool, first tables, data map page and the development / live Docker setup built.
 **Last updated:** 28 October 2026
 
 This document describes how we will rebuild the Catchment Catalyst water quality dashboard (currently North Devon) as a platform that can be reused for any location in the country. It covers the data model, how data gets in, how the system is hosted, and what needs to happen before development starts.
@@ -47,7 +47,7 @@ This document describes how we will rebuild the Catchment Catalyst water quality
 
 ### 3.1.1 Changing the database structure
 
-Every table and column is listed in one master file, `backend/catalyst/db/schema.yaml`, which separates core tables from data tables (one per dataset; each must have a `catchment_id`). A schema tool compares it with the database and makes whatever changes are needed (`plan` to preview, `apply` to make them). It runs in the same way locally and against Azure. Changes that would delete data are refused unless explicitly allowed. See `README.md`.
+Every table and column is listed in one master file, `backend/catalyst/db/schema.yaml`, which separates core tables from data tables (one per dataset; each must have a `catchment_id`). A schema tool compares it with the database and makes whatever changes are needed (`plan` to preview, `apply` to make them). It runs in the same way locally and on the live server. Changes that would delete data are refused unless explicitly allowed. See `README.md`.
 
 ### 3.2 Data tables (one per thing shown on the dashboard)
 
@@ -93,54 +93,74 @@ A new type of source file means writing one new importer, which should only happ
 
 ## 5. Architecture
 
-The system is packaged as **Docker containers**. The same containers run on a developer's machine and in Azure. Only the connection settings change.
+The system is packaged as **Docker containers** and, for now, runs on a **single Azure virtual machine (VM)** with Docker Compose. The same containers run on a developer's machine: only the settings change. If the platform grows a lot, the same containers can move to separate Azure services without rewriting anything (§5.5).
 
 ```
-                         ┌──────────────────────────────┐
-  Public users  ───────► │ Public dashboard              │  Azure Static Web Apps
-                         │ (one app, a URL per location) │
-                         └──────────────┬───────────────┘
-                                        │ reads published data files
-                                        ▼
-                         ┌──────────────────────────────┐
-                         │ Blob Storage                  │
-                         │  /raw       uploaded files    │
-                         │  /published one data bundle   │
-                         │             per location      │
-                         └──────▲───────────────▲───────┘
-                                │               │ publish step writes bundles
-  Admins (Entra login) ──►  Admin portal ──► Admin API ──► Import jobs (Python,
-                          (Static Web App)  (Container      one importer
-                                             Apps)          per dataset)
-                                                  │
+          ┌──────────────────────── Azure VM (Docker Compose) ─────────────────────────┐
+          │                                                                            │
+ Public   │  Web server ──────────► Public dashboard + published data bundles          │
+ users ──►│  (HTTPS for every        (one bundle per location; never touches the       │
+          │   location's address)     database)                                        │
+          │       │                                                                    │
+ Admins ─►│       └──► Admin portal ──► Admin API ──► Import worker (one importer      │
+(Microsoft│                                 │               │       per dataset)       │
+ login)   │                                 ▼               ▼                          │
+          │                         PostgreSQL + PostGIS (the database)                │
+          └───────────────────────────────────────┬────────────────────────────────────┘
+                                                  │ raw uploaded files, nightly backups
                                                   ▼
-                         ┌──────────────────────────────┐
-                         │ Azure Database for PostgreSQL │
-                         │ (Flexible Server + PostGIS)   │
-                         └──────────────────────────────┘
+                                   Azure Blob Storage (outside the VM)
 ```
 
 ### 5.1 Components
 
-| Component | Azure service | Role |
+| Component | Runs as | Role |
 |---|---|---|
-| **Public dashboard** | Azure Static Web Apps | Serves the website. Custom domain and SSL per location. Reads only published data bundles, so it never touches the database. |
-| **Published data and raw files** | Azure Blob Storage | `/raw`: original uploaded files. `/published`: one data bundle per location, written by the publish step. |
-| **Database** | Azure Database for PostgreSQL – Flexible Server (Burstable B1ms) with PostGIS | The single source of truth. Managed backups and patching. PostGIS handles boundaries and point-in-catchment lookups. |
-| **Admin portal** | Azure Static Web Apps (separate app, or `/admin`) | Upload, preview, approve and publish screens, plus forms for the hand-written text. Login with organisation Microsoft accounts (Entra ID). |
-| **Admin API** | Azure Container Apps (Docker container) | Python API behind the admin portal. Scales to zero when not in use. |
-| **Import jobs** | Azure Container Apps Jobs (Docker container) | Run the importers in the background when a file is uploaded. |
+| **Web server** | Container (e.g. Caddy) | The only part open to the internet. Serves the dashboard and admin portal over HTTPS, with a certificate for each location's address that it gets and renews automatically. |
+| **Public dashboard** | Files served by the web server | One app, a URL per location. Reads only published data bundles, so it never touches the database. |
+| **Published data bundles** | Folder on the VM | One bundle per location, written by the publish step. Can always be rebuilt from the database. |
+| **Admin portal** | Files served by the web server (at `/admin` or its own address) | Upload, preview, approve and publish screens, plus forms for the hand-written text. Login with organisation Microsoft accounts (Entra ID). |
+| **Admin API** | Python container | Behind the admin portal. Checks logins and roles, handles uploads and publishing. |
+| **Import worker** | Python container (same image) | Runs the importers in the background after an upload. |
+| **Database** | PostgreSQL 17 + PostGIS container | The single source of truth. Not reachable from the internet. PostGIS handles boundaries and point-in-catchment lookups. |
+| **Raw files and backups** | Azure Blob Storage | Original uploaded files and nightly database backups, kept off the VM so they survive if it fails. |
 
 ### 5.2 Why this design
 
-- **No VM to maintain.** Patching, backups, SSL and uptime are handled by Azure.
-- **A fast, secure public site.** Public users only read static files: there is no public API and no database exposure.
-- **Low cost.** Roughly £20–40 a month in total, almost all of it the database. *(Estimate: check current Azure pricing.)*
-- **No lock-in.** Everything is a Docker container, so the same Docker Compose setup could run on a single VM as a fallback without rewriting anything.
+- **Simple and cheap.** One machine to run and pay for (around Azure's B2s size: 2 processors, 4 GB memory) plus a little storage. *(Check current Azure pricing.)*
+- **Development matches live.** The same Compose setup, the same images and the same database container run on a developer's machine and on the VM.
+- **A fast, secure public site.** Public users only read static files. Only web traffic reaches the VM, and the database is never exposed.
+- **No lock-in.** Everything is a container configured by settings, so it can move to separate Azure services later (§5.5).
 
-### 5.3 Infrastructure as code
+### 5.3 What we look after ourselves
 
-The Azure setup will be defined in a script (**Bicep** or **Terraform**) rather than set up by hand in the Azure portal. The same script creates the test and live environments, so they stay identical.
+On a VM, some jobs that managed services would do are ours:
+
+| Job | How |
+|---|---|
+| HTTPS certificates | The web server gets and renews them automatically. |
+| Database backups | A nightly backup (`pg_dump`) copied to Blob Storage. Restore it occasionally to check it works. **This must not be skipped:** without it, a failed VM disk means losing the data. |
+| Security updates | Ubuntu's automatic security updates. Container images are updated when deploying. |
+| Firewall | Azure network rules: only web traffic (ports 80 and 443) open to everyone; SSH only from known IP addresses. |
+| Monitoring | Azure alerts by email if the VM stops or its disk is nearly full. |
+
+### 5.4 Setting up the VM
+
+The VM and its network rules are set up once by hand in the Azure portal, following written steps (§6.2 and `README.md`). A setup script (Bicep or Terraform) becomes worthwhile if we add a second VM or move to separate services.
+
+### 5.5 Moving to separate Azure services later
+
+If traffic or the number of locations grows a lot, each container can move to an Azure service:
+
+| Now (on the VM) | Later |
+|---|---|
+| Web server, dashboard and admin portal files | Azure Static Web Apps |
+| Admin API | Azure Container Apps |
+| Import worker | Azure Container Apps Jobs |
+| Database container | Azure Database for PostgreSQL – Flexible Server, with PostGIS (moved by backup and restore) |
+| Blob Storage | Unchanged |
+
+To keep this easy: everything stays in containers, all settings come from environment variables, files go to Blob Storage rather than the VM's disk, and the dashboard only reads published files. (Azure's managed PostgreSQL needs PostGIS added to its allowed extensions list first. The schema tool then installs it, as it already does.)
 
 ---
 
@@ -148,24 +168,40 @@ The Azure setup will be defined in a script (**Bicep** or **Terraform**) rather 
 
 | Environment | Where | Purpose |
 |---|---|---|
-| **Local** | Developer's machine, Docker Compose | Day-to-day development and testing of the full upload → preview → approve → publish → dashboard flow. |
-| **Test** | Azure (small, can be paused) | Check the Azure-only parts: real Entra login, file-upload events, networking, permissions. |
-| **Live** | Azure | The public site and the real admin portal. |
+| **Local** | Developer's machine: Docker Compose with `docker-compose.override.yml` | Day-to-day development and testing of the full upload → preview → approve → publish → dashboard flow. |
+| **Live** | The Azure VM: Docker Compose with `docker-compose.prod.yml` | The public site and the real admin portal. |
+| **Test** *(optional, later)* | A second copy on the same VM, at a test address, with its own database | Trying a change on the server before it goes live, if that's ever needed. |
+
+Local and live use the same Compose setup and images; only settings differ, and the commands are the same in both (see `README.md`, "Development and live settings"). Because they match so closely, a separate Test environment is optional.
 
 ### 6.1 Local setup
 
-One `docker compose up` starts:
+One `docker compose up` starts (built so far: the database, plus the schema tool and tests on demand):
 
-| Container | Stands in for |
+| Container | Role |
 |---|---|
-| Postgres + PostGIS | Azure Database for PostgreSQL |
-| Azurite (Microsoft's official emulator) | Azure Blob Storage |
-| Admin API | Container Apps |
-| Import worker | Container Apps Jobs |
+| Postgres + PostGIS | The database |
+| Azurite (Microsoft's official emulator) | Stands in for Azure Blob Storage |
+| Admin API and import worker | As on the VM |
+| Web server | Serves the dashboard and admin portal |
 
-The public dashboard and admin portal run in dev mode alongside these. Microsoft's **SWA CLI** emulates Static Web Apps routing and provides a fake login screen for testing admin roles.
+**Known differences locally:** a test login instead of real Microsoft accounts, no HTTPS certificates, and Azurite instead of real Blob Storage.
 
-**Known differences locally:** real Entra login, the "file uploaded" event that starts imports (locally the API starts the import directly), and Azure networking and permissions. All of these are checked in the Test environment.
+### 6.2 The live VM
+
+- Ubuntu LTS, around Azure's B2s size (2 processors, 4 GB memory), with enough disk for the database and Docker images. Region: UK South (to be confirmed).
+- A fixed public IP address, with each location's domain name pointed at it.
+- Network rules: ports 80 and 443 open to everyone; SSH only from known IP addresses. The database port is never opened.
+- Automatic security updates switched on.
+- Docker installed, the code cloned from GitHub, and the settings in `.env` (template: `.env.prod.example`). Step-by-step: `README.md`, "Live server".
+
+### 6.3 Deploying changes
+
+1. Test locally (`docker compose run --rm test`).
+2. Push to GitHub.
+3. On the VM: pull the code, rebuild and restart, then check and apply any database changes (`schema plan`, then `schema apply`). The exact commands are in `README.md`.
+
+Later, GitHub can run the tests on every push and do step 3 automatically.
 
 ---
 
@@ -176,7 +212,7 @@ The public dashboard and admin portal run in dev mode alongside these. Microsoft
 3. Add its waterbody IDs.
 4. Upload any location-specific datasets (e.g. FOI responses) and write or upload the per-catchment text.
 5. Publish the location.
-6. Point the new URL at the dashboard (a custom domain on Static Web Apps). This can be done manually.
+6. Point the new address's domain name at the VM and add it to the web server's list of addresses. The web server gets its HTTPS certificate automatically. This can be done manually.
 
 No code changes should be needed unless the new location brings a new kind of source file, which would need a new importer.
 
@@ -252,5 +288,5 @@ Agree the final set of pages and panels (Section 8), including anything to be ad
 3. **Publish step:** generate a data bundle per location, including the calculated values (rankings, counts, percentages).
 4. **Public dashboard:** recreate the five pages, reading from the published bundles.
 5. **Admin portal:** upload, preview, approve, publish and the text-editing forms.
-6. **Azure:** infrastructure script, Test environment, then Live. Migrate North Devon.
+6. **Live server:** set up the Azure VM (§6.2) with HTTPS, backups and monitoring, then deploy. Migrate North Devon.
 7. **Second location:** add a new location end to end to prove that it can be reused.

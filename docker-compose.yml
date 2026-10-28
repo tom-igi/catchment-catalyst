@@ -1,35 +1,28 @@
-# Local development stack.
+# Catchment Catalyst services, shared by every environment.
 #
+# Each environment adds its own settings on top of this file:
+#   your machine      docker-compose.override.yml   loaded automatically
+#   the live server   docker-compose.prod.yml       chosen by COMPOSE_FILE in the server's .env
+#
+# So the commands are the same everywhere:
 #   docker compose up -d                     start the database
 #   docker compose run --rm schema plan      preview database structure changes
 #   docker compose run --rm schema apply     apply them
-#   docker compose run --rm test             run the backend tests
-#
-# In Azure the same backend image runs in Container Apps and the database is
-# Azure Database for PostgreSQL. Only DATABASE_URL changes.
+# See README.md.
 
 name: catchment-catalyst
 
-x-database-url: &database-url postgresql+psycopg://${POSTGRES_USER:-catalyst}:${POSTGRES_PASSWORD:-catalyst}@db:5432/${POSTGRES_DB:-catalyst}
-
 services:
 
-  # Stands in for Azure Database for PostgreSQL (Flexible Server). Keep the
-  # versions in line with what Azure offers.
+  # PostgreSQL with PostGIS (maps and boundaries).
   db:
     image: postgis/postgis:17-3.5
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-catalyst}
-      POSTGRES_USER: ${POSTGRES_USER:-catalyst}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-catalyst}
-    ports:
-      # Only reachable from this machine. Change POSTGRES_PORT in .env if 5434 is taken.
-      - "127.0.0.1:${POSTGRES_PORT:-5434}:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
     # Hide the image's start-up script, which pre-installs PostGIS and some
-    # US-only extras. Azure starts with an empty database and the schema tool
-    # installs PostGIS itself, so local now starts the same way.
+    # US-only extras. A new database then starts empty and the schema tool
+    # installs PostGIS itself, which also works on Azure's managed database
+    # if we move there later.
     tmpfs:
       - /docker-entrypoint-initdb.d
     healthcheck:
@@ -48,31 +41,6 @@ services:
     profiles: ["tools"]
     entrypoint: ["python", "-m", "catalyst.db"]
     command: ["plan"]
-    environment:
-      DATABASE_URL: *database-url
-    volumes:
-      # Use the code and schema.yaml from this folder, so edits don't need a
-      # rebuild. A deployed image has its own copy built in.
-      - ./backend/catalyst:/app/catalyst:ro
-      - ./datamap:/app/datamap  # data map: rebuilt after each apply (see datamap/README.md)
-    depends_on:
-      db:
-        condition: service_healthy
-
-  # Backend tests. Each test run uses its own throwaway database on `db`.
-  test:
-    build:
-      context: ./backend
-      target: dev
-    image: catchment-catalyst-backend-dev
-    profiles: ["tools"]
-    entrypoint: ["python", "-m", "pytest"]
-    environment:
-      DATABASE_URL: *database-url
-    volumes:
-      - ./backend/catalyst:/app/catalyst:ro
-      - ./backend/tests:/app/tests:ro
-      - ./datamap:/app/datamap:ro  # data map
     depends_on:
       db:
         condition: service_healthy

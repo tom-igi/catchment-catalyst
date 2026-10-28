@@ -1,0 +1,39 @@
+# Live server settings (the Azure VM). Never used on your machine.
+#
+# The server's .env (made from .env.prod.example) contains
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
+# so the usual commands use this file, and the development settings in
+# docker-compose.override.yml are never loaded there.
+#
+# Nothing here has a default: if .env is missing a setting, the command stops
+# and says which one.
+#
+# Still to come in this file, when there is a site to serve: the web server
+# (HTTPS for each location's address), nightly backups to Azure storage, the
+# admin API and the import worker.
+
+x-database-url: &database-url postgresql+psycopg://${POSTGRES_USER:?Set POSTGRES_USER in .env}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
+
+# Keep container logs from filling the server's disk.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "5"
+
+services:
+
+  db:
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      # Only reachable from the server itself, never from the internet. To
+      # look at the live database in DBeaver, connect through an SSH tunnel.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    logging: *logging
+
+  schema:
+    environment:
+      DATABASE_URL: *database-url

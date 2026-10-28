@@ -5,13 +5,17 @@ Water quality dashboard platform. See [PLAN.md](PLAN.md) for the overall design.
 ## Layout
 
 ```
-docker-compose.yml          local stack: database + tools
-backend/                    all Python code, built into one Docker image
-  catalyst/db/schema.yaml   ← the database master file: every table and column
-  catalyst/db/schema.py     reads and checks schema.yaml
-  catalyst/db/sync.py       compares schema.yaml with the database and applies changes
+docker-compose.yml           the services, shared by every environment
+docker-compose.override.yml  development settings (used on your machine automatically)
+docker-compose.prod.yml      live server settings
+.env.example                 optional settings for your machine
+.env.prod.example            template for the live server's settings
+backend/                     all Python code, built into one Docker image
+  catalyst/db/schema.yaml    ← the database master file: every table and column
+  catalyst/db/schema.py      reads and checks schema.yaml
+  catalyst/db/sync.py        compares schema.yaml with the database and applies changes
   tests/
-datamap/                    optional data map page: every table in plain English (see datamap/README.md)
+datamap/                     optional data map page: every table in plain English (see datamap/README.md)
 ```
 
 ## Running locally
@@ -21,9 +25,12 @@ Only Docker is needed.
 ```bash
 docker compose up -d                    # start the database (PostgreSQL 17 + PostGIS)
 docker compose run --rm schema plan     # preview changes needed to match schema.yaml
-docker compose run --rm schema apply    # make them (asks before changing anything)
+docker compose run --rm schema apply    # make them (asks first), and rebuild the data map
 docker compose run --rm test            # run the backend tests
 ```
+
+To see the data map, open `datamap/site/index.html` in a browser. From WSL:
+`explorer.exe "$(wslpath -w datamap/site/index.html)"`.
 
 To connect a database client (DBeaver, pgAdmin, etc.): host `localhost`, port `5434`,
 database / user / password `catalyst`. To change these, copy `.env.example` to `.env`.
@@ -49,15 +56,60 @@ Notes:
   script.
 - Only tables in the `public` schema are managed.
 
-## Deployment (Azure)
+## Development and live settings
 
-The same `backend` image runs in Azure. Only `DATABASE_URL` changes:
+The commands are the same on your machine and on the live server. What differs is which
+settings file Docker Compose adds to `docker-compose.yml`:
+
+| | Your machine | Live server |
+|---|---|---|
+| Settings file | `docker-compose.override.yml` (added automatically) | `docker-compose.prod.yml` (chosen by `COMPOSE_FILE` in the server's `.env`) |
+| Passwords | Simple defaults | Must be set in `.env`, or nothing starts |
+| Code | Used straight from this folder, so edits need no rebuild | Built into the image |
+| Database port | Open on this machine for DBeaver | Only reachable from the server itself |
+| Tests and data map | Yes | No |
+
+The differences are only settings, never code: the same images run in both places.
+
+## Live server (Azure VM)
+
+### First-time setup
+
+1. Create the VM (size and security settings: PLAN.md §6.2).
+2. Install Docker, following Docker's instructions for Ubuntu:
+   <https://docs.docker.com/engine/install/ubuntu/>.
+3. Get the code: `git clone https://github.com/tom-igi/catchment-catalyst.git`, then
+   `cd catchment-catalyst`. If the repository is private, give the server a read-only
+   *deploy key* in GitHub first.
+4. Create the settings file: `cp .env.prod.example .env`, then fill in the password
+   (make one with `openssl rand -hex 24`).
+5. Start it and create the tables:
+
+   ```bash
+   docker compose up -d
+   docker compose run --build --rm schema apply
+   ```
+
+### Updating to the latest code
 
 ```bash
-DATABASE_URL="postgresql+psycopg://<user>:<password>@<server>.postgres.database.azure.com:5432/catalyst?sslmode=require" \
-  python -m catalyst.db plan      # or run the image as a Container Apps Job
+git pull
+docker compose up -d --build
+docker compose run --build --rm schema plan     # check what will change in the database
+docker compose run --build --rm schema apply
 ```
 
-Before the first `apply` on Azure Database for PostgreSQL, PostGIS must be on the server's
-allowed extensions list (server parameter `azure.extensions`, add `POSTGIS`). The schema
-tool then installs it, the same way it does locally.
+`--build` matters here: on the server the code is built into the image, so without it the
+schema tool would still be using the old copy of `schema.yaml`.
+
+### Looking at the live database
+
+The database only accepts connections from the server itself. To use DBeaver from your
+machine, open an SSH tunnel (`ssh -L 5435:localhost:5432 <user>@<server>`), then connect to
+`localhost`, port `5435`, with the user and password from the server's `.env`.
+
+### Not set up yet
+
+These get added to `docker-compose.prod.yml` when there's a site to serve: the web server
+with HTTPS for each location's address, nightly database backups to Azure storage, the admin
+API and the import worker. See PLAN.md §5–6.

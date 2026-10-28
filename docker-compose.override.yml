@@ -1,0 +1,49 @@
+# Development settings, for your machine only. Docker Compose adds this file
+# to docker-compose.yml automatically. The live server uses
+# docker-compose.prod.yml instead.
+#
+#   docker compose run --rm test             run the backend tests
+#
+# The local passwords below are defaults for convenience. To change them, copy
+# .env.example to .env.
+
+x-database-url: &database-url postgresql+psycopg://${POSTGRES_USER:-catalyst}:${POSTGRES_PASSWORD:-catalyst}@db:5432/${POSTGRES_DB:-catalyst}
+
+services:
+
+  db:
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-catalyst}
+      POSTGRES_USER: ${POSTGRES_USER:-catalyst}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-catalyst}
+    ports:
+      # For a database client (DBeaver, pgAdmin). Only reachable from this
+      # machine. Change POSTGRES_PORT in .env if 5434 is taken.
+      - "127.0.0.1:${POSTGRES_PORT:-5434}:5432"
+
+  schema:
+    environment:
+      DATABASE_URL: *database-url
+    volumes:
+      # Use the code and schema.yaml from this folder, so edits don't need a
+      # rebuild. On the live server the image's own copy is used.
+      - ./backend/catalyst:/app/catalyst:ro
+      - ./datamap:/app/datamap  # data map: rebuilt after each apply (see datamap/README.md)
+
+  # Backend tests. Each test run uses its own throwaway database on `db`.
+  test:
+    build:
+      context: ./backend
+      target: dev
+    image: catchment-catalyst-backend-dev
+    profiles: ["tools"]
+    entrypoint: ["python", "-m", "pytest"]
+    environment:
+      DATABASE_URL: *database-url
+    volumes:
+      - ./backend/catalyst:/app/catalyst:ro
+      - ./backend/tests:/app/tests:ro
+      - ./datamap:/app/datamap:ro  # data map
+    depends_on:
+      db:
+        condition: service_healthy

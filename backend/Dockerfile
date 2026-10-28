@@ -1,6 +1,6 @@
 # One image for all of the Python backend: the schema tool now, and later the
 # admin API and import worker. Each service chooses its own command, so the
-# same image runs locally (Docker Compose) and in Azure (Container Apps).
+# same image runs on your machine and on the live server.
 
 FROM python:3.12-slim AS base
 

@@ -28,9 +28,9 @@ docker compose run --rm --entrypoint python schema -m datamap
 
 ## Hosting
 
-It isn't published anywhere yet. The plan is to host it later on the dashboard's Azure
-Static Web App at a path that isn't linked from anywhere. The page asks search engines not
-to list it, but anyone who has the link can open it.
+It isn't published anywhere yet. The plan is to host it later on the live server alongside
+the dashboard, at an address that isn't linked from anywhere. The page asks search engines
+not to list it, but anyone who has the link can open it.
 
 ## Files
 
@@ -44,7 +44,8 @@ to list it, but anyone who has the link can open it.
 ## Removing it
 
 1. Delete this `datamap` folder.
-2. Delete the lines that mention `data map` in `docker-compose.yml` (two) and `README.md` (one).
+2. Delete the lines that mention `data map` in `docker-compose.override.yml` (two) and
+   `README.md` (one).
 
 Nothing else needs to change. The schema tool skips the rebuild when this folder isn't there,
 the tests skip it too, and the `title` and `example` lines in `schema.yaml` are harmless if
