@@ -28,6 +28,7 @@ This document describes how we will rebuild the Catchment Catalyst water quality
 | **Store facts, calculate comparisons** | Anything that depends on which catchments are in a location (rankings such as "68/92", status counts, "% of catchment", densities, "increase needed to reach Good") is calculated per location, not stored. |
 | **Years are rows, not columns** | Source files have `2025 / 2022 / 2019` columns. The database stores one row per year so a new year needs no change to the table design. |
 | **Every conversion is code** | Source files are never in the shape we need, but each source's columns stay the same between downloads. So each dataset gets its own **importer** (a small Python module) rather than a general column-mapping screen. |
+| **One source per table** | Each table is filled from a single source: the catchments tables only from the EA, hand-written text only through the admin portal, and so on. Anything entered by hand goes in its own table, linked by catchment ID. A re-import can then replace a table's contents without losing anyone's work. |
 | **Keep the raw files** | Every uploaded file is kept as it was, so data can be re-imported if an importer had a bug and there is a record of what was loaded and when. |
 | **Nothing goes live without review** | Uploads produce a preview first, and changes only appear on the public site after a **publish** step. |
 
@@ -39,7 +40,8 @@ This document describes how we will rebuild the Catchment Catalyst water quality
 
 | Table | Contents | Scope |
 |---|---|---|
-| **catchments** | Catchment ID (EA waterbody ID), name, type (river, lake, estuary…), catchment boundary, river line, management / operational catchment, river basin district, river system, upstream and downstream waterbodies, area, river length | National |
+| **catchments** | Catchment ID (EA waterbody ID), name, type, catchment boundary, river line, management / operational catchment and river basin district (EA names and IDs), hydromorphological designation, area, river length. Filled entirely by the catchments importer (§4.3). | National |
+| **catchment_connections** | Upstream and downstream waterbodies of each catchment, from the EA. Filled by the catchments importer. | National |
 | **locations** | URL name (e.g. `north-devon`), display name, intro text, photo, logo and branding, contact email | One per location |
 | **location_catchments** | Which catchments belong to which location (a catchment can be in more than one location) | One per location |
 | **datasets** | The list of datasets, one row per data table (the tiles on the admin "Choose a table" screen): name, source organisation, date of data, caveats, national or location-specific. Also drives the "i" info buttons. Holds no data itself. | All |
@@ -89,6 +91,15 @@ A new type of source file means writing one new importer, which should only happ
 5. **Approve.** The data goes into the database (it is not yet public).
 6. **Publish** the location. The public dashboard updates.
 
+
+### 4.3 Catchments importer (built)
+
+Fills the `catchments` and `catchment_connections` tables from the EA's Catchment Data Explorer, for a list of catchment IDs in a JSON file (`imports/catchments.json`). For each catchment it downloads:
+
+- the waterbody's **shapefile** from the API: details (name, type, catchment hierarchy names and IDs, hydromorphological designation), catchment boundary and river line, converted from British National Grid to latitude/longitude;
+- the waterbody's **web page**, the only source of its **river length** and **upstream / downstream waterbodies**. If the EA changes the page, the importer stops with a clear error rather than guessing.
+
+The **area** is calculated from the boundary (it matches the EA's figure). The importer checks everything before saving, shows a preview, saves all catchments in one go, and keeps the downloaded files. Running it again updates catchments rather than duplicating them. Only river waterbodies are supported so far. Command: see `imports/README.md`. Later, the admin portal will call the same code.
 ---
 
 ## 5. Architecture
@@ -229,7 +240,7 @@ This list is the starting point for the dataset inventory in Section 9. To be co
 | **Overview** | Intro text, photo, count of waterbodies by ecological status, map of the whole location by ecological status, "Using this dashboard" text, contact email |
 | **River Status** | Why is the river failing?, What is happening now?, Risk levels (Untreated Sewage, Sewage (Private), Livestock, Runoff, Modification, Invasive Species, Overheating, Running Dry), Intervention hypothesis with confidence level, Interventions table (desired change, lead partner, actions, how we'll know; primary / contingency) |
 | **EA Data** | EA scoring table: classification items × years (Latest, 2025, 2022, 2019, 2016) with thresholds (Poor / Moderate / Good / High) and colour coding |
-| **Land Use Data** | River information (area, length, river system, upstream / downstream rivers), Habitat and land use (type, area, % of catchment, relative coverage), Number of farms, Livestock pressures (number, density, density rating), Phosphate source estimate (2025 / 2030 by source), River obstacles (map and table: EA ID, site name, type, origin), Risk levels |
+| **Land Use Data** | River information (area, length, upstream / downstream rivers; the current "river system" isn't EA data, so it isn't imported: if still wanted, it would come from a hand-written table), Habitat and land use (type, area, % of catchment, relative coverage), Number of farms, Livestock pressures (number, density, density rating), Phosphate source estimate (2025 / 2030 by source), River obstacles (map and table: EA ID, site name, type, origin), Risk levels |
 | **Sewerage Data** | SWW intermittent discharges (hours per year by site, 2021–2025), SWW outlet locations map, Properties on SWW / private sewerage, private sewerage per ha, Continuous discharge text, Source of phosphate (continuous / diffuse), SWW asset improvement plans (site, improvements, completion date, predicted spills), Risk levels |
 
 ---
@@ -264,11 +275,12 @@ Agree the final set of pages and panels (Section 8), including anything to be ad
 5. **Hand-written text:** who writes it, and will they use the admin portal?
 6. **Branding per location:** does the Biosphere logo, colours, intro text or contact email change per location?
 7. **Admin users:** who can upload, and can someone be limited to managing only their own location?
-8. **Which waterbodies count:** the current dashboard includes only the 92 river waterbodies, excluding lakes, reservoirs and some coastal waters. Is this the rule for every location?
+8. **Which waterbodies count:** the current dashboard includes only the 92 river waterbodies, excluding lakes, reservoirs and some coastal waters. Is this the rule for every location? *(The EA's North Devon management catchment contains exactly these 92 rivers plus 6 lakes.)*
 9. **Column mapping screen or importers?** The concept deck (slide 3) shows the admin choosing which column in the file goes into which database column, remembered for next time. Section 4.1 instead has a small importer written for each dataset. A mapping screen handles simple files with no developer; some conversions need code (e.g. livestock's `Cattle_Dairy, Sheep, …` columns becoming rows). A likely answer is both: a mapping screen for simple files, importers for the rest. To decide before building the import step.
 
 ### 9.4 Notes from the reference data so far
 
+- **River length:** the current dashboard's figures match neither the EA's (e.g. Langham Lake: dashboard 13.9 km, EA 15.53 km) nor a length calculated from the EA's river line (13.20 km). Decided: use the EA's figure.
 - `DO.csv`, `Fish.csv` and `Phosphate.csv` are keyed by **name**, not ID, and include location-specific ranks. These look like derived files and may come from `EA Data.csv`. To be confirmed when the raw data arrives.
 - `Fish.csv` and `EA Data.csv` include 6 reservoirs that are not in `waterbody_id_name.csv` (98 vs 92 waterbodies).
 - `geojson/` has 93 boundaries for the 92 listed waterbodies. The extra one is `GB30844801` (likely an estuary or coastal water).

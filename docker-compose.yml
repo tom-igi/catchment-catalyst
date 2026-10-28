@@ -8,6 +8,7 @@
 #   docker compose up -d                     start the database
 #   docker compose run --rm schema plan      preview database structure changes
 #   docker compose run --rm schema apply     apply them
+#   docker compose run --rm importer catchments imports/catchments.json
 # See README.md.
 
 name: catchment-catalyst
@@ -41,6 +42,19 @@ services:
     profiles: ["tools"]
     entrypoint: ["python", "-m", "catalyst.db"]
     command: ["plan"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # The importers, which fill the database. Run on demand only (profile "tools").
+  importer:
+    build:
+      context: ./backend
+      target: prod
+    image: catchment-catalyst-backend
+    profiles: ["tools"]
+    entrypoint: ["python", "-m", "catalyst.importers"]
+    command: ["--help"]
     depends_on:
       db:
         condition: service_healthy

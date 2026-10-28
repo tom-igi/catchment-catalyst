@@ -14,7 +14,9 @@ backend/                     all Python code, built into one Docker image
   catalyst/db/schema.yaml    ← the database master file: every table and column
   catalyst/db/schema.py      reads and checks schema.yaml
   catalyst/db/sync.py        compares schema.yaml with the database and applies changes
+  catalyst/importers/        fill the database (one importer per kind of data)
   tests/
+imports/                     lists of what to import, and copies of every download (see imports/README.md)
 datamap/                     optional data map page: every table in plain English (see datamap/README.md)
 ```
 
@@ -55,6 +57,18 @@ Notes:
   column in two). `plan` warns about primary key differences. Moving data needs a one-off
   script.
 - Only tables in the `public` schema are managed.
+
+## Importing data
+
+Each importer fills its own tables. So far there is one, for catchments from the EA:
+
+```bash
+docker compose run --rm importer catchments imports/catchments.json
+```
+
+It downloads and checks everything first, shows what it will add or update, and asks before
+saving. Running it again updates catchments rather than duplicating them. See
+`imports/README.md`.
 
 ## Development and live settings
 
@@ -99,8 +113,11 @@ docker compose run --build --rm schema plan     # check what will change in the 
 docker compose run --build --rm schema apply
 ```
 
+To import data on the server, use the same command as locally, with `--build`:
+`docker compose run --build --rm importer catchments imports/catchments.json`.
+
 `--build` matters here: on the server the code is built into the image, so without it the
-schema tool would still be using the old copy of `schema.yaml`.
+schema tool and importers would still be using the old code (and the old `schema.yaml`).
 
 ### Looking at the live database
 

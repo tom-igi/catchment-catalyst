@@ -76,17 +76,19 @@ tables:
   catchments:
     title: Catchments
     description: >-
-      Every EA Water Framework Directive (WFD) waterbody catchment, loaded
-      nationally. The catchment ID is the key that ties all the data together.
+      Every EA Water Framework Directive (WFD) waterbody catchment. Filled
+      entirely from the EA's Catchment Data Explorer by the catchments
+      importer, so it is never edited by hand: anything written by hand goes
+      in its own table, linked by Catchment ID.
     columns:
       id:
         type: text
         example: GB108050008080
         primary_key: true
-        description: Catchment ID, which is the EA WFD waterbody ID, e.g. GB108050008080
+        description: Catchment ID, which is the EA WFD waterbody ID
       name:
         type: text
-        example: Wooleigh Brook
+        example: West Okement
         required: true
         description: EA name. Names are not unique nationally, so data is always linked by Catchment ID.
       waterbody_type:
@@ -94,35 +96,43 @@ tables:
         example: River
         required: true
         description: River, Lake, Transitional (estuary), Coastal or Groundwater
+      river_basin_district_id:
+        type: integer
+        example: 8
+        description: EA ID of the river basin district
       river_basin_district:
         type: text
         example: South West
         description: EA river basin district the catchment is in
+      management_catchment_id:
+        type: integer
+        example: 3062
+        index: true
+        description: EA ID of the management catchment. Can be used to choose a location's catchments.
       management_catchment:
         type: text
         example: North Devon
-        index: true
-        description: EA management catchment. Can be used to choose a location's catchments.
+        description: EA management catchment name
+      operational_catchment_id:
+        type: integer
+        example: 3468
+        description: EA ID of the operational catchment
       operational_catchment:
         type: text
         example: Torridge
         description: EA operational catchment, a smaller grouping within the management catchment
-      river_system:
-        type: text
-        example: Torridge
-        description: River system shown in the River information panel
       hydromorphological_designation:
         type: text
-        example: Not designated
-        description: Not designated, heavily modified or artificial
+        example: not designated artificial or heavily modified
+        description: Whether the EA designates the waterbody as artificial or heavily modified
       area_ha:
         type: double
-        example: 2240
-        description: Catchment area in hectares
+        example: 3174.75
+        description: Catchment area in hectares, calculated from the boundary (matches the EA's figure)
       river_length_km:
         type: double
-        example: 11.6
-        description: Main river length in kilometres
+        example: 21.13
+        description: River length in kilometres, as shown on the EA's Catchment Data Explorer page
       boundary:
         type: geometry(MultiPolygon, 4326)
         example: "(outline on the map)"
@@ -134,6 +144,42 @@ tables:
         type: geometry(MultiLineString, 4326)
         example: "(line on the map)"
         description: River line(s) as latitude/longitude (WGS84)
+      imported_at:
+        type: timestamptz
+        example: 2026-10-28 09:00
+        required: true
+        default: now()
+        description: When this catchment was last imported from the EA
+
+  catchment_connections:
+    title: Upstream and downstream
+    description: >-
+      Which waterbodies flow into and out of each catchment, from the EA's
+      Catchment Data Explorer. Filled by the catchments importer.
+    columns:
+      catchment_id:
+        type: text
+        example: GB108050008080
+        primary_key: true
+        references: catchments.id
+        on_delete: cascade
+      direction:
+        type: text
+        example: downstream
+        primary_key: true
+        description: >-
+          upstream (the connected waterbody flows into this catchment) or
+          downstream (this catchment flows into it)
+      connected_id:
+        type: text
+        example: GB108050008110
+        primary_key: true
+        description: EA waterbody ID of the connected waterbody. It may not be in the catchments table.
+      connected_name:
+        type: text
+        example: Middle River Okement
+        required: true
+        description: EA name of the connected waterbody
 
   locations:
     title: Locations

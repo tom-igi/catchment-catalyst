@@ -37,3 +37,11 @@ services:
   schema:
     environment:
       DATABASE_URL: *database-url
+
+  importer:
+    environment:
+      DATABASE_URL: *database-url
+    volumes:
+      # The lists of what to import, and where downloads are kept (moving to
+      # Azure storage later).
+      - ./imports:/app/imports

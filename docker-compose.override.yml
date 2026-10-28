@@ -30,6 +30,14 @@ services:
       - ./backend/catalyst:/app/catalyst:ro
       - ./datamap:/app/datamap  # data map: rebuilt after each apply (see datamap/README.md)
 
+  importer:
+    environment:
+      DATABASE_URL: *database-url
+    volumes:
+      - ./backend/catalyst:/app/catalyst:ro
+      # The lists of what to import, and where downloads are kept.
+      - ./imports:/app/imports
+
   # Backend tests. Each test run uses its own throwaway database on `db`.
   test:
     build:
