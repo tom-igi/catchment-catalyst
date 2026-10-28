@@ -1,7 +1,7 @@
 # Catchment Catalyst – Platform Plan
 
-**Status:** High-level plan, agreed in principle. No code written yet.
-**Last updated:** 9 October 2026
+**Status:** High-level plan, agreed in principle. Phase 1 (foundations) in progress: database schema tool and first core tables built.
+**Last updated:** 28 October 2026
 
 This document describes how we will rebuild the Catchment Catalyst water quality dashboard (currently North Devon) as a platform that can be reused for any location in the country. It covers the data model, how data gets in, how the system is hosted, and what needs to happen before development starts.
 
@@ -9,7 +9,7 @@ This document describes how we will rebuild the Catchment Catalyst water quality
 
 ## 1. Goals
 
-1. **Recreate the existing dashboard** (Overview, River Status, EA Data, Land Use Data, Sewerage Data). The reference screenshots are in `Reference/ReferenceImages`.
+1. **Recreate the existing dashboard** (Overview, River Status, EA Data, Land Use Data, Sewerage Data). The reference screenshots are in `Reference/ReferenceImages`. The original concept is in `Catchment Catalyst IGI.pptx`.
 2. **Make it reusable.** A new location should need only:
    - the list of catchment (waterbody) IDs it covers,
    - any data specific to that location (e.g. FOI responses, hand-written text),
@@ -23,7 +23,7 @@ This document describes how we will rebuild the Catchment Catalyst water quality
 
 | Principle | What it means |
 |---|---|
-| **Waterbody ID is the key to everything** | Every row of data is tied to an official EA WFD waterbody ID (e.g. `GB108050008080`), never to a name. Names drift and clash nationally. Name-keyed source files are converted to IDs on import. |
+| **Catchment ID is the key to everything** | Every row of data is tied to a catchment ID, which is the official EA WFD waterbody ID (e.g. `GB108050008080`), never to a name. Names drift and clash nationally. Name-keyed source files are converted to IDs on import. |
 | **One shared set of tables for all locations** | National data is loaded once. Location-specific data goes into the same tables. A location is just a list of waterbody IDs. |
 | **Store facts, calculate comparisons** | Anything that depends on which catchments are in a location (rankings such as "68/92", status counts, "% of catchment", densities, "increase needed to reach Good") is calculated per location, not stored. |
 | **Years are rows, not columns** | Source files have `2025 / 2022 / 2019` columns. The database stores one row per year so a new year needs no change to the table design. |
@@ -39,15 +39,19 @@ This document describes how we will rebuild the Catchment Catalyst water quality
 
 | Table | Contents | Scope |
 |---|---|---|
-| **waterbodies** | ID, name, type (river, lake, estuary…), catchment boundary, river line, management / operational catchment, river basin district, river system, upstream and downstream waterbodies, area, river length | National |
+| **catchments** | Catchment ID (EA waterbody ID), name, type (river, lake, estuary…), catchment boundary, river line, management / operational catchment, river basin district, river system, upstream and downstream waterbodies, area, river length | National |
 | **locations** | URL name (e.g. `north-devon`), display name, intro text, photo, logo and branding, contact email | One per location |
-| **location_waterbodies** | Which waterbodies belong to which location (a waterbody can be in more than one location) | One per location |
-| **datasets** | One row per data source: name, source organisation, date of data, caveats, national or location-specific. Also drives the "i" info buttons. | All |
+| **location_catchments** | Which catchments belong to which location (a catchment can be in more than one location) | One per location |
+| **datasets** | The list of datasets, one row per data table (the tiles on the admin "Choose a table" screen): name, source organisation, date of data, caveats, national or location-specific. Also drives the "i" info buttons. Holds no data itself. | All |
 | **uploads** | Each import run: dataset, raw file, who uploaded it and when, status (preview / approved / rejected), row counts | All |
+
+### 3.1.1 Changing the database structure
+
+Every table and column is listed in one master file, `backend/catalyst/db/schema.yaml`, which separates core tables from data tables (one per dataset; each must have a `catchment_id`). A schema tool compares it with the database and makes whatever changes are needed (`plan` to preview, `apply` to make them). It runs in the same way locally and against Azure. Changes that would delete data are refused unless explicitly allowed. See `README.md`.
 
 ### 3.2 Data tables (one per thing shown on the dashboard)
 
-Each row has a waterbody ID and the upload it came from. There are three kinds:
+Each dataset has its own table, and each row has a catchment ID (and, once uploads are tracked, the upload it came from). Built so far: `ea_scores` and `habitat_land_use`. There are three kinds:
 
 - **One row per waterbody:** e.g. number of farms, properties on SWW or private sewerage, risk levels.
 - **Many rows per waterbody:** e.g. EA classification items per year, habitat types, livestock types, phosphate sources, SWW discharge sites per year, asset improvement plans.
@@ -225,6 +229,7 @@ Agree the final set of pages and panels (Section 8), including anything to be ad
 6. **Branding per location:** does the Biosphere logo, colours, intro text or contact email change per location?
 7. **Admin users:** who can upload, and can someone be limited to managing only their own location?
 8. **Which waterbodies count:** the current dashboard includes only the 92 river waterbodies, excluding lakes, reservoirs and some coastal waters. Is this the rule for every location?
+9. **Column mapping screen or importers?** The concept deck (slide 3) shows the admin choosing which column in the file goes into which database column, remembered for next time. Section 4.1 instead has a small importer written for each dataset. A mapping screen handles simple files with no developer; some conversions need code (e.g. livestock's `Cattle_Dairy, Sheep, …` columns becoming rows). A likely answer is both: a mapping screen for simple files, importers for the rest. To decide before building the import step.
 
 ### 9.4 Notes from the reference data so far
 

@@ -1,0 +1,275 @@
+# =============================================================================
+#  Catchment Catalyst – database schema  (MASTER FILE)
+# =============================================================================
+#
+#  This file lists every table and column in the database. To change the
+#  database, edit this file, then from the project folder run:
+#
+#      docker compose run --rm schema plan      # preview the changes (safe)
+#      docker compose run --rm schema apply     # make the changes
+#
+#  The tool compares this file with the database and works out the changes
+#  itself, so no SQL is needed. Changes are all-or-nothing: if any step fails,
+#  nothing is changed.
+#
+#  Changes that would delete data (removing a table or column, or changing a
+#  column's type) are refused unless you add --allow-data-loss to `apply`.
+#
+#  RENAMING: change the name and add `renamed_from: <old name>` to the table
+#  or column. Without it, a rename is treated as "delete the old one and add
+#  a new empty one". The line is harmless if left in afterwards.
+#
+#  -----------------------------------------------------------------------------
+#  Column options
+#  -----------------------------------------------------------------------------
+#    type          Required. One of:
+#                    text, varchar(N), integer, bigint, smallint,
+#                    numeric, numeric(P,S), double, real, boolean,
+#                    date, timestamptz, jsonb, uuid,
+#                    geometry(<Point | LineString | Polygon | MultiPoint |
+#                             MultiLineString | MultiPolygon>, <SRID>)
+#    description   What the column holds. Saved as a comment in the database.
+#    required      true = must always have a value. Default: false.
+#    primary_key   true = part of the table's primary key (always required).
+#    identity      true = numbered automatically (integer primary keys).
+#    unique        true = no two rows can have the same value.
+#    index         true = add an index for faster lookups. Geometry columns
+#                  get a spatial index.
+#    default       Value used when none is given. Numbers and true/false are
+#                  written as they are. Anything else is SQL, so text needs
+#                  inner quotes:  default: "'draft'"   or   default: now()
+#    references    other_table.column (a link to a row in another table).
+#    on_delete     What happens to this row when the row it references is
+#                  deleted: cascade (delete this row too) | set null |
+#                  restrict. If left out, the delete is refused.
+#    renamed_from  The column's previous name (see RENAMING above).
+#
+#  Table options:  description, columns, indexes, renamed_from
+#    indexes       Indexes over several columns, for example:
+#                    indexes:
+#                      - columns: [location_id, year]
+#                        unique: true
+#
+#  -----------------------------------------------------------------------------
+#  Two kinds of table
+#  -----------------------------------------------------------------------------
+#    tables        Core tables: the catchments, the locations and the list of
+#                  datasets.
+#    data_tables   One table per dataset (EA scores, habitat, livestock, ...).
+#                  Every data table must have a required catchment_id column
+#                  that references catchments.id, so every row belongs to a
+#                  catchment. The catchment ID is the EA WFD waterbody ID.
+# =============================================================================
+
+extensions:
+  - postgis          # spatial types: boundaries, river lines, points
+
+tables:
+
+  # ---------------------------------------------------------------------------
+  #  Core tables
+  # ---------------------------------------------------------------------------
+
+  catchments:
+    description: >-
+      Every EA Water Framework Directive (WFD) waterbody catchment, loaded
+      nationally. The catchment ID is the key that ties all the data together.
+    columns:
+      id:
+        type: text
+        primary_key: true
+        description: Catchment ID, which is the EA WFD waterbody ID, e.g. GB108050008080
+      name:
+        type: text
+        required: true
+        description: EA name. Not unique nationally, so always link on id.
+      waterbody_type:
+        type: text
+        required: true
+        description: River, Lake, Transitional (estuary), Coastal or Groundwater
+      river_basin_district:
+        type: text
+        description: e.g. South West
+      management_catchment:
+        type: text
+        index: true
+        description: e.g. North Devon. Can be used to choose a location's catchments.
+      operational_catchment:
+        type: text
+        description: e.g. Taw Lower
+      river_system:
+        type: text
+        description: River system shown in the River information panel
+      hydromorphological_designation:
+        type: text
+        description: Not designated, heavily modified or artificial
+      area_ha:
+        type: double
+        description: Catchment area in hectares
+      river_length_km:
+        type: double
+        description: Main river length in kilometres
+      boundary:
+        type: geometry(MultiPolygon, 4326)
+        index: true
+        description: >-
+          Catchment boundary as latitude/longitude (WGS84). Converted from
+          British National Grid on import.
+      river_line:
+        type: geometry(MultiLineString, 4326)
+        description: River line(s) as latitude/longitude (WGS84)
+
+  locations:
+    description: >-
+      One row per dashboard location (e.g. North Devon). Each location is
+      published as the same dashboard at its own URL, showing only its own
+      catchments.
+    columns:
+      id:
+        type: integer
+        primary_key: true
+        identity: true
+      slug:
+        type: text
+        required: true
+        unique: true
+        description: URL name, e.g. north-devon
+      display_name:
+        type: text
+        required: true
+        description: e.g. North Devon
+      intro_text:
+        type: text
+        description: Introduction on the Overview page
+      how_to_use_text:
+        type: text
+        description: '"Using this dashboard" text on the Overview page'
+      photo_path:
+        type: text
+        description: Path of the Overview photo in blob storage
+      logo_path:
+        type: text
+        description: Path of the logo in blob storage
+      branding:
+        type: jsonb
+        description: Colours and other branding settings (to be confirmed, PLAN.md 9.3 Q6)
+      contact_email:
+        type: text
+      created_at:
+        type: timestamptz
+        required: true
+        default: now()
+      updated_at:
+        type: timestamptz
+        required: true
+        default: now()
+
+  location_catchments:
+    description: >-
+      The catchments included in each location. A catchment can be in more
+      than one location.
+    columns:
+      location_id:
+        type: integer
+        primary_key: true
+        references: locations.id
+        on_delete: cascade
+      catchment_id:
+        type: text
+        primary_key: true
+        references: catchments.id
+        index: true
+
+  datasets:
+    description: >-
+      The list of datasets: one row for each table in data_tables below (the
+      tiles on the admin "Choose a table" screen). Holds the text for the
+      dashboard's "i" info buttons. The data itself is in the dataset's table.
+    columns:
+      id:
+        type: integer
+        primary_key: true
+        identity: true
+      table_name:
+        type: text
+        required: true
+        unique: true
+        description: The data table this row describes, e.g. ea_scores
+      name:
+        type: text
+        required: true
+        description: Name on the admin tile and info button, e.g. EA Scores
+      description:
+        type: text
+      source_organisation:
+        type: text
+        description: e.g. Environment Agency, South West Water
+      source_url:
+        type: text
+        description: Where the data comes from
+      data_date:
+        type: date
+        description: Date of the data currently loaded
+      caveats:
+        type: text
+        description: Caveats shown on the info button
+      is_national:
+        type: boolean
+        required: true
+        default: false
+        description: true = one national set for all locations; false = loaded per location
+      created_at:
+        type: timestamptz
+        required: true
+        default: now()
+      updated_at:
+        type: timestamptz
+        required: true
+        default: now()
+
+
+data_tables:
+
+  # ---------------------------------------------------------------------------
+  #  One table per dataset. Every row has a catchment_id.
+  # ---------------------------------------------------------------------------
+
+  ea_scores:
+    description: >-
+      EA water quality classification results: one row per catchment,
+      measure and year.
+    columns:
+      catchment_id:
+        type: text
+        primary_key: true
+        references: catchments.id
+      measure:
+        type: text
+        primary_key: true
+        description: e.g. Ecological, Fish, Phosphate
+      year:
+        type: integer
+        primary_key: true
+        description: Classification year, e.g. 2025
+      status:
+        type: text
+        description: High, Good, Moderate, Poor or Bad
+      value:
+        type: double
+        description: Measured value, where there is one, e.g. Fish EQR 0.16 or phosphate 0.013
+
+  habitat_land_use:
+    description: Area of each habitat or land use type in each catchment.
+    columns:
+      catchment_id:
+        type: text
+        primary_key: true
+        references: catchments.id
+      habitat:
+        type: text
+        primary_key: true
+        description: e.g. Farmland, Woodland, Not farmed, Urban
+      area_ha:
+        type: double
+        required: true
+        description: Area in hectares
