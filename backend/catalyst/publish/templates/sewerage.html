@@ -1,0 +1,46 @@
+{% extends "catchment.html" %}
+{% from "macros.html" import heading, empty_table, risk_levels %}
+{% block panels %}
+<div class="grid sewerage">
+  <section class="panel clay intermittent">
+    {{ heading("Intermittent Discharges") }}
+  </section>
+
+  <section class="panel clay discharges">
+    {{ heading("South West Water Intermittent Sewage Discharges (hrs per year)") }}
+    {{ empty_table(["Site Name", "Total"]) }}
+  </section>
+
+  <section class="panel white outlets">
+    {{ heading("SWW Outlet Locations") }}
+    <div class="map-box"></div>
+  </section>
+
+  <section class="panel clay properties">
+    <dl>
+      <dt>Properties on SWW sewerage:</dt><dd></dd>
+      <dt>Properties on Private Sewerage:</dt><dd></dd>
+      <dt>Private sewerage per ha of catchment:</dt><dd></dd>
+    </dl>
+  </section>
+
+  <section class="panel clay continuous">
+    {{ heading("Continuous Discharge") }}
+  </section>
+
+  <section class="panel clay phosphate">
+    {{ heading("Source of Phosphate", info=true) }}
+    {{ empty_table(["Source", "2025 (%)", "2030 (%)"]) }}
+  </section>
+
+  <section class="panel navy risks-panel">
+    {{ heading("Risk Levels", info=true) }}
+    {{ risk_levels(["Untreated Sewage", "Sewage (Private)"]) }}
+  </section>
+
+  <section class="panel clay plans">
+    {{ heading("South West Water Asset Improvement Plans") }}
+    {{ empty_table(["Site Name", "Improvements", "Completion Date", "Predicted no of spills pa"]) }}
+  </section>
+</div>
+{% endblock %}

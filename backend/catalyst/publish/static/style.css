@@ -1,69 +1,278 @@
-/* The dashboard's styles. */
+/* The dashboard's styles, after the original dashboard (Reference/ReferenceImages). */
 
 :root {
-  --bg: #f3f6f7;
-  --card: #ffffff;
-  --text: #1c282d;
-  --muted: #5a6a71;
-  --border: #d9e2e5;
-  --accent: #0d6b77;
-  --accent-soft: #e3f1f3;
-  --shadow: 0 1px 2px rgba(20, 40, 50, .06), 0 2px 8px rgba(20, 40, 50, .05);
+  --page: #ece9a6;         /* pale yellow background, also the current tab */
+  --bar: #4b8587;          /* the teal bars at the top and bottom */
+  --brand: #3c8a8c;        /* "Catchment Catalyst" */
+  --text: #1f1f1f;
+  --yellow: #d8c54d;       /* tabs and text panels */
+  --navy: #2c3e8f;         /* classification and risk panels */
+  --navy-light: #4058bb;   /* EA scoring headings */
+  --dark: #333333;         /* catchment name, ranking and table headings */
+  --green: #8db95d;
+  --green-light: #a8cd87;
+  --purple: #9b70d4;
+  --purple-light: #b192e0;
+  --pink: #d27b80;
+  --pink-light: #e2a0a3;
+  --sky: #8fb1f1;
+  --sky-light: #b2c9f5;
+  --clay: #d58b5c;
+  --clay-light: #e8bb9a;
+
+  /* EA classification statuses. map.js colours the maps with these too. */
+  --status-high: #5b80e3;
+  --status-good: #7cbd4f;
+  --status-supports-good: #7cbd4f;
+  --status-not-high: #7cbd4f;
+  --status-moderate: #f0d13c;
+  --status-poor: #e9993b;
+  --status-bad: #bf2228;
+  --status-fail: #bf2228;
+  --status-none: #d2d2d2;
 }
 * { box-sizing: border-box; }
 body {
+  display: flex; flex-direction: column; min-height: 100vh;
   margin: 0;
-  background: var(--bg);
+  background: var(--page);
   color: var(--text);
-  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font: 15px/1.45 "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+  border-top: 12px solid var(--bar);
 }
-a { color: var(--accent); }
-:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-h1 { margin: 4px 0; font-size: 2rem; line-height: 1.2; }
-h2 { margin: 0 0 10px; font-size: 1.2rem; }
-.lead { margin: 0 0 20px; color: var(--muted); }
-.muted { color: var(--muted); }
-.empty { margin: 0; color: var(--muted); font-style: italic; }
-.crumb { margin: 0; }
+a { color: inherit; }
+:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
 
-/* Page layout */
-.inner { max-width: 1120px; margin: 0 auto; padding-left: 16px; padding-right: 16px; }
-.site-header { background: var(--accent); }
-.site-header .inner { padding-top: 14px; padding-bottom: 14px; }
-.site-name { color: #fff; font-size: 1.1rem; font-weight: 700; text-decoration: none; }
-.site-name span { margin-left: 10px; font-weight: 400; opacity: .8; }
-main.inner { padding-top: 28px; padding-bottom: 40px; }
-.site-footer { padding-bottom: 32px; color: var(--muted); font-size: .85rem; }
-.card {
-  margin-bottom: 20px; padding: 20px 22px;
-  background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
+/* Header: the name, the tabs, and a space for the location's logo */
+.site-header { display: flex; align-items: flex-end; gap: 12px; padding: 16px 16px 0; background: #fff; }
+.brand {
+  flex: 0 0 auto; margin: 0 auto 12px 0;
+  color: var(--brand); font-size: 2.6rem; font-weight: 700; line-height: 1.1; text-decoration: none;
 }
-.columns { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 20px; margin-bottom: 20px; }
-.columns > * { margin: 0; }
-@media (max-width: 760px) { .columns { grid-template-columns: 1fr; } }
+.tabs { display: flex; flex: 0 1 auto; gap: 12px; min-width: 0; }
+.tabs a {
+  display: flex; flex: 0 1 auto; align-items: center; justify-content: center;
+  width: 200px; height: 64px; padding: 0 12px; background: var(--yellow);
+  font-size: 1.35rem; text-align: center; text-decoration: none; white-space: nowrap;
+}
+.tabs a:hover { background: #e3d36a; }
+.tabs a[aria-current="page"] { background: var(--page); }
+.logo { flex: 0 1 210px; }
+main { flex: 1 0 auto; padding: 8px; }
+.site-footer { padding: 8px 16px; background: var(--bar); color: #fff; font-size: .8rem; }
 
-/* Maps (map.js) */
-.map { height: 460px; margin-bottom: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
-.columns .map { height: auto; min-height: 360px; }
-.map-message { padding: 16px; color: var(--muted); }
-.leaflet-container { font: inherit; }
+/* Panels */
+.panel { min-width: 0; padding: 8px 12px 12px; border-radius: 10px; }
+.head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.head h2 { margin: 0; font-size: 1.2rem; font-weight: 700; line-height: 1.25; }
+.yellow { background: var(--yellow); }
+.navy { background: var(--navy); color: #fff; }
+.dark { background: var(--dark); color: #fff; }
+.white { background: #fff; }
+.green { background: var(--green); --row: var(--green-light); }
+.purple { background: var(--purple); --row: var(--purple-light); }
+.pink { background: var(--pink); --row: var(--pink-light); }
+.sky { background: var(--sky); --row: var(--sky-light); }
+.clay { background: var(--clay); --row: var(--clay-light); }
+.grid { display: grid; gap: 8px; }
+.scroll { overflow-x: auto; }
+.map-box { height: 300px; margin-bottom: 10px; border-radius: 6px; background: rgba(255, 255, 255, .35); }
 
-/* Details list */
-dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
-dt { color: var(--muted); }
-dd { margin: 0; }
+/* The "i" buttons, and the box each one opens */
+.info {
+  display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center;
+  width: 28px; height: 28px; margin-left: auto; padding: 0;
+  border: 2.5px solid currentColor; border-radius: 50%; background: none;
+  color: inherit; font: 700 16px/1 Georgia, "Times New Roman", serif;
+}
+button.info { cursor: pointer; }
+span.info { opacity: .4; }
+.info-box {
+  max-width: min(440px, calc(100vw - 32px)); padding: 16px 20px;
+  border: 0; border-radius: 10px; background: #fff; color: var(--text);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .3);
+}
+.info-box::backdrop { background: rgba(0, 0, 0, .2); }
+.info-box h3 { margin: 0 0 8px; }
+.info-box p { margin: 0 0 10px; }
+.info-box dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; }
+.info-box dt { font-weight: 600; }
+.info-box dd { margin: 0; }
 
 /* Tables */
-.scroll { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: .95rem; }
-th, td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
-th { font-weight: 600; white-space: nowrap; }
+th, td { padding: 3px 8px; text-align: left; vertical-align: top; font-weight: 400; }
+thead th { border-bottom: 2px solid rgba(0, 0, 0, .3); vertical-align: bottom; }
+/* :where() keeps this weak, so the status colours win */
+:where(.panel tbody) :is(td, th) { background: var(--row, transparent); border-bottom: 1px solid rgba(255, 255, 255, .45); }
+tfoot th, tfoot td { border-top: 1px solid rgba(0, 0, 0, .3); font-weight: 700; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
-tbody tr:hover { background: var(--accent-soft); }
 
 /* Sortable tables (sort.js): the headings become buttons, with an arrow */
-th button { padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+th button { padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: inherit; cursor: pointer; }
 th button::after { content: "↕"; margin-left: 6px; opacity: .35; }
 th[aria-sort="ascending"] button::after { content: "▲"; opacity: 1; font-size: .8em; }
 th[aria-sort="descending"] button::after { content: "▼"; opacity: 1; font-size: .8em; }
-th button:hover { color: var(--accent); }
+
+/* Statuses: map key, classification boxes and EA scores */
+.status-high { background: var(--status-high); }
+.status-good { background: var(--status-good); }
+.status-supports-good { background: var(--status-supports-good); }
+.status-not-high { background: var(--status-not-high); }
+.status-moderate { background: var(--status-moderate); }
+.status-poor { background: var(--status-poor); }
+.status-bad { background: var(--status-bad); color: #fff; }
+.status-fail { background: var(--status-fail); color: #fff; }
+.status-none { background: var(--status-none); }
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; margin: 0 0 6px; }
+.legend > span { display: inline-flex; align-items: center; gap: 4px; }
+.dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; }
+
+/* Maps (map.js) */
+.map { height: 360px; background: #fff; }
+.map-message { padding: 16px; }
+.leaflet-container { font: inherit; background: #fff; }
+
+/* ---------------------------------------------------------------------------
+   Overview
+   --------------------------------------------------------------------------- */
+.overview {
+  grid-template-columns: minmax(0, 683fr) minmax(0, 298fr) minmax(0, 697fr);
+  grid-template-areas: "intro intro map" "photo counts map" "using using map";
+}
+.intro { grid-area: intro; min-height: 230px; }
+.photo { grid-area: photo; min-height: 300px; border: 2px solid var(--dark); background: rgba(255, 255, 255, .35); }
+.counts { grid-area: counts; border: 2px solid var(--dark); }
+.counts .head h2 { font-weight: 400; }
+.counts tbody tr:nth-child(even) td { background: #ececec; }
+.using { grid-area: using; min-height: 260px; }
+.overview-map { grid-area: map; display: flex; flex-direction: column; }
+.overview-map .head h2 { font-weight: 400; }
+.overview-map .map { flex: 1 1 auto; min-height: 520px; }
+
+/* ---------------------------------------------------------------------------
+   The catchment tabs: the side column and the catchment's name
+   --------------------------------------------------------------------------- */
+.catchment-page { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(0, 3fr); gap: 8px; }
+.side, .main { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.map-panel .head h2 { font-weight: 400; }
+.ranking .head h2 { font-size: 1.9rem; }
+.ranking p { margin: 0; font-size: .9rem; }
+.classification .head { justify-content: center; }
+.years { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; padding: 0; list-style: none; }
+.years li {
+  display: flex; flex-direction: column; align-items: center; min-height: 66px;
+  padding: 8px 4px; border: 1px solid var(--navy); color: var(--text); font-size: 1.15rem;
+}
+.years strong { font-size: 1.2rem; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.small { min-height: 140px; }
+.small .head h2 { font-size: 1.05rem; }
+.title-bar {
+  margin: 0; padding: 8px 16px; border-radius: 10px;
+  background: var(--dark); color: #fff; font-size: 2.6rem; line-height: 1.2; text-align: center;
+}
+.title-bar.none { font-size: 1.6rem; font-weight: 400; line-height: 1.95; }
+
+/* Risk Levels tiles */
+.risks-panel .head { justify-content: center; }
+.risks-panel .head h2 { margin-left: auto; font-size: 1.5rem; font-weight: 400; }
+.risks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.risks li {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 66px; padding: 4px; border-radius: 6px; background: rgba(255, 255, 255, .14); text-align: center;
+}
+.risk-level { min-height: 1.3em; font-size: 1.6rem; line-height: 1.3; }
+
+/* River Status */
+.river-status {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: minmax(370px, auto) minmax(370px, auto);
+  grid-template-areas: "why now risks" "hypothesis interventions interventions";
+}
+.why { grid-area: why; }
+.now { grid-area: now; }
+.river-status .risks-panel { grid-area: risks; }
+.hypothesis { grid-area: hypothesis; }
+.interventions { grid-area: interventions; }
+.interventions thead th { background: var(--dark); color: #fff; border: 0; padding: 6px 8px 22px; }
+.why .head h2, .now .head h2, .hypothesis .head h2 { font-size: 1.05rem; }
+
+/* EA Data */
+.scoring { padding-bottom: 40px; }
+.scoring .head h2 { font-size: 1.35rem; }
+.scoring table { border: 2px solid #fff; }
+.scoring th, .scoring td { border: 1px solid rgba(255, 255, 255, .25); text-align: right; }
+.scoring thead th { background: var(--navy-light); color: #fff; text-align: left; }
+.scoring thead .group { text-align: center; }
+.scoring .item { width: 22%; text-align: left; }
+.scoring tbody th.item { background: var(--navy-light); color: #fff; }
+.scoring tbody td { color: var(--text); white-space: nowrap; }
+.scoring .first-threshold { border-left: 6px solid #fff; }
+
+/* Land Use Data */
+.land-use {
+  grid-template-columns: minmax(0, 2.6fr) minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 2.6fr);
+  grid-template-areas:
+    "info info risks obstacles"
+    "habitat habitat risks obstacles"
+    "farms phosphate phosphate obstacles"
+    "livestock phosphate phosphate obstacles";
+}
+.river-info { grid-area: info; min-height: 220px; }
+.habitat { grid-area: habitat; min-height: 210px; }
+.land-use .risks-panel { grid-area: risks; }
+.land-use .risks { grid-template-columns: 1fr; }
+.obstacles { grid-area: obstacles; }
+.farms { grid-area: farms; }
+.livestock { grid-area: livestock; min-height: 220px; }
+.land-use .phosphate { grid-area: phosphate; }
+.details thead th { background: var(--dark); color: #fff; border: 0; }
+.details tbody th, .details tbody td { border-bottom: 1px solid #d8d8d8; }
+.details tbody th { width: 40%; border-right: 1px solid #d8d8d8; }
+.details tbody td { text-align: right; }
+
+/* Sewerage Data */
+.sewerage {
+  grid-template-columns: minmax(0, 542fr) minmax(0, 320fr) minmax(0, 407fr);
+  grid-template-areas:
+    "intermittent intermittent outlets"
+    "discharges discharges outlets"
+    "discharges discharges properties"
+    "continuous phosphate risks"
+    "plans plans plans";
+}
+.intermittent { grid-area: intermittent; min-height: 70px; }
+.intermittent .head h2, .continuous .head h2 { font-size: 1.05rem; }
+.discharges { grid-area: discharges; min-height: 300px; }
+.outlets { grid-area: outlets; }
+.outlets .map-box { height: 220px; background: #eee; }
+.properties { grid-area: properties; }
+.properties dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 6px; margin: 0; }
+.properties dt { font-weight: 700; }
+.properties dd { margin: 0; }
+.continuous { grid-area: continuous; min-height: 130px; }
+.sewerage .phosphate { grid-area: phosphate; }
+.sewerage .risks-panel { grid-area: risks; }
+.plans { grid-area: plans; min-height: 200px; }
+
+/* ---------------------------------------------------------------------------
+   Narrower screens: one column
+   --------------------------------------------------------------------------- */
+@media (max-width: 1500px) {
+  .brand { font-size: 2.1rem; }
+  .tabs a { height: 54px; font-size: 1.1rem; }
+  .logo { display: none; }
+}
+@media (max-width: 1100px) {
+  .site-header { flex-wrap: wrap; padding: 12px 8px 0; }
+  .brand { width: 100%; margin-bottom: 8px; font-size: 1.8rem; }
+  .tabs { flex: 1 1 100%; gap: 6px; overflow-x: auto; }
+  .tabs a { flex: 1 0 auto; width: auto; height: 46px; font-size: 1rem; }
+  .catchment-page { grid-template-columns: minmax(0, 1fr); }
+  .grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: none; }
+  main .grid > .panel { grid-area: auto; }
+  .why, .now, .hypothesis { min-height: 160px; }
+  .overview-map .map { min-height: 420px; }
+  .title-bar { font-size: 2rem; }
+}

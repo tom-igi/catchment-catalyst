@@ -1,0 +1,55 @@
+{% extends "catchment.html" %}
+{% from "macros.html" import heading %}
+
+{# A classification result: its value if it has one, otherwise its status, coloured by its status. #}
+{% macro score_cell(score) %}
+{% if score %}
+<td class="{{ score.status | status_class }}"{% if score.status and score.value is not none %} title="{{ score.status }}"{% endif %}>{{ score.value | show if score.value is not none else score.status or "" }}</td>
+{% else %}
+<td class="status-none"></td>
+{% endif %}
+{% endmacro %}
+
+{% block panels %}
+{% set scoring = figures.scoring(catchment.id if catchment else "") %}
+<section class="panel navy scoring">
+  {{ heading("Environment Agency Scoring", info=true, dataset=location.dataset("ea_scores")) }}
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col" rowspan="2" class="item">Classification Item</th>
+          <th scope="colgroup" colspan="{{ 1 + scoring.years | length }}" class="group">Classification Year</th>
+          <th scope="colgroup" colspan="4" class="group">Thresholds</th>
+        </tr>
+        <tr>
+          <th scope="col">Latest</th>
+          {% for year in scoring.years %}
+          <th scope="col">{{ year }}</th>
+          {% endfor %}
+          <th scope="col" class="first-threshold">Poor</th>
+          <th scope="col">Moderate</th>
+          <th scope="col">Good</th>
+          <th scope="col">High</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in scoring.rows %}
+        <tr>
+          <th scope="row" class="item">{{ row.measure }}</th>
+          {{ score_cell(row.latest) }}
+          {% for year in scoring.years %}
+          {{ score_cell(row.by_year.get(year)) }}
+          {% endfor %}
+          {# The thresholds have no table yet. #}
+          <td class="status-poor first-threshold"></td>
+          <td class="status-moderate"></td>
+          <td class="status-good"></td>
+          <td class="status-high"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

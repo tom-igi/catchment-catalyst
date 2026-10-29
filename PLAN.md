@@ -140,7 +140,7 @@ password) │                                 ▼               ▼             
 | Component | Runs as | Role |
 |---|---|---|
 | **Web server** | Caddy container | The only part open to the internet. Serves the dashboard and admin portal over HTTPS, with a certificate for each location's address that it gets and renews automatically. Caddy rather than nginx because it does the certificates itself, with a much shorter configuration. *(Not built yet.)* |
-| **Public dashboard** | Plain web pages, written by the publish step and served by the web server | A folder per location, with a URL each. The data is written into the pages, so they never touch the database and make no API calls. No JavaScript framework: the only scripts draw the maps (Leaflet, on an OpenStreetMap background) and sort the tables. *(A first, basic version is built: a map page per location, and a page per catchment with its details and a sortable table for every data table.)* |
+| **Public dashboard** | Plain web pages, written by the publish step and served by the web server | A folder per location, with a URL each. The data is written into the pages, so they never touch the database and make no API calls. No JavaScript framework: the only scripts draw the maps (Leaflet) and sort the tables. *(Built: the five pages of the original, filled in where there's a table (catchment details, EA Scores, Habitat & Land Use) and otherwise empty.)* |
 | **Published data bundles** | Folder on the VM (`published/`) | One folder per location, holding its pages, map outlines and everything else they need, written by the publish step. Can always be rebuilt from the database. |
 | **Admin portal** | Files served by the web server (at `/admin` or its own address) | Upload, preview, approve and publish screens, plus forms for the hand-written text. Each person has their own name and password; only hashes of the passwords are stored, in the server's settings. Microsoft accounts (Entra ID) could replace this if many more people need access. *(Built so far: the login and the Excel download, upload, preview and approve screens, served by the admin API's container.)* |
 | **Admin API** | Python container | Behind the admin portal. Checks logins and roles, handles uploads and publishing. |
@@ -310,7 +310,7 @@ Agree the final set of pages and panels (Section 8), including anything to be ad
 1. **Foundations:** database design, Docker Compose local setup, waterbody boundaries loaded.
 2. **Importers:** one per dataset, with validation and preview, tested against the real raw files.
 3. **Publish step:** generate a data bundle per location, including the calculated values (rankings, counts, percentages). *(Started: `backend/catalyst/publish/`. No calculated values yet.)*
-4. **Public dashboard:** recreate the five pages, reading from the published bundles. *(Started: a basic map and tables, not yet the real pages.)*
+4. **Public dashboard:** recreate the five pages, reading from the published bundles. *(Started: the five pages are laid out, filled in where there is a table.)*
 5. **Admin portal:** upload, preview, approve, publish and the text-editing forms.
 6. **Live server:** set up the Azure VM (§6.2) with HTTPS, backups and monitoring, then deploy. Migrate North Devon.
 7. **Second location:** add a new location end to end to prove that it can be reused.

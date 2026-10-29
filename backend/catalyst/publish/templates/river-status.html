@@ -1,0 +1,26 @@
+{% extends "catchment.html" %}
+{% from "macros.html" import heading, empty_table, risk_levels %}
+{% block panels %}
+<div class="grid river-status">
+  <section class="panel yellow why">
+    {{ heading("Why is the river failing?") }}
+  </section>
+
+  <section class="panel yellow now">
+    {{ heading("What is happening now?") }}
+  </section>
+
+  <section class="panel navy risks-panel">
+    {{ heading("Risk Levels", info=true) }}
+    {{ risk_levels(["Untreated Sewage", "Modification", "Sewage (Private)", "Invasive Species", "Livestock", "Overheating", "Runoff", "Running Dry"]) }}
+  </section>
+
+  <section class="panel yellow hypothesis">
+    {{ heading("Intervention hypothesis") }}
+  </section>
+
+  <section class="panel white interventions">
+    {{ empty_table(["Desired change", "Lead partner", "Actions", "How we'll know"]) }}
+  </section>
+</div>
+{% endblock %}

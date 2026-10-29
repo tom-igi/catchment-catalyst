@@ -1,27 +1,77 @@
 {# Pieces shared by the pages. #}
 
-{# A sortable table of a dataset's rows (sort.js does the sorting). #}
-{% macro data_table(columns, rows) %}
+{# A panel's heading. Panels that have an "i" button in the original get one:
+   it shows the dataset's row in the datasets table, and is greyed out until
+   there is one. #}
+{% macro heading(text, info=false, dataset=none) %}
+<div class="head">
+  <h2>{{ text }}</h2>
+  {% if dataset and dataset.info %}
+  {% set about = dataset.info %}
+  <button type="button" class="info" popovertarget="info-{{ dataset.table }}" aria-label="About the {{ dataset.title }} data">i</button>
+  <div id="info-{{ dataset.table }}" class="info-box" popover>
+    <h3>{{ about.name }}</h3>
+    {% if about.description %}<p>{{ about.description }}</p>{% endif %}
+    <dl>
+      {% if about.source_organisation or about.source_url %}
+      <dt>Source</dt>
+      <dd>{% if about.source_url %}<a href="{{ about.source_url }}">{{ about.source_organisation or about.source_url }}</a>{% else %}{{ about.source_organisation }}{% endif %}</dd>
+      {% endif %}
+      {% if about.data_date %}
+      <dt>Data from</dt>
+      <dd>{{ about.data_date | show }}</dd>
+      {% endif %}
+      {% if about.caveats %}
+      <dt>Caveats</dt>
+      <dd>{{ about.caveats }}</dd>
+      {% endif %}
+    </dl>
+  </div>
+  {% elif info %}
+  <span class="info" aria-hidden="true">i</span>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{# A table with only its headings, for a panel whose data has no table yet. #}
+{% macro empty_table(headings) %}
 <div class="scroll">
-  <table class="sortable">
+  <table>
     <thead>
       <tr>
-        {% for column in columns %}
-        <th scope="col" data-type="{{ column.kind }}"{% if column.kind == "number" %} class="num"{% endif %}>{{ column.label }}</th>
+        {% for text in headings %}
+        <th scope="col">{{ text }}</th>
         {% endfor %}
       </tr>
     </thead>
-    <tbody>
-      {% for row in rows %}
-      <tr>
-        {% for column in columns %}
-        <td data-sort="{{ row[column.name] | sort_value }}"{% if column.kind == "number" %} class="num"{% endif %}>{{ row[column.name] | show }}</td>
-        {% endfor %}
-      </tr>
-      {% endfor %}
-    </tbody>
+    <tbody></tbody>
   </table>
 </div>
+{% endmacro %}
+
+{# The "Risk Levels" tiles. The levels themselves have no table yet. #}
+{% macro risk_levels(names) %}
+<ul class="risks">
+  {% for name in names %}
+  <li><span class="risk-name">{{ name }}</span><span class="risk-level"></span></li>
+  {% endfor %}
+</ul>
+{% endmacro %}
+
+{# The key to the maps' colours. #}
+{% macro legend(figures) %}
+<p class="legend">
+  <strong>Eco Class</strong>
+  {% for status in figures.statuses() %}
+  <span><span class="dot {{ status | status_class }}"></span>{{ status }}</span>
+  {% endfor %}
+</p>
+{% endmacro %}
+
+{# The map of the location's catchments, coloured by ecological status (map.js). #}
+{% macro status_map(location, root, links, selected) %}
+<div id="map" class="map" data-geojson="{{ root }}catchments.geojson" data-links="{{ links }}" data-selected="{{ selected }}"
+     role="img" aria-label="Map of the catchments in {{ location.name }}, coloured by ecological status"></div>
 {% endmacro %}
 
 {# Links to other catchments: a link if it's in this location, otherwise its name. #}

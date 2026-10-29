@@ -9,10 +9,13 @@ For the overall design, see [PLAN.md](PLAN.md). For commands, see [README.md](RE
 
 ## Picking up again
 
+**Just running it?** [OPERATING.md](OPERATING.md) has only the essential commands (written for
+Tom to run things himself, 29 October 2026).
+
 ```bash
 docker compose up -d                      # start the local database, admin page and dashboard preview
 docker compose run --rm schema plan       # should say "The database already matches schema.yaml."
-docker compose run --rm test              # run the tests (82 passing at the last update)
+docker compose run --rm test              # run the tests (89 passing at the last update)
 docker compose run --rm publish           # rebuild the dashboard pages from the database
 explorer.exe "$(wslpath -w datamap/site/index.html)"   # open the data map
 ```
@@ -37,7 +40,7 @@ and optional extras are kept self-contained so they're easy to remove.
 | **Catchments importer** | `backend/catalyst/importers/api/`, `imports/` | Fills the catchments table from the EA's Catchment Data Explorer for the IDs in `imports/catchments.json`. Preview first, safe to re-run, keeps the downloaded files. |
 | **Excel uploads** | `backend/catalyst/importers/excel/` | For every table marked `filled_by: excel`: download it as Excel, upload an edited copy, see what will be added, changed and deleted, then approve. No code per table. |
 | **Admin page** | `backend/catalyst/admin/` | The web page for the Excel uploads, with a login (one name and password per person). Runs with `docker compose up -d`. |
-| **Publish step and basic dashboard** | `backend/catalyst/publish/`, `published/` | Writes each location's dashboard as plain web pages: a map of its catchments, and a page per catchment with its details and a sortable table for every data table. Previewed at <http://localhost:8080>. |
+| **Publish step and dashboard** | `backend/catalyst/publish/`, `published/` | Writes each location's dashboard as plain web pages, laid out like the original (`Reference/ReferenceImages`): Overview, River Status, EA Data, Land Use Data and Sewerage Data. Panels with a table are filled in (catchment details, EA Scores, Habitat & Land Use); the rest are empty until their table exists. Previewed at <http://localhost:8080>. |
 | **Data map** | `datamap/` | A plain-English web page of every table, rebuilt on every `schema apply`. Self-contained: deleting the folder removes it (see `datamap/README.md`). |
 | **Dev and live setup** | `docker-compose*.yml`, `.env*.example` | The same commands on your machine and on the live server. Only the settings differ. |
 | **Tests** | `backend/tests/`, `datamap/test_datamap.py` | Cover the schema tool, the importer, the Excel uploads, the admin page, the publish step and the data map. |
@@ -96,9 +99,13 @@ show on the dashboard. They were uploaded through the admin page on 29 October 2
 **The dashboard**
 - **Plain web pages, not a JavaScript app.** The dashboard only shows data (tables and a simple map), so the publish step writes the data straight into the pages, as the data map does. There are no API calls and no build step. React and TypeScript were considered: they'd only pay off for a much more interactive dashboard.
 - **The publish step has two halves:** `collect.py` gathers a location's data and knows nothing about web pages; `site.py` and the templates turn it into pages. A different front end could reuse the first half.
-- **Every data table shows up automatically** on each catchment page, as a table of its columns. Datasets that need their own layout (charts, colours) can get one later.
+- **The pages copy the original dashboard's five tabs and colours** (29 October 2026). The Overview is the location's page; each other tab has a page per catchment (`<tab>/<catchment ID>/`) and one before a catchment is chosen (`<tab>/`). Clicking the map stays on the same tab, as in the original.
+- **Panels with no table yet are shown empty,** with their headings (and table headings) only. That includes the location's text, photo and logo, ranking, failing elements, RNAGs, risk levels, thresholds and everything on Sewerage Data.
+- **Nothing is worked out without an agreed rule.** Failing elements, ranking and "Relative Coverage" could be calculated, but the rules aren't agreed (PLAN.md §9.3), so they're empty. What is calculated is in `figures.py`: each catchment's latest ecological status (for the map colours and the Overview counts), the EA scoring grid, and each habitat's % of the catchment.
+- **A new data table no longer appears by itself:** it needs a place on a page. The original layout has no space for a generic table.
+- **The "i" buttons show the table's row in `datasets`,** and are greyed out until it has one.
 - **Tables are sortable** by clicking a heading (a small script, `static/sort.js`). Numbers sort as numbers, and empty cells always go last.
-- **Maps: Leaflet over OpenStreetMap,** with the catchment outlines and rivers simplified for the web. Leaflet is copied into the project rather than loaded from elsewhere.
+- **Maps: Leaflet with no background map,** as in the original, with the catchment outlines coloured by ecological status (the colours are in `style.css`). Leaflet is copied into the project rather than loaded from elsewhere.
 - **One self-contained folder per location** (`published/north-devon/`), so each can later be served at its own address. Each folder is built alongside the old one and swapped in, so a half-written dashboard is never served.
 - **A location's web address comes from its name** (North Devon → `north-devon`), for now.
 
@@ -128,7 +135,7 @@ show on the dashboard. They were uploaded through the admin page on 29 October 2
 
 1. **Try the admin page with real data.** Download EA Scores or Habitat & Land Use, paste in real rows, upload, approve, then `docker compose run --rm publish`. Only the 2 imported catchments can have rows until step 2 is done.
 2. **Import all 92 North Devon rivers,** and add them to the North Devon location. Let `imports/catchments.json` accept a management catchment (North Devon is `3062`) as well as single IDs. The EA provides the whole management catchment as one download.
-3. **The next datasets.** Each needs a table in the master file. Simple ones can be `filled_by: excel` with no code; fiddly raw files (PLAN.md §9.1) may still need an importer.
+3. **The next datasets.** Each needs a table in the master file, and filling in its empty panel on the dashboard. Simple ones can be `filled_by: excel` with no code; fiddly raw files (PLAN.md §9.1) may still need an importer.
 4. **Have GitHub run the tests on every push** (offered, not yet agreed).
 
 ---
@@ -143,4 +150,4 @@ show on the dashboard. They were uploaded through the admin page on 29 October 2
 - **On the live server, every `docker compose` command needs `ADMIN_USERS` and `ADMIN_SECRET_KEY` in `.env`,** even commands that don't use the admin page. Make the `ADMIN_USERS` entries on your own machine.
 - **The admin page's port is 8000, and the dashboard preview's is 8080** (change `ADMIN_PORT` or `WEB_PORT` in `.env` if either is taken).
 - **The dashboard doesn't update by itself:** after approving an upload, run `docker compose run --rm publish`.
-- **OpenStreetMap's map images are free for light use only** (their tile usage policy). Fine for now; a busy public site may need a paid map provider, which is a one-line change in `static/map.js`.
+- **The status maps have no background map,** as in the original. The River Obstacles and SWW Outlet maps will need one (e.g. OpenStreetMap, whose map images are free for light use only).

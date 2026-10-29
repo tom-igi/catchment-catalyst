@@ -1,12 +1,17 @@
 """Write a location's dashboard as plain web pages, from the data collect.py gathered.
 
+The pages follow the tabs of the original dashboard (Reference/ReferenceImages).
 Each location gets its own folder, which has everything its pages need, so it
 can be served at its own address:
 
-    <location>/index.html                the location: a map and list of its catchments
-    <location>/<catchment ID>/index.html  a catchment: its details and a table per dataset
-    <location>/catchments.geojson         the outlines and rivers, for the maps
-    <location>/assets/                    styles, scripts and the map library
+    <location>/index.html                      the Overview tab
+    <location>/<tab>/index.html                another tab, before a catchment is chosen
+    <location>/<tab>/<catchment ID>/index.html  that tab for one catchment
+    <location>/catchments.geojson               the outlines, rivers and ecological statuses, for the maps
+    <location>/assets/                          styles, scripts and the map library
+
+where <tab> is river-status, ea-data, land-use or sewerage. Clicking the map
+picks a catchment and stays on the same tab, as in the original.
 
 The folder is built next to the old one and swapped in at the end, so a
 half-written dashboard is never served.
@@ -23,9 +28,17 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
 from .collect import Location
+from .figures import Figures
 
 HERE = Path(__file__).parent
 ASSETS = HERE / "static"
+# Folder name -> the tab's name. Each has a template of the same name.
+TABS = {
+    "river-status": "River Status",
+    "ea-data": "EA Data",
+    "land-use": "Land Use Data",
+    "sewerage": "Sewerage Data",
+}
 
 
 def write_location(location: Location, out_dir: Path) -> Path:
@@ -36,17 +49,21 @@ def write_location(location: Location, out_dir: Path) -> Path:
     for leftover in (building, old):
         shutil.rmtree(leftover, ignore_errors=True)
 
+    figures = Figures(location)
     shutil.copytree(ASSETS, building / "assets")
-    (building / "catchments.geojson").write_text(json.dumps(location.map, separators=(",", ":")), encoding="utf-8")
+    (building / "catchments.geojson").write_text(json.dumps(_map(location, figures), separators=(",", ":")), encoding="utf-8")
     env = _environment()
-    published = _today()
-    _write(building / "index.html", env.get_template("location.html").render(
-        location=location, root="", published=published,
+    shared = {"location": location, "figures": figures, "tabs": TABS, "published": _today()}
+    _write(building / "index.html", env.get_template("overview.html").render(
+        **shared, tab="", catchment=None, root="",
     ))
-    for catchment in location.catchments:
-        _write(building / catchment["id"] / "index.html", env.get_template("catchment.html").render(
-            location=location, catchment=catchment, root="../", published=published,
-        ))
+    for tab in TABS:
+        template = env.get_template(f"{tab}.html")
+        _write(building / tab / "index.html", template.render(**shared, tab=tab, catchment=None, root="../"))
+        for catchment in location.catchments:
+            _write(building / tab / catchment["id"] / "index.html", template.render(
+                **shared, tab=tab, catchment=catchment, root="../../",
+            ))
 
     if final.exists():
         final.rename(old)
@@ -62,6 +79,15 @@ def write_index(names: list[str], slugs: list[str], out_dir: Path) -> Path:
     return path
 
 
+def _map(location: Location, figures: Figures) -> dict:
+    """The location's map, with each catchment's ecological status for colouring it."""
+    features = [
+        {**f, "properties": {**f["properties"], "status": figures.status(f["properties"]["id"])}}
+        for f in location.map["features"]
+    ]
+    return {**location.map, "features": features}
+
+
 def _write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
@@ -75,7 +101,7 @@ def _environment() -> Environment:
         trim_blocks=True,
         lstrip_blocks=True,
     )
-    env.filters.update(show=_show, sort_value=_sort_value, number=_number)
+    env.filters.update(show=_show, sort_value=_sort_value, number=_number, status_class=_status_class)
     return env
 
 
@@ -112,6 +138,11 @@ def _number(value: float | int | None, decimals: int | None = None) -> str:
         return f"{value:,.{decimals}f}"
     text = repr(value)
     return text[:-2] if text.endswith(".0") else text
+
+
+def _status_class(status: str | None) -> str:
+    """The CSS class that colours a status, e.g. 'Supports Good' -> 'status-supports-good'."""
+    return "status-" + "-".join(status.lower().split()) if status else "status-none"
 
 
 def _today() -> str:

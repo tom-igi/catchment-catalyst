@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "macros.html" import heading, legend, status_map %}
+{% block title %}{{ location.name }} · Catchment Catalyst{% endblock %}
+{% block content %}
+{% set year = " (%s)" % figures.years[0] if figures.years else "" %}
+<div class="grid overview">
+  <section class="panel yellow intro">
+    {{ heading("Understanding Water Quality in the %s Catchment" % location.name) }}
+  </section>
+
+  <div class="panel photo" aria-hidden="true"></div>
+
+  <section class="panel white counts">
+    {{ heading("Ecological status of %s Catchment rivers%s" % (location.name, year)) }}
+    {% set counts = figures.status_counts() %}
+    <table class="sortable">
+      <thead>
+        <tr>
+          <th scope="col" data-type="text">Ecological Status</th>
+          <th scope="col" data-type="number" class="num">Count</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for status, count in counts %}
+        <tr>
+          <td>{{ status }}</td>
+          <td class="num">{{ count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% if counts %}
+      <tfoot>
+        <tr>
+          <th scope="row">Total</th>
+          <td class="num">{{ counts | sum(attribute=1) }}</td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </section>
+
+  <section class="panel yellow using">
+    {{ heading("Using this Dashboard") }}
+  </section>
+
+  <section class="panel white overview-map">
+    {{ heading("Ecological Status of %s Rivers%s" % (location.name, year)) }}
+    {{ legend(figures) }}
+    {{ status_map(location, root, "river-status/", "") }}
+  </section>
+</div>
+{% endblock %}

@@ -9,15 +9,20 @@
 </head>
 <body>
 <header class="site-header">
-  <div class="inner">
-    <a class="site-name" href="{{ root or './' }}">{{ location.name }}<span>Catchment Catalyst</span></a>
-  </div>
+  <a class="brand" href="{{ root or './' }}">Catchment Catalyst</a>
+  <nav class="tabs" aria-label="Dashboard pages">
+    <a href="{{ root or './' }}"{% if not tab %} aria-current="page"{% endif %}>Overview</a>
+    {% for folder, name in tabs.items() %}
+    <a href="{{ root }}{{ folder }}/{% if catchment %}{{ catchment.id }}/{% endif %}"{% if tab == folder %} aria-current="page"{% endif %}>{{ name }}</a>
+    {% endfor %}
+  </nav>
+  <div class="logo"></div>
 </header>
-<main class="inner">
+<main>
 {% block content %}{% endblock %}
 </main>
-<footer class="inner site-footer">
-  Published {{ published }}. Catchment details and outlines contain Environment Agency information
+<footer class="site-footer">
+  {{ location.name }}. Published {{ published }}. Catchment details and outlines contain Environment Agency information
   © Environment Agency and database right.
 </footer>
 <script src="{{ root }}assets/leaflet/leaflet.js"></script>

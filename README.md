@@ -3,6 +3,9 @@
 Water quality dashboard platform. See [PLAN.md](PLAN.md) for the overall design, and
 [PROGRESS.md](PROGRESS.md) for where the build is up to.
 
+**Just want to run it?** [OPERATING.md](OPERATING.md) has only the essential commands. This
+file has the details.
+
 ## Layout
 
 ```
@@ -130,17 +133,24 @@ publish again:
 docker compose run --rm publish     # write every location's pages into published/
 ```
 
-On your machine, see them at <http://localhost:8080>. Each location gets a folder (e.g.
-`published/north-devon/`) with:
+On your machine, see them at <http://localhost:8080>. The pages copy the original dashboard
+(`Reference/ReferenceImages`): the same five tabs, Overview, River Status, EA Data, Land Use
+Data and Sewerage Data. Each location gets a folder (e.g. `published/north-devon/`) with:
 
-- a page with a map and a list of its catchments;
-- a page for each catchment: a map, its details, and a table for every data table. A new data
-  table appears here with no code to write. Every table can be sorted by clicking a column
-  heading.
+- `index.html`: the Overview, with a map of the catchments coloured by ecological status;
+- `<tab>/<catchment ID>/`: each of the other tabs, for each catchment. Clicking the map picks
+  another catchment and stays on the same tab;
+- `<tab>/`: each tab before a catchment is chosen.
 
-The pages' layouts are in `backend/catalyst/publish/templates/`, and their styles and scripts
-in `backend/catalyst/publish/static/`. The maps use Leaflet (copied into `static/leaflet/`)
-over OpenStreetMap's map images, which are the only thing the pages load from elsewhere.
+Panels whose data has a table are filled in (the catchment details, EA Scores, Habitat & Land
+Use, and the "i" buttons from the `datasets` table). The others are shown empty until their
+table is added. Each new data table now needs a place on a page, in
+`backend/catalyst/publish/templates/` (calculations such as percentages go in
+`backend/catalyst/publish/figures.py`).
+
+The styles and scripts are in `backend/catalyst/publish/static/`. The maps use Leaflet (copied
+into `static/leaflet/`) with no background map, as in the original, so the pages load nothing
+from elsewhere.
 
 ### Locations
 

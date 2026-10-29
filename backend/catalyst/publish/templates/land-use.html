@@ -1,0 +1,71 @@
+{% extends "catchment.html" %}
+{% from "macros.html" import heading, empty_table, risk_levels, catchment_links %}
+{% block panels %}
+<div class="grid land-use">
+  <section class="panel white river-info">
+    <table class="details">
+      <thead>
+        <tr><th scope="col">River Information</th><th></th></tr>
+      </thead>
+      <tbody>
+        <tr><th scope="row">Catchment ID</th><td>{{ catchment.id if catchment else "" }}</td></tr>
+        <tr><th scope="row">Catchment Area (ha)</th><td>{{ catchment.area_ha | number(1) if catchment else "" }}</td></tr>
+        <tr><th scope="row">River Length (km)</th><td>{{ catchment.river_length_km | number(2) if catchment else "" }}</td></tr>
+        <tr><th scope="row">Upstream Rivers</th><td>{% if catchment %}{{ catchment_links(catchment.upstream_ids, location, root ~ tab ~ "/") }}{% endif %}</td></tr>
+        <tr><th scope="row">Downstream Rivers</th><td>{% if catchment %}{{ catchment_links(catchment.downstream_ids, location, root ~ tab ~ "/") }}{% endif %}</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="panel green habitat">
+    {{ heading("Habitat and Land Usage", info=true, dataset=location.dataset("habitat_land_use")) }}
+    <div class="scroll">
+      <table class="sortable">
+        <thead>
+          <tr>
+            <th scope="col" data-type="text">Habitat Type</th>
+            <th scope="col" data-type="number" class="num">Area (ha)</th>
+            <th scope="col" data-type="number" class="num">% of Catchment</th>
+            <th scope="col" data-type="text">Relative Coverage</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in (figures.habitat(catchment) if catchment else []) %}
+          <tr>
+            <td>{{ row.habitat }}</td>
+            <td class="num" data-sort="{{ row.area_ha | sort_value }}">{{ row.area_ha | number(0) }}</td>
+            <td class="num" data-sort="{{ row.share | sort_value }}">{% if row.share is not none %}{{ row.share | number(1) }}%{% endif %}</td>
+            <td>{# Relative coverage: no rule for it yet #}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel navy risks-panel">
+    {{ heading("Risk Levels", info=true) }}
+    {{ risk_levels(["Modification", "Invasive Species", "Runoff", "Livestock", "Overheating", "Running Dry"]) }}
+  </section>
+
+  <section class="panel sky obstacles">
+    {{ heading("River Obstacles") }}
+    <div class="map-box"></div>
+    {{ empty_table(["EA ID", "Site name", "Obstacle type", "Origin"]) }}
+  </section>
+
+  <section class="panel purple farms">
+    {{ heading("Number of Farms:") }}
+  </section>
+
+  <section class="panel purple livestock">
+    {{ heading("Livestock Pressures", info=true) }}
+    {{ empty_table(["Livestock", "Number", "Density per SqKm (100ha)", "Density Rating"]) }}
+  </section>
+
+  <section class="panel pink phosphate">
+    {{ heading("Phosphate source (estimated)", info=true) }}
+    {{ empty_table(["Source", "2025 (%)", "2030 (%)"]) }}
+  </section>
+</div>
+{% endblock %}

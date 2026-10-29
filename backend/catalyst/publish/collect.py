@@ -4,8 +4,8 @@ This half of the publish step knows nothing about web pages: it returns plain
 data (a Location), which site.py turns into pages. A different kind of
 dashboard could use the same data.
 
-Every data table is collected the same way, so a new table appears on the
-dashboard with no code to write.
+Every data table is collected the same way, so a new table's data is ready
+for the pages with no code to write here.
 """
 
 from __future__ import annotations
@@ -46,6 +46,7 @@ class Dataset:
     description: str | None
     columns: list[Column]  # every column except catchment_id
     rows: dict[str, list[dict[str, Any]]]  # catchment ID -> its rows
+    info: dict[str, Any] | None  # its row in the datasets table (source, caveats), for the "i" buttons
 
     def rows_for(self, catchment_id: str) -> list[dict[str, Any]]:
         return self.rows.get(catchment_id, [])
@@ -62,6 +63,10 @@ class Location:
 
     def catchment_ids(self) -> set[str]:
         return {c["id"] for c in self.catchments}
+
+    def dataset(self, table: str) -> Dataset | None:
+        """The data table's dataset, or None if there's no such table (yet)."""
+        return next((d for d in self.datasets if d.table == table), None)
 
 
 def slug(name: str) -> str:
@@ -92,12 +97,13 @@ def collect(conn: sa.Connection, schema: Schema, location: sa.Row) -> Location:
             "Import them first, or take them off the location."
         )
     linked = {i for c in catchments for i in (c["upstream_ids"] or []) + (c["downstream_ids"] or [])}
+    info = _info(conn, schema)
     return Location(
         name=location.name,
         slug=slug(location.name),
         catchments=catchments,
         names=_names(conn, schema, set(ids) | linked),
-        datasets=[_dataset(conn, schema.metadata.tables[name], ids) for name in schema.data_tables],
+        datasets=[_dataset(conn, schema.metadata.tables[name], ids, info.get(name)) for name in schema.data_tables],
         map=_map(conn, schema, ids),
     )
 
@@ -114,7 +120,13 @@ def _names(conn: sa.Connection, schema: Schema, ids: set[str]) -> dict[str, str]
     return dict(conn.execute(sa.select(table.c.id, table.c.name).where(table.c.id.in_(ids))).all())
 
 
-def _dataset(conn: sa.Connection, table: sa.Table, ids: list[str]) -> Dataset:
+def _info(conn: sa.Connection, schema: Schema) -> dict[str, dict[str, Any]]:
+    """Each data table's row in the datasets table, by table name."""
+    table = schema.metadata.tables["datasets"]
+    return {row["table_name"]: dict(row) for row in conn.execute(sa.select(table)).mappings()}
+
+
+def _dataset(conn: sa.Connection, table: sa.Table, ids: list[str], info: dict[str, Any] | None) -> Dataset:
     catchment_id = table.c[CATCHMENT_COLUMN]
     shown = [c for c in table.columns if c.name != CATCHMENT_COLUMN]
     rows: dict[str, list[dict[str, Any]]] = {}
@@ -127,6 +139,7 @@ def _dataset(conn: sa.Connection, table: sa.Table, ids: list[str]) -> Dataset:
         description=table.comment,
         columns=[Column(c.name, _label(c.name), _kind(c)) for c in shown],
         rows=rows,
+        info=info,
     )
 
 

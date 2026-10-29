@@ -1,49 +1,46 @@
+{# What the River Status, EA Data, Land Use Data and Sewerage Data tabs share:
+   the map for choosing a catchment, its ranking and classification down the
+   side, and its name across the top. Each tab fills in the panels block.
+   With no catchment chosen, everything is shown empty. #}
 {% extends "base.html" %}
-{% from "macros.html" import data_table, catchment_links %}
-{% block title %}{{ catchment.name }} · {{ location.name }}{% endblock %}
+{% from "macros.html" import heading, legend, status_map %}
+{% block title %}{% if catchment %}{{ catchment.name }} · {% endif %}{{ tabs[tab] }} · {{ location.name }}{% endblock %}
 {% block content %}
-<p class="crumb"><a href="../">← All {{ location.name }} catchments</a></p>
-<h1>{{ catchment.name }}</h1>
-<p class="lead">{{ catchment.waterbody_type }} · Catchment ID {{ catchment.id }}</p>
+<div class="catchment-page">
+  <div class="side">
+    <section class="panel white map-panel">
+      {{ heading("Click the map to select a river catchment") }}
+      {{ legend(figures) }}
+      {{ status_map(location, root, root ~ tab ~ "/", catchment.id if catchment else "") }}
+    </section>
 
-<div class="columns">
-  <div id="map" class="map" data-geojson="../catchments.geojson" data-links="../" data-selected="{{ catchment.id }}"
-       role="img" aria-label="Map of {{ catchment.name }} and the catchments around it"></div>
-  <section class="card">
-    <h2>About this catchment</h2>
-    <dl>
-      <dt>Area</dt>
-      <dd>{{ catchment.area_ha | number(1) }} ha</dd>
-      {% if catchment.river_length_km is not none %}
-      <dt>River length</dt>
-      <dd>{{ catchment.river_length_km | number(2) }} km</dd>
-      {% endif %}
-      <dt>Operational catchment</dt>
-      <dd>{{ catchment.operational_catchment or "" }}</dd>
-      <dt>Management catchment</dt>
-      <dd>{{ catchment.management_catchment or "" }}</dd>
-      <dt>River basin district</dt>
-      <dd>{{ catchment.river_basin_district or "" }}</dd>
-      <dt>Modified</dt>
-      <dd>{{ catchment.hydromorphological_designation or "" }}</dd>
-      <dt>Flows from</dt>
-      <dd>{{ catchment_links(catchment.upstream_ids, location, "../") }}</dd>
-      <dt>Flows into</dt>
-      <dd>{{ catchment_links(catchment.downstream_ids, location, "../") }}</dd>
-    </dl>
-  </section>
+    <section class="panel dark ranking">
+      {{ heading("Catchment Ranking:", info=true) }}
+      <p>({{ figures.rivers() }} river waterbodies in the {{ location.name }} Catchment)</p>
+    </section>
+
+    <section class="panel navy classification">
+      {{ heading("EA Ecological Classification") }}
+      <ul class="years">
+        {% for year, status in figures.classification(catchment.id if catchment else "") %}
+        <li class="{{ status | status_class }}"><span>{{ year }}</span><strong>{{ status or "" }}</strong></li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <div class="pair">
+      <section class="panel navy small">
+        {{ heading("Failing Elements") }}
+      </section>
+      <section class="panel navy small">
+        {{ heading("EA RNAGs") }}
+      </section>
+    </div>
+  </div>
+
+  <div class="main">
+    <h1 class="title-bar{% if not catchment %} none{% endif %}">{{ catchment.name if catchment else "Select a river catchment on the map" }}</h1>
+    {% block panels %}{% endblock %}
+  </div>
 </div>
-
-{% for dataset in location.datasets %}
-<section class="card">
-  <h2>{{ dataset.title }}</h2>
-  {% if dataset.description %}<p class="muted">{{ dataset.description }}</p>{% endif %}
-  {% set rows = dataset.rows_for(catchment.id) %}
-  {% if rows %}
-  {{ data_table(dataset.columns, rows) }}
-  {% else %}
-  <p class="empty">No data for this catchment yet.</p>
-  {% endif %}
-</section>
-{% endfor %}
 {% endblock %}
