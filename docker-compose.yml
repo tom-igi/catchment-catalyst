@@ -9,6 +9,7 @@
 #   docker compose run --rm schema plan      preview database structure changes
 #   docker compose run --rm schema apply     apply them
 #   docker compose run --rm importer catchments imports/catchments.json
+#   docker compose run --rm publish          write the dashboards' pages into published/
 # See README.md.
 
 name: catchment-catalyst
@@ -55,6 +56,19 @@ services:
     profiles: ["tools"]
     entrypoint: ["python", "-m", "catalyst.importers"]
     command: ["--help"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # The publish step: writes every location's dashboard as web pages, into
+  # published/. Run on demand only (profile "tools").
+  publish:
+    build:
+      context: ./backend
+      target: prod
+    image: catchment-catalyst-backend
+    profiles: ["tools"]
+    entrypoint: ["python", "-m", "catalyst.publish"]
     depends_on:
       db:
         condition: service_healthy

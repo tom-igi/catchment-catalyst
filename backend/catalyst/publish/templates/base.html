@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{% endblock %}</title>
+<link rel="stylesheet" href="{{ root }}assets/leaflet/leaflet.css">
+<link rel="stylesheet" href="{{ root }}assets/style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="inner">
+    <a class="site-name" href="{{ root or './' }}">{{ location.name }}<span>Catchment Catalyst</span></a>
+  </div>
+</header>
+<main class="inner">
+{% block content %}{% endblock %}
+</main>
+<footer class="inner site-footer">
+  Published {{ published }}. Catchment details and outlines contain Environment Agency information
+  © Environment Agency and database right.
+</footer>
+<script src="{{ root }}assets/leaflet/leaflet.js"></script>
+<script src="{{ root }}assets/map.js"></script>
+<script src="{{ root }}assets/sort.js"></script>
+</body>
+</html>

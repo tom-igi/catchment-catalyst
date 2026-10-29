@@ -47,6 +47,13 @@ services:
       # Azure storage later).
       - ./imports:/app/imports
 
+  publish:
+    environment:
+      DATABASE_URL: *database-url
+    volumes:
+      # The published dashboards, which the web server will serve.
+      - ./published:/app/published
+
   admin:
     environment:
       DATABASE_URL: *database-url

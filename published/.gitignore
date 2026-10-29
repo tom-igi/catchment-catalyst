@@ -1,0 +1,5 @@
+# The published dashboards, made by `docker compose run --rm publish`. They can
+# always be made again from the database, so they aren't kept in git.
+*
+!.gitignore
+!README.md

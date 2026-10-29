@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Catchment Catalyst locations</title>
+<style>
+  body { margin: 0; padding: 40px 16px; background: #f3f6f7; color: #1c282d;
+         font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; }
+  a { color: #0d6b77; font-size: 1.2rem; }
+  li { margin: 6px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Catchment Catalyst locations</h1>
+  <p>Every published location. Each will later have its own web address.</p>
+  <ul>
+    {% for name, slug in locations %}
+    <li><a href="{{ slug }}/">{{ name }}</a></li>
+    {% endfor %}
+  </ul>
+</main>
+</body>
+</html>

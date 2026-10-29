@@ -1,0 +1,69 @@
+/* The dashboard's styles. */
+
+:root {
+  --bg: #f3f6f7;
+  --card: #ffffff;
+  --text: #1c282d;
+  --muted: #5a6a71;
+  --border: #d9e2e5;
+  --accent: #0d6b77;
+  --accent-soft: #e3f1f3;
+  --shadow: 0 1px 2px rgba(20, 40, 50, .06), 0 2px 8px rgba(20, 40, 50, .05);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+a { color: var(--accent); }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+h1 { margin: 4px 0; font-size: 2rem; line-height: 1.2; }
+h2 { margin: 0 0 10px; font-size: 1.2rem; }
+.lead { margin: 0 0 20px; color: var(--muted); }
+.muted { color: var(--muted); }
+.empty { margin: 0; color: var(--muted); font-style: italic; }
+.crumb { margin: 0; }
+
+/* Page layout */
+.inner { max-width: 1120px; margin: 0 auto; padding-left: 16px; padding-right: 16px; }
+.site-header { background: var(--accent); }
+.site-header .inner { padding-top: 14px; padding-bottom: 14px; }
+.site-name { color: #fff; font-size: 1.1rem; font-weight: 700; text-decoration: none; }
+.site-name span { margin-left: 10px; font-weight: 400; opacity: .8; }
+main.inner { padding-top: 28px; padding-bottom: 40px; }
+.site-footer { padding-bottom: 32px; color: var(--muted); font-size: .85rem; }
+.card {
+  margin-bottom: 20px; padding: 20px 22px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
+}
+.columns { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 20px; margin-bottom: 20px; }
+.columns > * { margin: 0; }
+@media (max-width: 760px) { .columns { grid-template-columns: 1fr; } }
+
+/* Maps (map.js) */
+.map { height: 460px; margin-bottom: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+.columns .map { height: auto; min-height: 360px; }
+.map-message { padding: 16px; color: var(--muted); }
+.leaflet-container { font: inherit; }
+
+/* Details list */
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
+dt { color: var(--muted); }
+dd { margin: 0; }
+
+/* Tables */
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+th { font-weight: 600; white-space: nowrap; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr:hover { background: var(--accent-soft); }
+
+/* Sortable tables (sort.js): the headings become buttons, with an arrow */
+th button { padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+th button::after { content: "↕"; margin-left: 6px; opacity: .35; }
+th[aria-sort="ascending"] button::after { content: "▲"; opacity: 1; font-size: .8em; }
+th[aria-sort="descending"] button::after { content: "▼"; opacity: 1; font-size: .8em; }
+th button:hover { color: var(--accent); }

@@ -1,6 +1,6 @@
 # Catchment Catalyst – Platform Plan
 
-**Status:** High-level plan, agreed in principle. Hosting changed to a single Azure VM (28 October 2026). Phase 1 (foundations) in progress: database schema tool, first tables, data map page and the development / live Docker setup built. Excel uploads and the admin page's login built (29 October 2026).
+**Status:** High-level plan, agreed in principle. Hosting changed to a single Azure VM (28 October 2026). Phase 1 (foundations) in progress: database schema tool, first tables, data map page and the development / live Docker setup built. Excel uploads, the admin page's login, and a first basic dashboard (static pages from a publish step) built (29 October 2026).
 **Last updated:** 29 October 2026
 
 This document describes how we will rebuild the Catchment Catalyst water quality dashboard (currently North Devon) as a platform that can be reused for any location in the country. It covers the data model, how data gets in, how the system is hosted, and what needs to happen before development starts.
@@ -89,9 +89,9 @@ A new type of source file means writing one new importer, which should only happ
 3. Add, change or delete rows in Excel, then upload the file.
 4. Review the preview: any problems (with Excel row numbers), and the rows that will be added, changed and deleted.
 5. **Approve.** The data goes into the database (it is not yet public).
-6. **Publish** the location. The public dashboard updates. *(Not built yet.)*
+6. **Publish** the location. The public dashboard updates. *(Built as a command for now: `docker compose run --rm publish`. A button in the admin page later.)*
 
-Steps 1–5 are built (§4.4).
+Steps 1–6 are built (§4.4, §5.1).
 
 
 ### 4.3 Catchments importer (built)
@@ -140,8 +140,8 @@ password) │                                 ▼               ▼             
 | Component | Runs as | Role |
 |---|---|---|
 | **Web server** | Caddy container | The only part open to the internet. Serves the dashboard and admin portal over HTTPS, with a certificate for each location's address that it gets and renews automatically. Caddy rather than nginx because it does the certificates itself, with a much shorter configuration. *(Not built yet.)* |
-| **Public dashboard** | Files served by the web server | One app, a URL per location. Reads only published data bundles, so it never touches the database. |
-| **Published data bundles** | Folder on the VM | One bundle per location, written by the publish step. Can always be rebuilt from the database. |
+| **Public dashboard** | Plain web pages, written by the publish step and served by the web server | A folder per location, with a URL each. The data is written into the pages, so they never touch the database and make no API calls. No JavaScript framework: the only scripts draw the maps (Leaflet, on an OpenStreetMap background) and sort the tables. *(A first, basic version is built: a map page per location, and a page per catchment with its details and a sortable table for every data table.)* |
+| **Published data bundles** | Folder on the VM (`published/`) | One folder per location, holding its pages, map outlines and everything else they need, written by the publish step. Can always be rebuilt from the database. |
 | **Admin portal** | Files served by the web server (at `/admin` or its own address) | Upload, preview, approve and publish screens, plus forms for the hand-written text. Each person has their own name and password; only hashes of the passwords are stored, in the server's settings. Microsoft accounts (Entra ID) could replace this if many more people need access. *(Built so far: the login and the Excel download, upload, preview and approve screens, served by the admin API's container.)* |
 | **Admin API** | Python container | Behind the admin portal. Checks logins and roles, handles uploads and publishing. |
 | **Import worker** | Python container (same image) | Runs long imports in the background. *(Not needed yet: Excel uploads are checked straight away.)* |
@@ -309,8 +309,8 @@ Agree the final set of pages and panels (Section 8), including anything to be ad
 
 1. **Foundations:** database design, Docker Compose local setup, waterbody boundaries loaded.
 2. **Importers:** one per dataset, with validation and preview, tested against the real raw files.
-3. **Publish step:** generate a data bundle per location, including the calculated values (rankings, counts, percentages).
-4. **Public dashboard:** recreate the five pages, reading from the published bundles.
+3. **Publish step:** generate a data bundle per location, including the calculated values (rankings, counts, percentages). *(Started: `backend/catalyst/publish/`. No calculated values yet.)*
+4. **Public dashboard:** recreate the five pages, reading from the published bundles. *(Started: a basic map and tables, not yet the real pages.)*
 5. **Admin portal:** upload, preview, approve, publish and the text-editing forms.
 6. **Live server:** set up the Azure VM (§6.2) with HTTPS, backups and monitoring, then deploy. Migrate North Devon.
 7. **Second location:** add a new location end to end to prove that it can be reused.

@@ -38,6 +38,26 @@ services:
       # The lists of what to import, and where downloads are kept.
       - ./imports:/app/imports
 
+  publish:
+    environment:
+      DATABASE_URL: *database-url
+    volumes:
+      - ./backend/catalyst:/app/catalyst:ro
+      - ./published:/app/published
+
+  # Shows the published dashboards at http://localhost:8080, as the live web
+  # server will. It's Caddy (a web server, like nginx), only serving the files
+  # in published/ here; HTTPS and the live addresses come later.
+  web:
+    image: caddy:2.10-alpine
+    command: ["caddy", "file-server", "--root", "/srv", "--listen", ":8080"]
+    ports:
+      # Only reachable from this machine. Change WEB_PORT in .env if 8080 is taken.
+      - "127.0.0.1:${WEB_PORT:-8080}:8080"
+    volumes:
+      - ./published:/srv:ro
+    restart: unless-stopped
+
   # The admin page, at http://localhost:8000/admin. Uses the development
   # image, so it restarts by itself when the code or schema.yaml changes.
   admin:

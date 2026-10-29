@@ -1,0 +1,35 @@
+{# Pieces shared by the pages. #}
+
+{# A sortable table of a dataset's rows (sort.js does the sorting). #}
+{% macro data_table(columns, rows) %}
+<div class="scroll">
+  <table class="sortable">
+    <thead>
+      <tr>
+        {% for column in columns %}
+        <th scope="col" data-type="{{ column.kind }}"{% if column.kind == "number" %} class="num"{% endif %}>{{ column.label }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        {% for column in columns %}
+        <td data-sort="{{ row[column.name] | sort_value }}"{% if column.kind == "number" %} class="num"{% endif %}>{{ row[column.name] | show }}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endmacro %}
+
+{# Links to other catchments: a link if it's in this location, otherwise its name. #}
+{% macro catchment_links(ids, location, links) %}
+{% set here = location.catchment_ids() %}
+{% for id in ids or [] %}
+{% if id in here %}<a href="{{ links }}{{ id }}/">{{ location.names[id] }}</a>{% elif id in location.names %}{{ location.names[id] }} ({{ id }}){% else %}{{ id }}{% endif %}{{ ", " if not loop.last else "" }}
+{% else %}
+None
+{% endfor %}
+{% endmacro %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ location.name }} · Catchment Catalyst{% endblock %}
+{% block content %}
+<h1>{{ location.name }}</h1>
+<p class="lead">
+  {{ location.catchments | length }} catchment{{ "" if location.catchments | length == 1 else "s" }}.
+  Choose one on the map or in the list to see its data.
+</p>
+
+<div id="map" class="map" data-geojson="catchments.geojson" data-links=""
+     role="img" aria-label="Map of the catchments in {{ location.name }}"></div>
+
+<section class="card">
+  <h2>Catchments</h2>
+  <div class="scroll">
+    <table class="sortable">
+      <thead>
+        <tr>
+          <th scope="col" data-type="text">Name</th>
+          <th scope="col" data-type="text">Catchment ID</th>
+          <th scope="col" data-type="text">Operational catchment</th>
+          <th scope="col" data-type="number" class="num">Area (ha)</th>
+          <th scope="col" data-type="number" class="num">River length (km)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in location.catchments %}
+        <tr>
+          <td><a href="{{ c.id }}/">{{ c.name }}</a></td>
+          <td>{{ c.id }}</td>
+          <td>{{ c.operational_catchment or "" }}</td>
+          <td class="num" data-sort="{{ c.area_ha | sort_value }}">{{ c.area_ha | number(1) }}</td>
+          <td class="num" data-sort="{{ c.river_length_km | sort_value }}">{{ c.river_length_km | number(2) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
