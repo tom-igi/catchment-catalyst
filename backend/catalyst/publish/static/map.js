@@ -1,8 +1,9 @@
 // The catchment maps: every catchment in the location, coloured by its
-// ecological status, as on the original dashboard. Clicking one opens its page.
+// ecological status as on the original dashboard, with its rivers, over an
+// OpenStreetMap background. Clicking a catchment opens its page.
 //
 // The page sets what to show, on the map's element:
-//   data-geojson   the file of outlines (catchments.geojson), with each one's status
+//   data-geojson   the file of outlines and rivers (catchments.geojson), with each catchment's status
 //   data-links     what goes before a catchment ID to link to its page
 //   data-selected  the catchment to highlight, if one is chosen
 //
@@ -16,7 +17,13 @@
   const selected = element.dataset.selected;
   const styles = getComputedStyle(document.documentElement);
 
-  const map = L.map(element, { scrollWheelZoom: false, attributionControl: false, zoomSnap: 0.25 });
+  const RIVER = "#1f78b4";
+
+  const map = L.map(element, { scrollWheelZoom: false, zoomSnap: 0.25 });
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  }).addTo(map);
 
   fetch(element.dataset.geojson)
     .then(function (response) {
@@ -40,6 +47,12 @@
       outlines.eachLayer(function (layer) {
         if (layer.feature.properties.id === selected) layer.bringToFront();
       });
+
+      L.geoJSON(data, {
+        filter: function (feature) { return feature.properties.layer === "river"; },
+        style: function (feature) { return { color: RIVER, weight: feature.properties.id === selected ? 2.5 : 1.5 }; },
+        interactive: false,
+      }).addTo(map);
       map.fitBounds(outlines.getBounds(), { padding: [4, 4] });
     })
     .catch(function () {
@@ -48,13 +61,14 @@
 
   function outline(feature, isHovered) {
     const isSelected = feature.properties.id === selected;
-    // With a catchment chosen, the others are faded, as on the original.
+    // With a catchment chosen, the others are faded, as on the original. The
+    // colours are partly see-through, so the background map shows.
     const faded = selected && !isSelected;
     return {
       color: isSelected ? "#333333" : isHovered ? "#555555" : "#ffffff",
       weight: isSelected ? 2.5 : isHovered ? 2 : 1,
       fillColor: colour(feature.properties.status),
-      fillOpacity: faded && !isHovered ? 0.4 : 0.95,
+      fillOpacity: isHovered ? 0.8 : faded ? 0.3 : 0.65,
     };
   }
 

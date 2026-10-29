@@ -105,7 +105,7 @@ show on the dashboard. They were uploaded through the admin page on 29 October 2
 - **A new data table no longer appears by itself:** it needs a place on a page. The original layout has no space for a generic table.
 - **The "i" buttons show the table's row in `datasets`,** and are greyed out until it has one.
 - **Tables are sortable** by clicking a heading (a small script, `static/sort.js`). Numbers sort as numbers, and empty cells always go last.
-- **Maps: Leaflet with no background map,** as in the original, with the catchment outlines coloured by ecological status (the colours are in `style.css`). Leaflet is copied into the project rather than loaded from elsewhere.
+- **Maps: Leaflet over OpenStreetMap,** with the catchment outlines coloured by ecological status (the colours are in `style.css`) and the rivers drawn on top. The original has no background map or rivers; Tom preferred them (29 October 2026). Leaflet is copied into the project rather than loaded from elsewhere.
 - **One self-contained folder per location** (`published/north-devon/`), so each can later be served at its own address. Each folder is built alongside the old one and swapped in, so a half-written dashboard is never served.
 - **A location's web address comes from its name** (North Devon → `north-devon`), for now.
 
@@ -137,6 +137,13 @@ show on the dashboard. They were uploaded through the admin page on 29 October 2
 2. **Import all 92 North Devon rivers,** and add them to the North Devon location. Let `imports/catchments.json` accept a management catchment (North Devon is `3062`) as well as single IDs. The EA provides the whole management catchment as one download.
 3. **The next datasets.** Each needs a table in the master file, and filling in its empty panel on the dashboard. Simple ones can be `filled_by: excel` with no code; fiddly raw files (PLAN.md §9.1) may still need an importer.
 4. **Have GitHub run the tests on every push** (offered, not yet agreed).
+5. **Fill more panels from the EA** (looked into 29 October 2026, not started). The Catchment Data
+   Explorer has one download for the whole management catchment (`ManagementCatchment/3062/...csv`,
+   98 waterbodies) of: `classifications` (status per item and year, 2009 to 2022, but no values
+   such as EQRs), `rnags` (reasons for not achieving good: for Langham Lake they match the original
+   dashboard exactly), `objectives`, `investigations` and `site-classifications`. The 2025 results
+   aren't in it yet: they're a separate data.gov.uk download. Storm overflow spills (EDM annual
+   returns) and River Obstacles are separate EA datasets, matched to catchments by location.
 
 ---
 
@@ -150,4 +157,4 @@ show on the dashboard. They were uploaded through the admin page on 29 October 2
 - **On the live server, every `docker compose` command needs `ADMIN_USERS` and `ADMIN_SECRET_KEY` in `.env`,** even commands that don't use the admin page. Make the `ADMIN_USERS` entries on your own machine.
 - **The admin page's port is 8000, and the dashboard preview's is 8080** (change `ADMIN_PORT` or `WEB_PORT` in `.env` if either is taken).
 - **The dashboard doesn't update by itself:** after approving an upload, run `docker compose run --rm publish`.
-- **The status maps have no background map,** as in the original. The River Obstacles and SWW Outlet maps will need one (e.g. OpenStreetMap, whose map images are free for light use only).
+- **OpenStreetMap's map images are free for light use only** (their tile usage policy). Fine for now; a busy public site may need a paid map provider, which is a one-line change in `static/map.js`.

@@ -149,7 +149,7 @@ table is added. Each new data table now needs a place on a page, in
 `backend/catalyst/publish/figures.py`).
 
 The styles and scripts are in `backend/catalyst/publish/static/`. The maps use Leaflet (copied
-into `static/leaflet/`) with no background map, as in the original, so the pages load nothing
+into `static/leaflet/`) over OpenStreetMap's map images, which are the only thing the pages load
 from elsewhere.
 
 ### Locations
