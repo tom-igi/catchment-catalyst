@@ -30,7 +30,7 @@ NAMING_CONVENTION = {
 }
 
 TOP_LEVEL_OPTIONS = {"extensions", "tables", "data_tables"}
-TABLE_OPTIONS = {"title", "description", "columns", "indexes", "renamed_from"}
+TABLE_OPTIONS = {"title", "description", "filled_by", "columns", "indexes", "renamed_from"}
 COLUMN_OPTIONS = {
     "type", "description", "required", "primary_key", "identity", "unique",
     "index", "default", "references", "on_delete", "renamed_from", "example",
@@ -43,6 +43,17 @@ INDEX_METHODS = {"btree", "gist", "gin"}
 # Every data table must link each row to a catchment with this column.
 CATCHMENT_COLUMN = "catchment_id"
 CATCHMENT_REFERENCE = "catchments.id"
+
+# How a table gets its data (the `filled_by` option).
+FILLED_BY = {
+    "api": "an importer, from an outside service's API (backend/catalyst/importers/api/)",
+    "excel": "uploading an Excel file in the admin page (backend/catalyst/importers/excel/)",
+}
+# Column types an Excel upload can fill: text, whole numbers, numbers, yes/no
+# and dates. (real and numeric aren't included: their values change slightly
+# when stored, so every upload would look like it changed them. Use double.)
+EXCEL_TYPES = (sa.String, sa.Integer, sa.Double, sa.Boolean, sa.Date)
+EXCEL_TYPE_NAMES = "text, varchar(N), integer, bigint, smallint, double, boolean or date"
 
 # Created by PostGIS, so not available as table names.
 RESERVED_TABLES = {"spatial_ref_sys"}
@@ -88,6 +99,11 @@ class Schema:
     data_tables: list[str] = field(default_factory=list)  # one per dataset
     table_renames: dict[str, str] = field(default_factory=dict)  # new -> old
     column_renames: dict[tuple[str, str], str] = field(default_factory=dict)  # (table, new) -> old
+
+    @property
+    def excel_tables(self) -> list[str]:
+        """The tables filled by Excel upload, in the order of schema.yaml."""
+        return [t.name for t in self.metadata.tables.values() if t.info.get("filled_by") == "excel"]
 
 
 def load_schema(path: Path | str = SCHEMA_FILE) -> Schema:
@@ -199,11 +215,16 @@ def _build_table(where, name, spec, known_columns, schema: Schema, problems: lis
         return
     if "title" in spec and not isinstance(spec["title"], str):
         problems.append(f"{where}: 'title' must be text, e.g. title: EA Scores")
+    filled_by = spec.get("filled_by")
+    if filled_by is not None and filled_by not in FILLED_BY:
+        problems.append(f"{where}: 'filled_by' must be one of: {', '.join(FILLED_BY)}")
     table = sa.Table(
         name, schema.metadata, *columns,
         comment=spec.get("description"),
-        info={"title": spec.get("title")},  # not stored in the database
+        info={"title": spec.get("title"), "filled_by": filled_by},  # not stored in the database
     )
+    if filled_by == "excel":
+        _check_excel_table(where, table, problems)
     for cols, unique, using in indexes:
         if all(c in table.c for c in cols):
             kwargs = {"postgresql_using": using} if using else {}
@@ -295,6 +316,26 @@ def _check_data_table(name, spec, problems) -> None:
             f"data_tables.{name}: every data table needs a required '{CATCHMENT_COLUMN}' "
             f"column that references {CATCHMENT_REFERENCE}"
         )
+
+
+def _check_excel_table(where, table: sa.Table, problems) -> None:
+    """An Excel upload must be able to fill every column, and match its rows to the table's."""
+    if not table.primary_key.columns:
+        problems.append(
+            f"{where}: tables filled by Excel need a primary key, so each uploaded row "
+            "can be matched with the row already in the table"
+        )
+    for column in table.columns:
+        if column.identity is not None:
+            problems.append(
+                f"{where}.columns.{column.name}: tables filled by Excel can't have numbered "
+                "('identity') columns. Make the primary key from the table's own columns instead, "
+                "e.g. catchment_id and year"
+            )
+        elif not isinstance(column.type, EXCEL_TYPES):
+            problems.append(
+                f"{where}.columns.{column.name}: Excel uploads can only fill {EXCEL_TYPE_NAMES} columns"
+            )
 
 
 def _parse_default(value: Any) -> sa.TextClause:

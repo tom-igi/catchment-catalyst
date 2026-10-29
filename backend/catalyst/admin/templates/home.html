@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Choose a table{% endblock %}
+{% block content %}
+<h1>Choose a table</h1>
+<p class="lead">
+  To update a table, download it as an Excel file, edit it, and upload it again.
+  You'll see exactly what will change before anything is saved.
+</p>
+<div class="tiles">
+  {% for table in tables %}
+  <a class="card tile" href="/admin/tables/{{ table.name }}">
+    <h2>{{ title(table) }}</h2>
+    <p>{{ table.comment or "" }}</p>
+    <p class="muted">
+      {{ counts[table.name] | rows }} ·
+      {% if last[table.name] %}last updated {{ last[table.name].approved_at | when }} by {{ last[table.name].uploaded_by }}{% else %}not uploaded yet{% endif %}
+    </p>
+  </a>
+  {% else %}
+  <p>No tables are filled by Excel upload yet. Mark one with <code>filled_by: excel</code> in schema.yaml.</p>
+  {% endfor %}
+</div>
+{% endblock %}

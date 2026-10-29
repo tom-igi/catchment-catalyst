@@ -24,11 +24,12 @@ def test_page_shows_every_table_and_column(tmp_path):
         for column in table.columns:
             assert f"<code>{column.name}</code>" in page
     assert '<meta name="robots" content="noindex, nofollow">' in page
+    assert "<strong>How it's filled:</strong> uploaded as an Excel file in the admin page." in page
 
 
 def test_sections_come_in_the_order_of_sections_yaml(tmp_path):
     page = build(load_schema(), tmp_path).read_text()
-    positions = [page.index(f"<h2>{title}</h2>") for title in ["Locations", "Catchments", "Datasets", "Data tables"]]
+    positions = [page.index(f"<h2>{title}</h2>") for title in ["Locations", "Catchments", "Datasets", "Uploads", "Data tables"]]
     assert positions == sorted(positions)
     assert "Other tables" not in page  # every core table has a section
 

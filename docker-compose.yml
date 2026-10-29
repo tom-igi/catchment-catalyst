@@ -5,7 +5,7 @@
 #   the live server   docker-compose.prod.yml       chosen by COMPOSE_FILE in the server's .env
 #
 # So the commands are the same everywhere:
-#   docker compose up -d                     start the database
+#   docker compose up -d                     start the database and the admin page
 #   docker compose run --rm schema plan      preview database structure changes
 #   docker compose run --rm schema apply     apply them
 #   docker compose run --rm importer catchments imports/catchments.json
@@ -58,6 +58,20 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  # The admin page: log in, download a table as Excel, upload an edited copy.
+  # Also makes logins:  docker compose run --rm admin hash-password <name>
+  admin:
+    build:
+      context: ./backend
+      target: prod
+    image: catchment-catalyst-backend
+    entrypoint: ["python", "-m", "catalyst.admin"]
+    command: ["serve"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   db-data:

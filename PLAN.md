@@ -1,7 +1,7 @@
 # Catchment Catalyst – Platform Plan
 
-**Status:** High-level plan, agreed in principle. Hosting changed to a single Azure VM (28 October 2026). Phase 1 (foundations) in progress: database schema tool, first tables, data map page and the development / live Docker setup built.
-**Last updated:** 28 October 2026
+**Status:** High-level plan, agreed in principle. Hosting changed to a single Azure VM (28 October 2026). Phase 1 (foundations) in progress: database schema tool, first tables, data map page and the development / live Docker setup built. Excel uploads and the admin page's login built (29 October 2026).
+**Last updated:** 29 October 2026
 
 This document describes how we will rebuild the Catchment Catalyst water quality dashboard (currently North Devon) as a platform that can be reused for any location in the country. It covers the data model, how data gets in, how the system is hosted, and what needs to happen before development starts.
 
@@ -27,7 +27,7 @@ This document describes how we will rebuild the Catchment Catalyst water quality
 | **One shared set of tables for all locations** | National data is loaded once. Location-specific data goes into the same tables. A location is just a name and a list of catchment IDs. |
 | **Store facts, calculate comparisons** | Anything that depends on which catchments are in a location (rankings such as "68/92", status counts, "% of catchment", densities, "increase needed to reach Good") is calculated per location, not stored. |
 | **Years are rows, not columns** | Source files have `2025 / 2022 / 2019` columns. The database stores one row per year so a new year needs no change to the table design. |
-| **Every conversion is code** | Source files are never in the shape we need, but each source's columns stay the same between downloads. So each dataset gets its own **importer** (a small Python module) rather than a general column-mapping screen. |
+| **Two ways to fill a table** | Each table is filled in one way only, set by `filled_by` in the master file. **api:** an importer (a small Python module) downloads it from an outside service, e.g. catchments from the EA. **excel:** a person downloads the table as Excel from the admin page, edits it and uploads it again. The file has exactly the table's columns, so no code is needed per table (§4.4). A source file too fiddly to convert by hand in Excel can still get its own importer. |
 | **One source per table** | Each table is filled from a single source: the catchments tables only from the EA, hand-written text only through the admin portal, and so on. Anything entered by hand goes in its own table, linked by catchment ID. A re-import can then replace a table's contents without losing anyone's work. |
 | **Keep the raw files** | Every uploaded file is kept as it was, so data can be re-imported if an importer had a bug and there is a record of what was loaded and when. |
 | **Nothing goes live without review** | Uploads produce a preview first, and changes only appear on the public site after a **publish** step. |
@@ -43,7 +43,7 @@ This document describes how we will rebuild the Catchment Catalyst water quality
 | **catchments** | Catchment ID (EA waterbody ID), name, type, catchment boundary, river line, management / operational catchment and river basin district (EA names and IDs), hydromorphological designation, area, river length, and the IDs of the waterbodies upstream and downstream (lists; names are looked up in this table). Filled entirely by the catchments importer (§4.3). | National |
 | **locations** | Location ID, name and the list of catchment IDs it includes (a catchment can be in more than one location). Whatever saves a location checks every ID is in `catchments`, because the database can't check IDs inside a list. Anything else about a location (intro text, photo, branding, contact email) goes in its own tables, keyed by location ID (§3.2). The web address (e.g. `/north-devon`) will be generated from the name, or added with the publish step. | One per location |
 | **datasets** | The list of datasets, one row per data table (the tiles on the admin "Choose a table" screen): name, source organisation, date of data, caveats, national or location-specific. Also drives the "i" info buttons. Holds no data itself. | All |
-| **uploads** | Each import run: dataset, raw file, who uploaded it and when, status (preview / approved / rejected), row counts | All |
+| **uploads** | Each Excel upload: the table, the file (kept), who uploaded it and when, status (preview / approved / cancelled), and the rows it added, changed and deleted. *(Built.)* | All |
 
 ### 3.1.1 Changing the database structure
 
@@ -51,7 +51,7 @@ Every table and column is listed in one master file, `backend/catalyst/db/schema
 
 ### 3.2 Data tables (one per thing shown on the dashboard)
 
-Each dataset has its own table, and each row has a catchment ID (and, once uploads are tracked, the upload it came from). Built so far: `ea_scores` and `habitat_land_use`. Data about a whole location (e.g. its intro text) will go in tables keyed by **location ID** instead; the master file's rule will be extended to allow this when the first one is added. Catchment data tables come in three kinds:
+Each dataset has its own table, and each row has a catchment ID. Built so far: `ea_scores` and `habitat_land_use`. Data about a whole location (e.g. its intro text) will go in tables keyed by **location ID** instead; the master file's rule will be extended to allow this when the first one is added. Catchment data tables come in three kinds:
 
 - **One row per waterbody:** e.g. number of farms, properties on SWW or private sewerage, risk levels.
 - **Many rows per waterbody:** e.g. EA classification items per year, habitat types, livestock types, phosphate sources, SWW discharge sites per year, asset improvement plans.
@@ -63,7 +63,9 @@ Each dataset has its own table, and each row has a catchment ID (and, once uploa
 
 ### 3.4 Replacing data safely
 
-When a dataset is re-uploaded, only that dataset's rows for the **waterbodies covered by the file** are replaced. For example, a new North Devon FOI file replaces North Devon's rows in that table and leaves every other location alone. National datasets replace the whole national set.
+**Built (Excel uploads):** each upload replaces the table's rows with the file's, matching rows by the table's primary key. The preview shows exactly what will be added, changed and deleted, warns when rows will be deleted, and nothing changes until someone approves it. If the table changes between the preview and the approval (e.g. two people uploading at once), the approval is refused and the up-to-date preview is shown instead.
+
+**Later, when tables hold several locations' data:** only the rows for the **waterbodies covered by the file** will be replaced. For example, a new North Devon FOI file would replace North Devon's rows in that table and leave every other location alone. National datasets replace the whole national set.
 
 ---
 
@@ -71,7 +73,7 @@ When a dataset is re-uploaded, only that dataset's rows for the **waterbodies co
 
 ### 4.1 Importers
 
-Each dataset has one importer, written by a developer, which:
+Tables filled by Excel upload need no importer (§4.4). Each other dataset has one importer, written by a developer, which:
 
 1. **Checks** that the file has the expected columns (and gives a clear error if the source format has changed).
 2. **Converts** the data: filters a large national file down to what we need, reshapes year columns into rows, converts units, turns names into IDs, assigns points to catchments, etc.
@@ -82,12 +84,14 @@ A new type of source file means writing one new importer, which should only happ
 
 ### 4.2 Update flow (as seen by a non-technical admin)
 
-1. Log in to the admin portal with an organisation Microsoft account.
-2. Choose the dataset (e.g. "SWW intermittent discharges") and upload the file.
-3. The import runs in the background, which handles large files.
-4. Review the preview: rows read, problems found, catchments missing, big changes since the last upload.
+1. Log in to the admin page with their own name and password.
+2. Choose the table (e.g. "EA Scores") and download it as an Excel file.
+3. Add, change or delete rows in Excel, then upload the file.
+4. Review the preview: any problems (with Excel row numbers), and the rows that will be added, changed and deleted.
 5. **Approve.** The data goes into the database (it is not yet public).
-6. **Publish** the location. The public dashboard updates.
+6. **Publish** the location. The public dashboard updates. *(Not built yet.)*
+
+Steps 1–5 are built (§4.4).
 
 
 ### 4.3 Catchments importer (built)
@@ -98,6 +102,16 @@ Fills the `catchments` table from the EA's Catchment Data Explorer, for a list o
 - the waterbody's **web page**, the only source of its **river length** and **upstream / downstream waterbodies**. If the EA changes the page, the importer stops with a clear error rather than guessing.
 
 The **area** is calculated from the boundary (it matches the EA's figure). Only the IDs of upstream / downstream waterbodies are stored. Some, such as estuaries, aren't imported yet (the importer handles rivers only), so their names can't be looked up until it supports those waterbody types too. The importer checks everything before saving, shows a preview, saves all catchments in one go, and keeps the downloaded files. Running it again updates catchments rather than duplicating them. Only river waterbodies are supported so far. Command: see `imports/README.md`. Later, the admin portal will call the same code.
+
+### 4.4 Excel uploads (built)
+
+Every table marked `filled_by: excel` in the master file appears in the admin page, and they all work the same way, with no code per table (`backend/catalyst/importers/excel/`):
+
+- **The file is an exact copy of the table:** the column names in row 1 (in any order) and one row per row, on the first sheet. The easiest start is the table's own download.
+- **Each upload replaces the whole table** (§3.4), so a row deleted from the file is deleted from the table. Corrections and deletions are made the same way, so no separate editing screen is needed.
+- **Checks before the preview:** the column names; that every value fits its column (numbers, dates, yes/no, and text that Excel has turned into a date); required values; no row appearing twice (by primary key); and that every catchment ID is in the catchments table. All the problems are listed together, with Excel row numbers.
+- **Every uploaded file is kept** and listed on the table's page, so going back to an earlier version means downloading that file and uploading it again.
+- **To make another table uploadable,** add `filled_by: excel` to it in the master file. Its columns must be text, whole numbers, numbers, yes/no or dates, and it needs a primary key made of its own columns.
 ---
 
 ## 5. Architecture
@@ -112,8 +126,8 @@ The system is packaged as **Docker containers** and, for now, runs on a **single
           │   location's address)     database)                                        │
           │       │                                                                    │
  Admins ─►│       └──► Admin portal ──► Admin API ──► Import worker (one importer      │
-(Microsoft│                                 │               │       per dataset)       │
- login)   │                                 ▼               ▼                          │
+(name and │                                 │               │       per dataset)       │
+password) │                                 ▼               ▼                          │
           │                         PostgreSQL + PostGIS (the database)                │
           └───────────────────────────────────────┬────────────────────────────────────┘
                                                   │ raw uploaded files, nightly backups
@@ -125,12 +139,12 @@ The system is packaged as **Docker containers** and, for now, runs on a **single
 
 | Component | Runs as | Role |
 |---|---|---|
-| **Web server** | Container (e.g. Caddy) | The only part open to the internet. Serves the dashboard and admin portal over HTTPS, with a certificate for each location's address that it gets and renews automatically. |
+| **Web server** | Caddy container | The only part open to the internet. Serves the dashboard and admin portal over HTTPS, with a certificate for each location's address that it gets and renews automatically. Caddy rather than nginx because it does the certificates itself, with a much shorter configuration. *(Not built yet.)* |
 | **Public dashboard** | Files served by the web server | One app, a URL per location. Reads only published data bundles, so it never touches the database. |
 | **Published data bundles** | Folder on the VM | One bundle per location, written by the publish step. Can always be rebuilt from the database. |
-| **Admin portal** | Files served by the web server (at `/admin` or its own address) | Upload, preview, approve and publish screens, plus forms for the hand-written text. Login with organisation Microsoft accounts (Entra ID). |
+| **Admin portal** | Files served by the web server (at `/admin` or its own address) | Upload, preview, approve and publish screens, plus forms for the hand-written text. Each person has their own name and password; only hashes of the passwords are stored, in the server's settings. Microsoft accounts (Entra ID) could replace this if many more people need access. *(Built so far: the login and the Excel download, upload, preview and approve screens, served by the admin API's container.)* |
 | **Admin API** | Python container | Behind the admin portal. Checks logins and roles, handles uploads and publishing. |
-| **Import worker** | Python container (same image) | Runs the importers in the background after an upload. |
+| **Import worker** | Python container (same image) | Runs long imports in the background. *(Not needed yet: Excel uploads are checked straight away.)* |
 | **Database** | PostgreSQL 17 + PostGIS container | The single source of truth. Not reachable from the internet. PostGIS handles boundaries and point-in-catchment lookups. |
 | **Raw files and backups** | Azure Blob Storage | Original uploaded files and nightly database backups, kept off the VM so they survive if it fails. |
 
@@ -194,7 +208,7 @@ One `docker compose up` starts (built so far: the database, plus the schema tool
 | Admin API and import worker | As on the VM |
 | Web server | Serves the dashboard and admin portal |
 
-**Known differences locally:** a test login instead of real Microsoft accounts, no HTTPS certificates, and Azurite instead of real Blob Storage.
+**Known differences locally:** a test login (admin / admin), no HTTPS certificates, and Azurite instead of real Blob Storage.
 
 ### 6.2 The live VM
 
@@ -272,9 +286,9 @@ Agree the final set of pages and panels (Section 8), including anything to be ad
 4. **Phosphate source estimates and 2030 values:** where do these come from (a model output, a file)?
 5. **Hand-written text:** who writes it, and will they use the admin portal?
 6. **Branding per location:** does the Biosphere logo, colours, intro text or contact email change per location?
-7. **Admin users:** who can upload, and can someone be limited to managing only their own location?
+7. **Admin users:** who can upload, and can someone be limited to managing only their own location? *So far: one or two people, each with their own login, who can upload to every table.*
 8. **Which waterbodies count:** the current dashboard includes only the 92 river waterbodies, excluding lakes, reservoirs and some coastal waters. Is this the rule for every location? *(The EA's North Devon management catchment contains exactly these 92 rivers plus 6 lakes.)*
-9. **Column mapping screen or importers?** The concept deck (slide 3) shows the admin choosing which column in the file goes into which database column, remembered for next time. Section 4.1 instead has a small importer written for each dataset. A mapping screen handles simple files with no developer; some conversions need code (e.g. livestock's `Cattle_Dairy, Sheep, …` columns becoming rows). A likely answer is both: a mapping screen for simple files, importers for the rest. To decide before building the import step.
+9. **Column mapping screen or importers?** The concept deck (slide 3) shows the admin choosing which column in the file goes into which database column, remembered for next time. Section 4.1 instead has a small importer written for each dataset. A mapping screen handles simple files with no developer; some conversions need code (e.g. livestock's `Cattle_Dairy, Sheep, …` columns becoming rows). A likely answer is both: a mapping screen for simple files, importers for the rest. **Decided (29 October 2026): neither, for now.** An uploaded file must be an exact copy of the table (§4.4), so there's nothing to map, and importers are only written for API sources or files too fiddly to convert in Excel.
 
 ### 9.4 Notes from the reference data so far
 

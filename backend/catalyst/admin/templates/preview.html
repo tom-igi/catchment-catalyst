@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}{{ "Check the changes" if upload.status == "preview" else "Upload " ~ upload.id }}{% endblock %}
+
+{% macro more(items) %}
+  {% if items | length > rows_shown %}<p class="muted">Showing the first {{ rows_shown }} of {{ items | length }}.</p>{% endif %}
+{% endmacro %}
+
+{% block content %}
+<p class="crumb"><a href="/admin/tables/{{ table.name }}">← {{ title(table) }}</a></p>
+<h1>{{ "Check the changes" if upload.status == "preview" else "Upload " ~ upload.id }}</h1>
+<p class="lead">
+  <a href="/admin/uploads/{{ upload.id }}/file">{{ upload.file_name }}</a>
+  ({{ upload.rows_in_file | rows }}), uploaded to {{ title(table) }} by {{ upload.uploaded_by }},
+  {{ upload.uploaded_at | when }}.
+</p>
+
+{% if upload.status == "approved" %}
+<p class="card">
+  Approved {{ upload.approved_at | when }}: {{ upload.rows_added }} added, {{ upload.rows_changed }} changed,
+  {{ upload.rows_removed }} deleted.
+</p>
+
+{% elif upload.status == "cancelled" %}
+<p class="card">Cancelled. It didn't change anything.</p>
+
+{% elif problems %}
+<div class="problems" role="alert">
+  <h2>This file can't be used any more</h2>
+  <p>The table or the tables it links to have changed since it was uploaded:</p>
+  <ul>{% for problem in problems[:50] %}<li>{{ problem }}</li>{% endfor %}</ul>
+</div>
+<form method="post" action="/admin/uploads/{{ upload.id }}/cancel">
+  <button class="button secondary">Cancel this upload</button>
+</form>
+
+{% else %}
+{% set c = comparison %}
+<div class="stats">
+  <div class="stat add"><strong>{{ c.added | length }}</strong> to add</div>
+  <div class="stat change"><strong>{{ c.changed | length }}</strong> to change</div>
+  <div class="stat remove"><strong>{{ c.removed | length }}</strong> to delete</div>
+  <div class="stat"><strong>{{ c.unchanged }}</strong> unchanged</div>
+</div>
+
+{% if not c.has_changes %}
+<p class="message">The file is now the same as the table, so there's nothing to change.</p>
+{% elif c.removed and not c.changed and not c.unchanged %}
+<p class="warning" role="alert">
+  <strong>This deletes every row that's in the table now</strong> and puts the file's rows in their place.
+  If that isn't what you meant, cancel, download the table again and make your changes in that copy.
+</p>
+{% elif c.removed %}
+<p class="warning" role="alert">
+  <strong>{{ c.removed | length | rows }} will be deleted,</strong> because {{ "it's" if c.removed | length == 1 else "they're" }}
+  in the table but not in the file. If you didn't mean to delete {{ "it" if c.removed | length == 1 else "them" }},
+  cancel, download the table again and make your changes in that copy.
+</p>
+{% endif %}
+
+{% if c.removed %}
+<section class="card change-list remove">
+  <h2>To delete ({{ c.removed | length }})</h2>
+  <div class="scroll">
+    <table class="rows">
+      <thead><tr>{% for column in table.columns %}<th scope="col">{{ column.name }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for row in c.removed[:rows_shown] %}
+        <tr>{% for column in table.columns %}<td{% if row[column.name] is none %} class="empty"{% endif %}>{{ row[column.name] | cell }}</td>{% endfor %}</tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ more(c.removed) }}
+</section>
+{% endif %}
+
+{% if c.changed %}
+<section class="card change-list change">
+  <h2>To change ({{ c.changed | length }})</h2>
+  <div class="scroll">
+    <table class="rows">
+      <thead><tr><th scope="col" class="num">Row</th>{% for k in key %}<th scope="col">{{ k }}</th>{% endfor %}<th scope="col">Changes</th></tr></thead>
+      <tbody>
+        {% for ch in c.changed[:rows_shown] %}
+        <tr>
+          <td class="num">{{ ch.row.line }}</td>
+          {% for k in key %}<td>{{ ch.row.values[k] | cell }}</td>{% endfor %}
+          <td>
+            {% for column in ch.columns %}
+            <div><code>{{ column }}</code>: <span class="old">{{ ch.old[column] | cell }}</span> → <span class="new">{{ ch.row.values[column] | cell }}</span></div>
+            {% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ more(c.changed) }}
+</section>
+{% endif %}
+
+{% if c.added %}
+<section class="card change-list add">
+  <h2>To add ({{ c.added | length }})</h2>
+  <div class="scroll">
+    <table class="rows">
+      <thead><tr><th scope="col" class="num">Row</th>{% for column in table.columns %}<th scope="col">{{ column.name }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for row in c.added[:rows_shown] %}
+        <tr>
+          <td class="num">{{ row.line }}</td>
+          {% for column in table.columns %}<td{% if row.values[column.name] is none %} class="empty"{% endif %}>{{ row.values[column.name] | cell }}</td>{% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ more(c.added) }}
+</section>
+{% endif %}
+
+<p class="muted">"Row" is the row number in your Excel file.</p>
+
+<div class="actions">
+  {% if c.has_changes %}
+  <form method="post" action="/admin/uploads/{{ upload.id }}/approve">
+    <input type="hidden" name="check" value="{{ c.fingerprint }}">
+    <button class="button">Approve and update the table</button>
+  </form>
+  {% endif %}
+  <form method="post" action="/admin/uploads/{{ upload.id }}/cancel">
+    <button class="button secondary">Cancel</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

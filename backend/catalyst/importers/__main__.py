@@ -17,9 +17,9 @@ import sqlalchemy as sa
 
 from catalyst.db import load_schema
 
-from . import catchments
-from .catchments import ImportProblem
-from .ea_api import EAClient
+from .api import catchments
+from .api.catchments import ImportProblem
+from .api.ea_api import EAClient
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -38,6 +38,29 @@ services:
       # The lists of what to import, and where downloads are kept.
       - ./imports:/app/imports
 
+  # The admin page, at http://localhost:8000/admin. Uses the development
+  # image, so it restarts by itself when the code or schema.yaml changes.
+  admin:
+    build:
+      context: ./backend
+      target: dev
+    image: catchment-catalyst-backend-dev
+    command: ["serve", "--reload"]
+    environment:
+      DATABASE_URL: *database-url
+      # Local login: name "admin", password "admin". To use your own, make an
+      # entry with `docker compose run --rm admin hash-password <name>` and put
+      # it in .env as ADMIN_USERS.
+      ADMIN_USERS: ${ADMIN_USERS:-admin:scrypt.643245e515ce89eb9cf1a97340e4bc14.6416f16ac5cb71939110556f96b9252c8e00bd2794e8d1697b86df440ffa6a16}
+      ADMIN_SECRET_KEY: ${ADMIN_SECRET_KEY:-local-only-not-secret}
+    ports:
+      # Only reachable from this machine. Change ADMIN_PORT in .env if 8000 is taken.
+      - "127.0.0.1:${ADMIN_PORT:-8000}:8000"
+    volumes:
+      - ./backend/catalyst:/app/catalyst:ro
+      # Uploaded files are kept in imports/raw/<table>/.
+      - ./imports:/app/imports
+
   # Backend tests. Each test run uses its own throwaway database on `db`.
   test:
     build:

@@ -107,3 +107,41 @@ def test_duplicate_names_are_rejected(tmp_path):
     )
     with pytest.raises(SchemaError, match="'id' appears twice"):
         load_schema(path)
+
+
+def test_which_tables_are_filled_by_excel():
+    schema = load_schema()
+    assert schema.excel_tables == ["ea_scores", "habitat_land_use"]
+    assert schema.metadata.tables["catchments"].info["filled_by"] == "api"
+
+
+def test_tables_filled_by_excel_must_suit_an_upload():
+    with pytest.raises(SchemaError) as error:
+        make_schema("""
+            tables:
+              things:
+                filled_by: excel
+                columns:
+                  id: {type: integer, primary_key: true, identity: true}
+                  shape: {type: "geometry(Point, 4326)"}
+                  tags: {type: "text[]"}
+                  score: {type: real}
+              keyless:
+                filled_by: excel
+                columns:
+                  name: {type: text}
+              others:
+                filled_by: spreadsheet
+                columns:
+                  name: {type: text}
+        """)
+    problems = "\n".join(error.value.problems)
+    for expected in [
+        "tables.things.columns.id: tables filled by Excel can't have numbered ('identity') columns",
+        "tables.things.columns.shape: Excel uploads can only fill text, varchar(N), integer",
+        "tables.things.columns.tags: Excel uploads can only fill",
+        "tables.things.columns.score: Excel uploads can only fill",
+        "tables.keyless: tables filled by Excel need a primary key",
+        "tables.others: 'filled_by' must be one of: api, excel",
+    ]:
+        assert expected in problems

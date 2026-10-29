@@ -11,9 +11,9 @@ import sqlalchemy as sa
 
 from catalyst.db import load_schema
 from catalyst.db.sync import apply_changes
-from catalyst.importers import catchments
-from catalyst.importers.catchments import ImportProblem
-from catalyst.importers.ea_api import EAError
+from catalyst.importers.api import catchments
+from catalyst.importers.api.catchments import ImportProblem
+from catalyst.importers.api.ea_api import EAError
 
 FIXTURES = Path(__file__).parent / "fixtures" / "ea"
 WEST_OKEMENT, EAST_OKEMONT = "GB108050008080", "GB108050008100"

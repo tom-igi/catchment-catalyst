@@ -29,6 +29,10 @@ MAP_SHAPES = {
 }
 DEFAULTS = {"now()": "Set automatically to the current time", "true": "Default: Yes", "false": "Default: No"}
 WORDS = {"id": "ID", "ea": "EA", "url": "URL", "ha": "(ha)", "km": "(km)", "ids": "IDs"}
+FILLED_BY = {
+    "api": "downloaded from an outside service by an importer.",
+    "excel": "uploaded as an Excel file in the admin page.",
+}
 PLURALS = {"Text": "text", "Whole number": "whole numbers", "Number": "numbers", "Date": "dates",
            "Date and time": "dates and times", "Yes / No": "yes / no values", "ID code": "ID codes"}
 
@@ -115,7 +119,7 @@ def _card(table: sa.Table, section: Section) -> str:
     <span class="tag{' data' if section.data else ''}">{_e('Data table' if section.data else section.title)}</span>
     <code class="tech">{_e(table.name)}</code>
   </div>
-  <p class="card-desc">{_e(table.comment or '')}</p>
+  <p class="card-desc">{_e(table.comment or '')}</p>{_filled_by(table)}
   <div class="scroll" role="region" aria-label="{_e(_title(table))}: columns and an example row" tabindex="0">
     <table class="sheet">
       <thead><tr>{headings}</tr><tr class="types">{types}</tr></thead>
@@ -129,6 +133,11 @@ def _card(table: sa.Table, section: Section) -> str:
   </table>
   <a class="top" href="#top">Back to the list of tables</a>
 </section>"""
+
+
+def _filled_by(table: sa.Table) -> str:
+    how = FILLED_BY.get(table.info.get("filled_by"))
+    return f'\n  <p class="note"><strong>How it\'s filled:</strong> {_e(how)}</p>' if how else ""
 
 
 def _flags(column: sa.Column, key_size: int) -> str:

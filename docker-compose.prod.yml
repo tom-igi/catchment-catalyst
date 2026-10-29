@@ -9,8 +9,9 @@
 # and says which one.
 #
 # Still to come in this file, when there is a site to serve: the web server
-# (HTTPS for each location's address), nightly backups to Azure storage, the
-# admin API and the import worker.
+# (HTTPS for each location's address; once it's there, set ADMIN_HTTPS_ONLY:
+# "true" on the admin service and remove the admin's port), and nightly
+# backups to Azure storage.
 
 x-database-url: &database-url postgresql+psycopg://${POSTGRES_USER:?Set POSTGRES_USER in .env}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
 
@@ -45,3 +46,17 @@ services:
       # The lists of what to import, and where downloads are kept (moving to
       # Azure storage later).
       - ./imports:/app/imports
+
+  admin:
+    environment:
+      DATABASE_URL: *database-url
+      ADMIN_USERS: ${ADMIN_USERS:?Set ADMIN_USERS in .env}
+      ADMIN_SECRET_KEY: ${ADMIN_SECRET_KEY:?Set ADMIN_SECRET_KEY in .env}
+    ports:
+      # Only reachable from the server itself until the web server (HTTPS) is
+      # added. Until then, open it through an SSH tunnel (see README.md).
+      - "127.0.0.1:8000:8000"
+    volumes:
+      # Uploaded files are kept in imports/raw/<table>/ (moving to Azure storage later).
+      - ./imports:/app/imports
+    logging: *logging

@@ -27,6 +27,12 @@ sections:
       dataset's source and caveats for the dashboard's "i" info buttons.
     tables: [datasets]
 
+  - title: Uploads
+    description: >-
+      A record of every Excel file uploaded in the admin page: who uploaded
+      it, when, and what it changed. The files themselves are kept too.
+    tables: [uploads]
+
 data_tables:
   title: Data tables
   description: >-

@@ -1,1 +1,3 @@
 pytest==9.1.1
+httpx2==2.16.0
+watchfiles==1.3.0  # lets the admin page restart itself when code or schema.yaml changes

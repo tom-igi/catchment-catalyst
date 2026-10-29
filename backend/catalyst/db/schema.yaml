@@ -48,8 +48,19 @@
 #    example       An example value, shown on the data map page
 #                  (datamap/). Not stored in the database.
 #
-#  Table options:  title, description, columns, indexes, renamed_from
+#  Table options:  title, description, filled_by, columns, indexes, renamed_from
 #    title         Friendly name, e.g. EA Scores. Shown on the data map page.
+#    filled_by     How the table gets its data:
+#                    api    an importer downloads it from an outside service
+#                           (code in backend/catalyst/importers/api/)
+#                    excel  uploaded as an Excel file in the admin page. The
+#                           table then appears there automatically, with no
+#                           code to write. Each upload replaces the table's
+#                           rows, so the table needs a primary key, and its
+#                           columns can only be text, varchar(N), integer,
+#                           bigint, smallint, double, boolean or date.
+#                  Leave it out for tables filled some other way (e.g. the
+#                  admin page's own records).
 #    indexes       Indexes over several columns, for example:
 #                    indexes:
 #                      - columns: [location_id, year]
@@ -82,6 +93,7 @@ tables:
       entirely from the EA's Catchment Data Explorer by the catchments
       importer, so it is never edited by hand: anything written by hand goes
       in its own table, linked by Catchment ID.
+    filled_by: api
     columns:
       id:
         type: text
@@ -257,6 +269,77 @@ tables:
         required: true
         default: now()
 
+  uploads:
+    title: Uploads
+    description: >-
+      One row for each Excel file uploaded in the admin page: which table it
+      was for, who uploaded it and when, and what it changed. The file itself
+      is kept, so an earlier version of a table can be downloaded from the
+      admin page and uploaded again.
+    columns:
+      id:
+        type: integer
+        example: 12
+        primary_key: true
+        identity: true
+        description: Upload ID
+      table_name:
+        type: text
+        example: ea_scores
+        required: true
+        description: The table the file was uploaded to
+      file_name:
+        type: text
+        example: EA scores October.xlsx
+        required: true
+        description: Name of the file that was uploaded
+      stored_as:
+        type: text
+        example: ea_scores/2026-10-29_143000_12.xlsx
+        required: true
+        description: Where the file is kept, inside the folder of uploaded and downloaded files
+      uploaded_by:
+        type: text
+        example: tom
+        required: true
+        description: Who uploaded it (their admin login name)
+      uploaded_at:
+        type: timestamptz
+        example: 2026-10-29 14:30
+        required: true
+        default: now()
+      status:
+        type: text
+        example: approved
+        required: true
+        default: "'preview'"
+        description: >-
+          preview (waiting for someone to check and approve it), approved (the
+          table's rows were replaced with the file's) or cancelled
+      rows_in_file:
+        type: integer
+        example: 830
+        required: true
+      rows_added:
+        type: integer
+        example: 12
+        required: true
+        description: Rows in the file that weren't in the table
+      rows_changed:
+        type: integer
+        example: 3
+        required: true
+        description: Rows in both, with different values
+      rows_removed:
+        type: integer
+        example: 0
+        required: true
+        description: Rows in the table that weren't in the file, so are deleted
+      approved_at:
+        type: timestamptz
+        example: 2026-10-29 14:32
+        description: When it was approved and the table's rows were replaced
+
 
 data_tables:
 
@@ -269,6 +352,7 @@ data_tables:
     description: >-
       EA water quality classification results: one row per catchment,
       measure and year.
+    filled_by: excel
     columns:
       catchment_id:
         type: text
@@ -297,6 +381,7 @@ data_tables:
   habitat_land_use:
     title: Habitat & Land Use
     description: Area of each habitat or land use type in each catchment.
+    filled_by: excel
     columns:
       catchment_id:
         type: text

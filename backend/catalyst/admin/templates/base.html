@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>{% block title %}Admin{% endblock %} · Catchment Catalyst</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f3f6f7;
+    --card: #ffffff;
+    --text: #1c282d;
+    --muted: #5a6a71;
+    --border: #d9e2e5;
+    --accent: #0d6b77;
+    --accent-text: #ffffff;
+    --accent-soft: #e3f1f3;
+    --add: #1d6b36;
+    --add-soft: #e6f4ea;
+    --change: #8a5a00;
+    --change-soft: #fdf3dc;
+    --remove: #b3261e;
+    --remove-soft: #fce8e6;
+    --shadow: 0 1px 2px rgba(20, 40, 50, .06), 0 2px 8px rgba(20, 40, 50, .05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #10171a;
+      --card: #172126;
+      --text: #e3ebee;
+      --muted: #9aabb2;
+      --border: #2a383e;
+      --accent: #5cc3ce;
+      --accent-text: #10171a;
+      --accent-soft: #163339;
+      --add: #7fd497;
+      --add-soft: #16301f;
+      --change: #f0c063;
+      --change-soft: #33280f;
+      --remove: #ff8a80;
+      --remove-soft: #3a1a18;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  a { color: var(--accent); }
+  code { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace; font-size: .88em; }
+  h1 { margin: 4px 0 6px; font-size: 2rem; line-height: 1.2; }
+  h2 { margin: 0 0 8px; font-size: 1.2rem; }
+  .lead { margin: 0 0 24px; color: var(--muted); max-width: 48em; }
+  .muted { color: var(--muted); }
+  .crumb { margin: 0; font-size: .95rem; }
+
+  .bar {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px;
+    padding: 12px 16px; background: var(--card); border-bottom: 1px solid var(--border);
+  }
+  .brand { font-weight: 700; color: var(--text); text-decoration: none; }
+  .brand span { color: var(--accent); font-weight: 600; }
+  .who { display: flex; align-items: center; gap: 12px; margin: 0; font-size: .95rem; color: var(--muted); }
+  main { max-width: 1120px; margin: 0 auto; padding: 32px 16px 64px; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px 22px; box-shadow: var(--shadow); margin-bottom: 16px;
+  }
+  .card > :last-child { margin-bottom: 0; }
+
+  .button {
+    display: inline-block; padding: 9px 18px; border-radius: 8px; border: 1px solid var(--accent);
+    background: var(--accent); color: var(--accent-text); font: inherit; font-weight: 600;
+    text-decoration: none; cursor: pointer;
+  }
+  .button.secondary { background: transparent; color: var(--accent); }
+  .button.danger { background: transparent; color: var(--remove); border-color: var(--remove); }
+  .button:hover { filter: brightness(1.08); }
+  .link { background: none; border: none; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 20px; }
+  .actions form { margin: 0; }
+
+  label { display: block; font-weight: 600; margin: 14px 0 4px; }
+  input[type=text], input[type=password] {
+    width: 100%; padding: 9px 11px; font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--border); border-radius: 8px;
+  }
+  input[type=file] { font: inherit; max-width: 100%; }
+
+  .message, .problems, .warning {
+    border-radius: 10px; padding: 14px 18px; margin: 0 0 20px; border: 1px solid;
+  }
+  .message { background: var(--accent-soft); border-color: transparent; }
+  .problems { background: var(--remove-soft); border-color: var(--remove); }
+  .problems h2 { color: var(--remove); }
+  .problems ul { margin: 8px 0 0; padding-left: 20px; }
+  .warning { background: var(--change-soft); border-color: var(--change); }
+  .warning strong { color: var(--change); }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .tile { display: flex; flex-direction: column; gap: 6px; color: var(--text); text-decoration: none; margin: 0; }
+  .tile:hover { border-color: var(--accent); }
+  .tile h2 { margin: 0; color: var(--accent); }
+  .tile p { margin: 0; }
+
+  .scroll { overflow-x: auto; }
+
+  .steps { list-style: none; padding: 0; margin: 0 0 32px; counter-reset: step; }
+  .steps > li { counter-increment: step; }
+  .steps > li > h2::before {
+    content: counter(step); display: inline-grid; place-items: center; width: 1.6em; height: 1.6em;
+    margin-right: 10px; border-radius: 50%; background: var(--accent); color: var(--accent-text); font-size: .9em;
+  }
+  .steps ul { padding-left: 20px; }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+  details .scroll { margin-top: 10px; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; color: var(--muted); }
+  .stat strong { display: block; font-size: 1.8rem; line-height: 1.1; color: var(--text); }
+  .stat.add strong { color: var(--add); }
+  .stat.change strong { color: var(--change); }
+  .stat.remove strong { color: var(--remove); }
+  .change-list { border-left-width: 5px; }
+  .change-list.add { border-left-color: var(--add); }
+  .change-list.change { border-left-color: var(--change); }
+  .change-list.remove { border-left-color: var(--remove); }
+  .change-list.remove h2 { color: var(--remove); }
+  table.rows { border-collapse: collapse; width: 100%; font-size: .93rem; }
+  table.rows th, table.rows td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.rows th { font-weight: 600; white-space: nowrap; }
+  table.rows td.num, table.rows th.num { text-align: right; }
+  .empty { color: var(--muted); font-style: italic; }
+  .old { color: var(--remove); text-decoration: line-through; }
+  .new { color: var(--add); font-weight: 600; }
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="brand" href="/admin">Catchment Catalyst <span>admin</span></a>
+  {% if user %}
+  <form class="who" method="post" action="/admin/logout">
+    <span>Logged in as <strong>{{ user }}</strong></span>
+    <button class="link">Log out</button>
+  </form>
+  {% endif %}
+</header>
+<main>
+  {% if message %}<p class="message" role="status">{{ message }}</p>{% endif %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

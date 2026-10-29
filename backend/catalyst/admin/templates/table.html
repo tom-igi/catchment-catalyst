@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}{{ title(table) }}{% endblock %}
+{% block content %}
+<p class="crumb"><a href="/admin">← All tables</a></p>
+<h1>{{ title(table) }}</h1>
+<p class="lead">{{ table.comment or "" }}</p>
+
+{% if problems %}
+<div class="problems" role="alert">
+  <h2>{{ file_name or "The file" }} can't be used yet</h2>
+  <p>Nothing has been changed. Fix {{ "this" if problems | length == 1 else "these" }} in the file, then upload it again:</p>
+  <ul>
+    {% for problem in problems[:50] %}<li>{{ problem }}</li>{% endfor %}
+  </ul>
+  {% if problems | length > 50 %}<p>…and {{ problems | length - 50 }} more.</p>{% endif %}
+</div>
+{% endif %}
+
+<ol class="steps">
+  <li class="card">
+    <h2>Download the table</h2>
+    <p>
+      It has {{ count | rows }} now. Always start from a fresh download, so you don't undo
+      changes someone else has uploaded since your last one.
+    </p>
+    <a class="button secondary" href="/admin/tables/{{ table.name }}/download">Download as Excel</a>
+  </li>
+  <li class="card">
+    <h2>Edit it in Excel</h2>
+    <ul>
+      <li>
+        Add, change or delete rows. The upload <strong>replaces the whole table</strong>,
+        so a row you delete from the file is deleted from the table.
+      </li>
+      <li>Keep the column names in row 1 as they are, and keep the data on the first sheet.</li>
+      <li>
+        {% if key | length > 1 -%}
+        Each combination of {{ key[:-1] | join(", ") }} and {{ key[-1] }} can only appear once.
+        {%- else -%}
+        Each {{ key[0] }} can only appear once.
+        {%- endif %}
+      </li>
+    </ul>
+    <details>
+      <summary>What each column holds</summary>
+      <div class="scroll">
+        <table class="rows">
+          <thead><tr><th scope="col">Column</th><th scope="col">Holds</th><th scope="col">Needs a value</th><th scope="col">What it means</th></tr></thead>
+          <tbody>
+            {% for column in table.columns %}
+            <tr>
+              <td><code>{{ column.name }}</code></td>
+              <td>{{ type_label(column) }}</td>
+              <td>{{ "Yes" if not column.nullable else "" }}</td>
+              <td>
+                {{ column.comment or "" }}
+                {% for fk in column.foreign_keys %}Must be in the {{ title(fk.column.table) }} table.{% endfor %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </li>
+  <li class="card">
+    <h2>Upload it</h2>
+    <p>You'll see what will be added, changed and deleted before anything is saved.</p>
+    <form method="post" action="/admin/tables/{{ table.name }}/upload" enctype="multipart/form-data">
+      <input type="file" name="file" aria-label="Excel file to upload"
+             accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
+      <div class="actions"><button class="button">Upload and preview</button></div>
+    </form>
+  </li>
+</ol>
+
+<h2>Recent uploads</h2>
+{% if recent %}
+<div class="card scroll">
+  <table class="rows">
+    <thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">File</th><th scope="col">What happened</th></tr></thead>
+    <tbody>
+      {% for upload in recent %}
+      <tr>
+        <td>{{ upload.uploaded_at | when }}</td>
+        <td>{{ upload.uploaded_by }}</td>
+        <td><a href="/admin/uploads/{{ upload.id }}/file">{{ upload.file_name }}</a></td>
+        <td>
+          {% if upload.status == "approved" %}
+          Approved: {{ upload.rows_added }} added, {{ upload.rows_changed }} changed, {{ upload.rows_removed }} deleted
+          {% elif upload.status == "preview" %}
+          <a href="/admin/uploads/{{ upload.id }}">Waiting to be checked and approved</a>
+          {% else %}
+          <span class="muted">Cancelled</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="muted">
+  To go back to an earlier version, download its file here and upload it again.
+</p>
+{% else %}
+<p class="muted">Nothing has been uploaded to this table yet.</p>
+{% endif %}
+{% endblock %}
