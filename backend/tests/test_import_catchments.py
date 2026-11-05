@@ -4,6 +4,7 @@ Uses real EA downloads saved in tests/fixtures/ea (EA data, Open Government
 Licence), so the tests don't depend on the EA's servers being up.
 """
 
+import json
 from pathlib import Path
 
 import pytest
@@ -36,6 +37,14 @@ class FakeEA:
 
     def waterbody_page(self, waterbody_id):
         return (FIXTURES / f"{self.answer_with.get(waterbody_id, waterbody_id)}.html").read_text()
+
+    def management_catchment(self, management_catchment_id):
+        # The North Devon list, cut down to the two test catchments and one lake
+        return json.loads((FIXTURES / f"management-catchment-{management_catchment_id}.geojson").read_text())
+
+    def management_catchment_file(self, management_catchment_id, name):
+        # The North Devon files, cut down to the two test catchments and Langham Lake
+        return (FIXTURES / f"management-catchment-{management_catchment_id}-{name}").read_bytes()
 
 
 def test_reads_details_and_shapes_from_the_shapefile():
@@ -86,23 +95,40 @@ def test_every_problem_is_reported_together():
     assert problems == ["GB999999999999: the EA returned error 500, after 3 tries"]
 
 
+@pytest.mark.parametrize("content, expected", [
+    ('{"catchments": ["GB108050008080"]}', (["GB108050008080"], [])),
+    ('{"description": "Test", "catchments": ["GB108050008080"]}', (["GB108050008080"], [])),
+    ('{"management_catchments": [3062]}', ([], [3062])),
+    ('{"management_catchments": [3062], "catchments": ["GB108050008080"]}', (["GB108050008080"], [3062])),
+])
+def test_the_catchment_list_can_name_catchments_and_management_catchments(tmp_path, content, expected):
+    path = tmp_path / "catchments.json"
+    path.write_text(content)
+    listed = catchments.read_catchment_list(path)
+    assert (listed.ids, listed.management_catchments) == expected
+
+
 @pytest.mark.parametrize("content, message", [
-    ('{"catchments": ["GB108050008080"]}', None),
-    ('{"description": "Test", "catchments": ["GB108050008080"]}', None),
     ('{"catchment": ["GB108050008080"]}', "should look like"),
     ('{"catchments": []}', "should look like"),
+    ('{"management_catchments": 3062}', "should look like"),
     ('{"catchments": ["West Okement"]}', "aren't catchment IDs: West Okement"),
+    ('{"management_catchments": ["North Devon"]}', "aren't management catchment IDs .*: North Devon"),
     ('{"catchments": ["GB108050008080", "GB108050008080"]}', "more than once: GB108050008080"),
     ('{"catchments": ["GB108050008080",]}', "not valid JSON"),
 ])
 def test_the_catchment_list_is_checked(tmp_path, content, message):
     path = tmp_path / "catchments.json"
     path.write_text(content)
-    if message is None:
-        assert catchments.read_catchment_list(path) == ["GB108050008080"]
-    else:
-        with pytest.raises(ImportProblem, match=message):
-            catchments.read_catchment_list(path)
+    with pytest.raises(ImportProblem, match=message):
+        catchments.read_catchment_list(path)
+
+
+def test_a_management_catchment_means_its_rivers():
+    assert catchments.rivers_in(3062, FakeEA()) == [
+        (EAST_OKEMONT, "East Okemont River"),  # listed once, though the EA has its outline and its river line
+        (WEST_OKEMENT, "West Okement"),
+    ]  # and not the lake
 
 
 def test_import_fills_the_tables_and_can_be_repeated(engine):

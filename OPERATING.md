@@ -81,11 +81,18 @@ Each upload replaces the whole table, so always start from a fresh download.
 ### Tables filled from an outside source (e.g. Catchments, from the Environment Agency)
 
 Each has its own import command, which downloads the data, shows what will change, and asks
-before saving. For Catchments, add the catchment IDs to `imports/catchments.json`, then:
+before saving. `imports/catchments.json` says which catchments to import (now all of North
+Devon's rivers). Import the catchments first, then the rest:
 
 ```bash
-docker compose run --rm importer catchments imports/catchments.json
+docker compose run --rm importer catchments imports/catchments.json   # a few minutes
+docker compose run --rm importer classifications
+docker compose run --rm importer storm-overflows                      # a minute or two
+docker compose run --rm importer river-obstacles
 ```
+
+Run them again whenever the EA updates its data (classifications about once a year, storm
+overflow returns each spring).
 
 To see every import command:
 
@@ -105,6 +112,12 @@ To change a location's catchments (list all of them, not just the new ones):
 
 ```bash
 docker compose exec db psql -U catalyst -c "UPDATE locations SET catchment_ids = ARRAY['GB108050008080', 'GB108050008100'] WHERE name = 'North Devon'"
+```
+
+Or give North Devon every river imported from its management catchment (`3062`):
+
+```bash
+docker compose exec db psql -U catalyst -c "UPDATE locations SET catchment_ids = (SELECT array_agg(id ORDER BY id) FROM catchments WHERE management_catchment_id = 3062 AND waterbody_type = 'River') WHERE name = 'North Devon'"
 ```
 
 ### Then publish the dashboard

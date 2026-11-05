@@ -1,4 +1,4 @@
 {
-  "description": "First test: West Okement and East Okemont River (North Devon, Torridge).",
-  "catchments": ["GB108050008080", "GB108050008100"]
+  "description": "North Devon: every river waterbody in the EA's North Devon management catchment (3062).",
+  "management_catchments": [3062]
 }

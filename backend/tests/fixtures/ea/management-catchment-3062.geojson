@@ -1,0 +1,75 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "GB108050008100",
+    "name": "East Okemont River",
+    "uri": "http://environment.data.gov.uk/catchment-planning/so/WaterBody/GB108050008100",
+    "water-body-type": {
+     "string": "River",
+     "lang": "en"
+    },
+    "geometry-type": "http://environment.data.gov.uk/catchment-planning/def/geometry/Catchment"
+   },
+   "geometry": null
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "GB108050008100",
+    "name": "East Okemont River",
+    "uri": "http://environment.data.gov.uk/catchment-planning/so/WaterBody/GB108050008100",
+    "water-body-type": {
+     "string": "River",
+     "lang": "en"
+    },
+    "geometry-type": "http://environment.data.gov.uk/catchment-planning/def/geometry/RiverLine"
+   },
+   "geometry": null
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "GB30843922",
+    "name": "Wistlandpound Reservoir",
+    "uri": "http://environment.data.gov.uk/catchment-planning/so/WaterBody/GB30843922",
+    "water-body-type": {
+     "string": "Lake",
+     "lang": "en"
+    },
+    "geometry-type": "http://environment.data.gov.uk/catchment-planning/def/geometry/Catchment"
+   },
+   "geometry": null
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "GB108050008080",
+    "name": "West Okement",
+    "uri": "http://environment.data.gov.uk/catchment-planning/so/WaterBody/GB108050008080",
+    "water-body-type": {
+     "string": "River",
+     "lang": "en"
+    },
+    "geometry-type": "http://environment.data.gov.uk/catchment-planning/def/geometry/Catchment"
+   },
+   "geometry": null
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "GB108050008080",
+    "name": "West Okement",
+    "uri": "http://environment.data.gov.uk/catchment-planning/so/WaterBody/GB108050008080",
+    "water-body-type": {
+     "string": "River",
+     "lang": "en"
+    },
+    "geometry-type": "http://environment.data.gov.uk/catchment-planning/def/geometry/RiverLine"
+   },
+   "geometry": null
+  }
+ ]
+}

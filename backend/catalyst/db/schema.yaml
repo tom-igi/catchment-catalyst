@@ -398,3 +398,228 @@ data_tables:
         example: 612
         required: true
         description: Area in hectares
+
+  ea_classifications:
+    title: EA Classifications
+    description: >-
+      The EA's Water Framework Directive classification results: the status of
+      each classification item (Ecological, Fish, Phosphate, ...) in each
+      classification year. Filled from the EA's Catchment Data Explorer by
+      `importer classifications`, which replaces every row.
+    filled_by: api
+    columns:
+      catchment_id:
+        type: text
+        example: GB108050008080
+        primary_key: true
+        references: catchments.id
+      item:
+        type: text
+        example: Fish
+        primary_key: true
+        description: The EA's classification item, e.g. Ecological, Fish, Phosphate, Chemical
+      year:
+        type: integer
+        example: 2022
+        primary_key: true
+        description: Classification year
+      cycle:
+        type: integer
+        example: 3
+        primary_key: true
+        description: >-
+          River basin planning cycle. Some years were classified in two cycles
+          (e.g. 2019 in cycles 2 and 3): the dashboard uses the later one.
+      level:
+        type: text
+        example: Element
+        description: Where the item sits, e.g. Ecological, chemical or quantitative status, Component, Element, Sub Element
+      status:
+        type: text
+        example: Moderate
+        description: e.g. High, Good, Moderate, Poor, Bad, Fail, Supports Good, Not High
+      certainty:
+        type: text
+        example: Quite Certain
+        description: How certain the EA is of the result (Very Certain, Quite Certain, Uncertain, No Information)
+
+  ea_rnags:
+    title: EA Reasons for Not Achieving Good
+    description: >-
+      The EA's reasons for not achieving good (RNAGs): for each element below
+      Good, the activity and sector the EA thinks is responsible. Filled from
+      the EA's Catchment Data Explorer by `importer classifications`, which
+      replaces every row.
+    filled_by: api
+    columns:
+      id:
+        type: integer
+        example: 570748
+        primary_key: true
+        description: The EA's ID for this reason
+      catchment_id:
+        type: text
+        example: GB108050014460
+        required: true
+        index: true
+        references: catchments.id
+      cycle:
+        type: integer
+        example: 3
+        description: River basin planning cycle
+      element:
+        type: text
+        example: Macrophytes and Phytobenthos Combined
+        description: The classification element that isn't Good
+      element_status:
+        type: text
+        example: Moderate
+        description: That element's status
+      activity:
+        type: text
+        example: Poor Livestock Management
+        description: What the EA thinks is causing it (shown on the dashboard as the EA RNAGs)
+      activity_certainty:
+        type: text
+        example: Probable
+        description: How sure the EA is (Suspect, Probable, Confirmed)
+      business_sector:
+        type: text
+        example: Agriculture - Livestock
+      category:
+        type: text
+        example: Agriculture and rural land management
+      source_type:
+        type: text
+        example: Diffuse source
+        description: e.g. Diffuse source, Point source, Physical modification
+      national_issue:
+        type: text
+        example: Pollution from rural areas
+        description: The national significant water management issue it comes under
+
+  storm_overflows:
+    title: Storm Overflows
+    description: >-
+      Storm overflow spills from the EA's storm overflow annual returns (Event
+      Duration Monitoring), which every water company sends each year: a row per
+      overflow per year, for overflows into an imported catchment's waterbody.
+      Filled by `importer storm-overflows`, which replaces every row.
+    filled_by: api
+    columns:
+      id:
+        type: integer
+        example: 1
+        primary_key: true
+        identity: true
+      catchment_id:
+        type: text
+        example: GB108050014460
+        required: true
+        index: true
+        references: catchments.id
+        description: The WFD waterbody the overflow discharges into, as given in the return
+      year:
+        type: integer
+        example: 2025
+        required: true
+        description: The year the return covers
+      company:
+        type: text
+        example: South West Water
+      site_name:
+        type: text
+        example: HIGH BICKINGTON STW_SO_HIGH BICKINGTON
+        description: The water company's name for the overflow
+      unique_id:
+        type: text
+        example: SBB00568
+        description: The return's ID for the overflow (only from 2023, and it changed format in 2024)
+      permit_reference:
+        type: text
+        example: 202194/CS/01
+        description: The EA's permit reference
+      activity_reference:
+        type: text
+        example: A2
+        description: The activity on the permit
+      asset_type:
+        type: text
+        example: Storm tank at WwTW
+      receiving_water:
+        type: text
+        example: Langham Lake
+      grid_reference:
+        type: text
+        example: SS 5916 2017
+        description: The outlet's Ordnance Survey grid reference, as given in the return
+      easting:
+        type: integer
+        example: 259160
+        description: Worked out from the grid reference (British National Grid, metres)
+      northing:
+        type: integer
+        example: 120170
+      latitude:
+        type: double
+        example: 50.96
+        description: Worked out from the easting and northing, for the maps
+      longitude:
+        type: double
+        example: -4.0
+      spill_hours:
+        type: double
+        example: 1911.98
+        description: >-
+          Total duration of all spills in the year, in hours, before the 12-24h
+          counting. Empty when there's no figure (e.g. no monitor yet), which
+          isn't the same as zero.
+      spill_count:
+        type: integer
+        example: 173
+        description: Spills, counted with the 12-24h count method
+
+  river_obstacles:
+    title: River Obstacles
+    description: >-
+      Weirs, culverts, fords, sluices and other obstacles in the rivers, from
+      River Obstacles (the Environment Agency and The Rivers Trust). Each is in
+      the catchment whose outline it's inside. Filled by `importer
+      river-obstacles`, which replaces every row.
+    filled_by: api
+    columns:
+      id:
+        type: text
+        example: 444d6377-dbeb-4ce7-a3f6-07241b6d5f22
+        primary_key: true
+        description: River Obstacles' ID for the obstacle
+      ea_id:
+        type: integer
+        example: 39245
+        description: The EA's ID for the obstacle
+      catchment_id:
+        type: text
+        example: GB108050014460
+        required: true
+        index: true
+        references: catchments.id
+      site_name:
+        type: text
+        example: Sticklepath Weir
+      obstacle_type:
+        type: text
+        example: culvert
+        description: e.g. culvert, weir, ford, waterfall, sluice, dam
+      origin:
+        type: text
+        example: artificial
+        description: artificial, natural or unknown
+      status:
+        type: text
+        example: operational
+      latitude:
+        type: double
+        example: 50.95765
+      longitude:
+        type: double
+        example: -3.99751

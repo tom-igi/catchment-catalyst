@@ -4,7 +4,8 @@ The pages follow the tabs of the original dashboard (Reference/ReferenceImages).
 Each location gets its own folder, which has everything its pages need, so it
 can be served at its own address:
 
-    <location>/index.html                      the Overview tab
+    <location>/index.html                      the front page: the Overview tab (switched off for now:
+                                               see SHOW_OVERVIEW), or River Status before a catchment is chosen
     <location>/<tab>/index.html                another tab, before a catchment is chosen
     <location>/<tab>/<catchment ID>/index.html  that tab for one catchment
     <location>/catchments.geojson               the outlines, rivers and ecological statuses, for the maps
@@ -22,6 +23,7 @@ from __future__ import annotations
 import datetime
 import json
 import shutil
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +34,9 @@ from .figures import Figures
 
 HERE = Path(__file__).parent
 ASSETS = HERE / "static"
+# The Overview tab is switched off for now (29 October 2026): the front page is
+# River Status instead. Set this to True to bring it back.
+SHOW_OVERVIEW = False
 # Folder name -> the tab's name. Each has a template of the same name.
 TABS = {
     "river-status": "River Status",
@@ -53,10 +58,9 @@ def write_location(location: Location, out_dir: Path) -> Path:
     shutil.copytree(ASSETS, building / "assets")
     (building / "catchments.geojson").write_text(json.dumps(_map(location, figures), separators=(",", ":")), encoding="utf-8")
     env = _environment()
-    shared = {"location": location, "figures": figures, "tabs": TABS, "published": _today()}
-    _write(building / "index.html", env.get_template("overview.html").render(
-        **shared, tab="", catchment=None, root="",
-    ))
+    shared = {"location": location, "figures": figures, "tabs": TABS, "show_overview": SHOW_OVERVIEW, "published": _today()}
+    front, tab = ("overview.html", "") if SHOW_OVERVIEW else ("river-status.html", "river-status")
+    _write(building / "index.html", env.get_template(front).render(**shared, tab=tab, catchment=None, root=""))
     for tab in TABS:
         template = env.get_template(f"{tab}.html")
         _write(building / tab / "index.html", template.render(**shared, tab=tab, catchment=None, root="../"))
@@ -101,7 +105,7 @@ def _environment() -> Environment:
         trim_blocks=True,
         lstrip_blocks=True,
     )
-    env.filters.update(show=_show, sort_value=_sort_value, number=_number, status_class=_status_class)
+    env.filters.update(show=_show, sort_value=_sort_value, number=_number, hours=_hours, status_class=_status_class)
     return env
 
 
@@ -138,6 +142,13 @@ def _number(value: float | int | None, decimals: int | None = None) -> str:
         return f"{value:,.{decimals}f}"
     text = repr(value)
     return text[:-2] if text.endswith(".0") else text
+
+
+def _hours(value: float | None) -> str:
+    """Hours as a whole number, with halves rounded up as on the original (1462.5 -> 1463)."""
+    if value is None:
+        return ""
+    return str(Decimal(str(value)).quantize(Decimal(1), rounding=ROUND_HALF_UP))
 
 
 def _status_class(status: str | None) -> str:

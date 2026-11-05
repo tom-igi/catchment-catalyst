@@ -32,7 +32,7 @@ from .ea_api import EAClient, EAError
 BNG = 27700  # British National Grid, used by the EA's shapefiles
 WGS84 = 4326  # latitude/longitude, used by web maps
 ID_RE = re.compile(r"^GB[0-9A-Z]{6,20}$")
-LIST_EXAMPLE = '{"catchments": ["GB108050008080", "GB108050008100"]}'
+LIST_EXAMPLE = '{"management_catchments": [3062], "catchments": ["GB108050008080"]}'
 
 # Shapefile field -> catchments column
 DETAIL_FIELDS = {
@@ -69,7 +69,14 @@ class Catchment:
         return self.details["name"]
 
 
-def read_catchment_list(path: Path) -> list[str]:
+@dataclass
+class CatchmentList:
+    """What to import: single catchments, and management catchments (all their rivers)."""
+    ids: list[str]
+    management_catchments: list[int]
+
+
+def read_catchment_list(path: Path) -> CatchmentList:
     """Read the JSON file listing which catchments to import."""
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -79,19 +86,38 @@ def read_catchment_list(path: Path) -> list[str]:
         raise ImportProblem(f"{path} is not valid JSON: {e}") from None
     if (
         not isinstance(data, dict)
-        or not set(data) <= {"description", "catchments"}
-        or not isinstance(data.get("catchments"), list)
-        or not data["catchments"]
+        or not set(data) <= {"description", "catchments", "management_catchments"}
+        or not all(isinstance(data.get(key, []), list) for key in ("catchments", "management_catchments"))
+        or not (data.get("catchments") or data.get("management_catchments"))
     ):
-        raise ImportProblem(f"{path} should look like {LIST_EXAMPLE}")
-    ids = data["catchments"]
+        raise ImportProblem(f"{path} should look like {LIST_EXAMPLE} (either list can be left out)")
+    ids = data.get("catchments", [])
     bad = [str(i) for i in ids if not isinstance(i, str) or not ID_RE.match(i)]
     if bad:
         raise ImportProblem(f"{path}: these aren't catchment IDs: {', '.join(bad)}")
-    repeated = sorted({i for i in ids if ids.count(i) > 1})
+    management = data.get("management_catchments", [])
+    bad = [str(i) for i in management if not isinstance(i, int) or isinstance(i, bool) or i <= 0]
+    if bad:
+        raise ImportProblem(f"{path}: these aren't management catchment IDs (numbers, e.g. 3062): {', '.join(bad)}")
+    repeated = sorted({str(i) for i in ids + management if (ids + management).count(i) > 1})
     if repeated:
         raise ImportProblem(f"{path}: listed more than once: {', '.join(repeated)}")
-    return ids
+    return CatchmentList(ids, management)
+
+
+def rivers_in(management_catchment_id: int, client: EAClient) -> list[tuple[str, str]]:
+    """The (ID, name) of every river waterbody in a management catchment. Only rivers
+    can be imported for now: lakes and others are left out."""
+    data = client.management_catchment(management_catchment_id)
+    rivers = {}
+    for feature in data.get("features", []):
+        properties = feature.get("properties", {})
+        kind = (properties.get("water-body-type") or {}).get("string")
+        if kind == "River" and ID_RE.match(properties.get("id") or ""):
+            rivers[properties["id"]] = properties.get("name") or ""
+    if not rivers:
+        raise ImportProblem(f"the EA lists no river waterbodies in management catchment {management_catchment_id}")
+    return sorted(rivers.items(), key=lambda item: item[1])
 
 
 def fetch(
@@ -259,6 +285,11 @@ def _unique(links: list[tuple[str, str]]) -> list[tuple[str, str]]:
 
 
 # --- Saving ----------------------------------------------------------------
+
+def imported_ids(conn: sa.Connection, schema: Schema) -> set[str]:
+    """Every catchment in the catchments table."""
+    return set(conn.scalars(sa.select(schema.metadata.tables["catchments"].c.id)))
+
 
 def existing_ids(conn: sa.Connection, schema: Schema, ids: list[str]) -> set[str]:
     table = schema.metadata.tables["catchments"]

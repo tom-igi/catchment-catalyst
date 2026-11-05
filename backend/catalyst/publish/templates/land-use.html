@@ -1,5 +1,5 @@
 {% extends "catchment.html" %}
-{% from "macros.html" import heading, empty_table, risk_levels, catchment_links %}
+{% from "macros.html" import heading, empty_table, risk_levels, catchment_links, points_map %}
 {% block panels %}
 <div class="grid land-use">
   <section class="panel white river-info">
@@ -50,8 +50,30 @@
 
   <section class="panel sky obstacles">
     {{ heading("River Obstacles") }}
-    <div class="map-box"></div>
-    {{ empty_table(["EA ID", "Site name", "Obstacle type", "Origin"]) }}
+    {% set obstacles = figures.obstacles(catchment.id if catchment else "") %}
+    {{ points_map(location, root, catchment, figures.obstacle_points(catchment.id if catchment else ""), "#2b6fd6", "Map of the river obstacles") }}
+    <div class="scroll">
+      <table class="sortable">
+        <thead>
+          <tr>
+            <th scope="col" data-type="number">EA ID</th>
+            <th scope="col" data-type="text">Site name</th>
+            <th scope="col" data-type="text">Obstacle type</th>
+            <th scope="col" data-type="text">Origin</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for obstacle in obstacles %}
+          <tr>
+            <td>{{ obstacle.ea_id | show }}</td>
+            <td>{{ obstacle.site_name or "" }}</td>
+            <td>{{ obstacle.obstacle_type or "" }}</td>
+            <td>{{ obstacle.origin or "" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </section>
 
   <section class="panel purple farms">

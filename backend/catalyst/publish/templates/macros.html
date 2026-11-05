@@ -74,6 +74,17 @@
      role="img" aria-label="Map of the catchments in {{ location.name }}, coloured by ecological status"></div>
 {% endmacro %}
 
+{# A small map of points in the catchment, over its outline (points.js). Empty
+   until a catchment is chosen. #}
+{% macro points_map(location, root, catchment, points, colour, label) %}
+{% if catchment %}
+<div class="map-box points-map" data-geojson="{{ root }}catchments.geojson" data-catchment="{{ catchment.id }}"
+     data-points='{{ points | tojson }}' data-colour="{{ colour }}" role="img" aria-label="{{ label }}"></div>
+{% else %}
+<div class="map-box"></div>
+{% endif %}
+{% endmacro %}
+
 {# Links to other catchments: a link if it's in this location, otherwise its name. #}
 {% macro catchment_links(ids, location, links) %}
 {% set here = location.catchment_ids() %}

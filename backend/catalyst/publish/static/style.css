@@ -26,6 +26,8 @@
   --status-supports-good: #7cbd4f;
   --status-not-high: #7cbd4f;
   --status-moderate: #f0d13c;
+  --status-moderate-or-less: #f0d13c;
+  --status-does-not-support-good: #f0d13c;
   --status-poor: #e9993b;
   --status-bad: #bf2228;
   --status-fail: #bf2228;
@@ -119,7 +121,7 @@ th[aria-sort="descending"] button::after { content: "▼"; opacity: 1; font-size
 .status-good { background: var(--status-good); }
 .status-supports-good { background: var(--status-supports-good); }
 .status-not-high { background: var(--status-not-high); }
-.status-moderate { background: var(--status-moderate); }
+.status-moderate, .status-moderate-or-less, .status-does-not-support-good { background: var(--status-moderate); }
 .status-poor { background: var(--status-poor); }
 .status-bad { background: var(--status-bad); color: #fff; }
 .status-fail { background: var(--status-fail); color: #fff; }
@@ -168,6 +170,7 @@ th[aria-sort="descending"] button::after { content: "▼"; opacity: 1; font-size
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .small { min-height: 140px; }
 .small .head h2 { font-size: 1.05rem; }
+.list { margin: 0; padding: 0; list-style: none; font-size: .85rem; line-height: 1.35; }
 .title-bar {
   margin: 0; padding: 8px 16px; border-radius: 10px;
   background: var(--dark); color: #fff; font-size: 2.6rem; line-height: 1.2; text-align: center;
@@ -208,6 +211,7 @@ th[aria-sort="descending"] button::after { content: "▼"; opacity: 1; font-size
 .scoring .item { width: 22%; text-align: left; }
 .scoring tbody th.item { background: var(--navy-light); color: #fff; }
 .scoring tbody td { color: var(--text); white-space: nowrap; }
+:where(.scoring tbody) td, :where(.years) li { background: var(--status-none); }  /* statuses with no colour of their own */
 .scoring .first-threshold { border-left: 6px solid #fff; }
 
 /* Land Use Data */
@@ -224,6 +228,8 @@ th[aria-sort="descending"] button::after { content: "▼"; opacity: 1; font-size
 .land-use .risks-panel { grid-area: risks; }
 .land-use .risks { grid-template-columns: 1fr; }
 .obstacles { grid-area: obstacles; }
+.obstacles .scroll { max-height: 420px; overflow-y: auto; }
+.discharges .total { font-weight: 700; }
 .farms { grid-area: farms; }
 .livestock { grid-area: livestock; min-height: 220px; }
 .land-use .phosphate { grid-area: phosphate; }

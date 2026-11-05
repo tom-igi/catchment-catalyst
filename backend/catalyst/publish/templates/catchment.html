@@ -31,9 +31,19 @@
     <div class="pair">
       <section class="panel navy small">
         {{ heading("Failing Elements") }}
+        <ul class="list">
+          {% for item in figures.failing_elements(catchment.id if catchment else "") %}
+          <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
       </section>
       <section class="panel navy small">
         {{ heading("EA RNAGs") }}
+        <ul class="list">
+          {% for reason in figures.reasons(catchment.id if catchment else "") %}
+          <li>{{ reason }}</li>
+          {% endfor %}
+        </ul>
       </section>
     </div>
   </div>

@@ -11,7 +11,9 @@
 <header class="site-header">
   <a class="brand" href="{{ root or './' }}">Catchment Catalyst</a>
   <nav class="tabs" aria-label="Dashboard pages">
+    {% if show_overview %}
     <a href="{{ root or './' }}"{% if not tab %} aria-current="page"{% endif %}>Overview</a>
+    {% endif %}
     {% for folder, name in tabs.items() %}
     <a href="{{ root }}{{ folder }}/{% if catchment %}{{ catchment.id }}/{% endif %}"{% if tab == folder %} aria-current="page"{% endif %}>{{ name }}</a>
     {% endfor %}
@@ -22,11 +24,13 @@
 {% block content %}{% endblock %}
 </main>
 <footer class="site-footer">
-  {{ location.name }}. Published {{ published }}. Catchment details and outlines contain Environment Agency information
-  © Environment Agency and database right.
+  {{ location.name }}. Published {{ published }}. Catchment details, outlines, classifications, reasons for not
+  achieving good and storm overflow returns: © Environment Agency copyright and/or database right, Open Government
+  Licence. River obstacles: River Obstacles (Environment Agency and The Rivers Trust), CC BY-SA 4.0.
 </footer>
 <script src="{{ root }}assets/leaflet/leaflet.js"></script>
 <script src="{{ root }}assets/map.js"></script>
+<script src="{{ root }}assets/points.js"></script>
 <script src="{{ root }}assets/sort.js"></script>
 </body>
 </html>

@@ -18,7 +18,8 @@ backend/                     all Python code, built into one Docker image
   catalyst/db/schema.yaml    ← the database master file: every table and column
   catalyst/db/schema.py      reads and checks schema.yaml
   catalyst/db/sync.py        compares schema.yaml with the database and applies changes
-  catalyst/importers/api/    tables filled from an outside service's API (catchments, from the EA)
+  catalyst/importers/api/    tables filled from outside sources (the EA's catchments, classifications, RNAGs,
+                             storm overflows; River Obstacles)
   catalyst/importers/excel/  tables filled by Excel upload (one shared piece of code for all of them)
   catalyst/admin/            the admin page: log in, download a table, upload it, preview, approve
   catalyst/publish/          the publish step: writes each location's dashboard as web pages
@@ -76,19 +77,24 @@ Each table is filled in one way, set by `filled_by` in `schema.yaml`:
 
 | `filled_by` | How | Tables so far |
 |---|---|---|
-| `api` | An importer downloads the data from an outside service (`backend/catalyst/importers/api/`) | Catchments |
+| `api` | An importer downloads the data from an outside service (`backend/catalyst/importers/api/`) | Catchments, EA Classifications, EA Reasons for Not Achieving Good, Storm Overflows, River Obstacles |
 | `excel` | Someone uploads an Excel file in the admin page (`backend/catalyst/importers/excel/`) | EA Scores, Habitat & Land Use |
 
 ### From an API
 
-So far there is one importer, for catchments from the EA:
+Import the catchments first: the other importers fetch data for every catchment in the
+catchments table.
 
 ```bash
-docker compose run --rm importer catchments imports/catchments.json
+docker compose run --rm importer catchments imports/catchments.json   # catchments, from the EA (all 92 North Devon rivers)
+docker compose run --rm importer classifications                      # the EA's classifications and RNAGs
+docker compose run --rm importer storm-overflows                      # storm overflow spills, from the EA's yearly returns
+docker compose run --rm importer river-obstacles                      # weirs, culverts and so on, from River Obstacles
 ```
 
-It downloads and checks everything first, shows what it will add or update, and asks before
-saving. Running it again updates catchments rather than duplicating them. See
+Each downloads and checks everything first, shows what it will change, and asks before saving
+(add `--yes` to skip the question). Running one again is safe: catchments are updated, and the
+other tables are replaced. Everything downloaded is kept in `imports/raw/`. See
 `imports/README.md`.
 
 ### From Excel (the admin page)
@@ -135,16 +141,19 @@ docker compose run --rm publish     # write every location's pages into publishe
 
 On your machine, see them at <http://localhost:8080>. The pages copy the original dashboard
 (`Reference/ReferenceImages`): the same five tabs, Overview, River Status, EA Data, Land Use
-Data and Sewerage Data. Each location gets a folder (e.g. `published/north-devon/`) with:
+Data and Sewerage Data. The Overview is switched off for now (`SHOW_OVERVIEW` in
+`backend/catalyst/publish/site.py`). Each location gets a folder (e.g. `published/north-devon/`) with:
 
-- `index.html`: the Overview, with a map of the catchments coloured by ecological status;
+- `index.html`: the front page: River Status before a catchment is chosen (or the Overview, when
+  it's switched on);
 - `<tab>/<catchment ID>/`: each of the other tabs, for each catchment. Clicking the map picks
   another catchment and stays on the same tab;
 - `<tab>/`: each tab before a catchment is chosen.
 
-Panels whose data has a table are filled in (the catchment details, EA Scores, Habitat & Land
-Use, and the "i" buttons from the `datasets` table). The others are shown empty until their
-table is added. Each new data table now needs a place on a page, in
+Panels whose data has a table are filled in: the map colours, classifications, failing elements
+and RNAGs (from the EA), the catchment details, Habitat & Land Use, river obstacles, storm
+overflow spills, and the "i" buttons (from the `datasets` table). The others are shown empty
+until their table is added. Each new data table now needs a place on a page, in
 `backend/catalyst/publish/templates/` (calculations such as percentages go in
 `backend/catalyst/publish/figures.py`).
 
@@ -158,6 +167,12 @@ Until the admin page can manage locations, add one with SQL:
 
 ```bash
 docker compose exec db psql -U catalyst -c "INSERT INTO locations (name, catchment_ids) VALUES ('North Devon', ARRAY['GB108050008080', 'GB108050008100'])"
+```
+
+Or give it every river imported from a management catchment (North Devon is `3062`):
+
+```bash
+docker compose exec db psql -U catalyst -c "UPDATE locations SET catchment_ids = (SELECT array_agg(id ORDER BY id) FROM catchments WHERE management_catchment_id = 3062 AND waterbody_type = 'River') WHERE name = 'North Devon'"
 ```
 
 Its web address comes from its name (North Devon → `north-devon`). Every catchment ID must

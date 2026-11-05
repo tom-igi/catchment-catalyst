@@ -1,19 +1,55 @@
 {% extends "catchment.html" %}
-{% from "macros.html" import heading, empty_table, risk_levels %}
+{% from "macros.html" import heading, empty_table, risk_levels, points_map %}
 {% block panels %}
+{% set discharges = figures.discharges(catchment.id if catchment else "") %}
+{% set company = discharges.company ~ " " if discharges.company else "" %}
 <div class="grid sewerage">
   <section class="panel clay intermittent">
     {{ heading("Intermittent Discharges") }}
   </section>
 
   <section class="panel clay discharges">
-    {{ heading("South West Water Intermittent Sewage Discharges (hrs per year)") }}
-    {{ empty_table(["Site Name", "Total"]) }}
+    {{ heading(company ~ "Intermittent Sewage Discharges (hrs per year)") }}
+    <div class="scroll">
+      <table class="sortable">
+        <thead>
+          <tr>
+            <th scope="col" data-type="text">Site Name</th>
+            {% for year in discharges.years %}
+            <th scope="col" data-type="number" class="num">{{ year }}</th>
+            {% endfor %}
+            <th scope="col" data-type="number" class="num">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for site, by_year in discharges.sites %}
+          <tr>
+            <td>{{ site }}</td>
+            {% for year in discharges.years %}
+            <td class="num" data-sort="{{ by_year.get(year) | sort_value }}">{% if year in by_year %}{{ by_year[year] | hours }}{% endif %}</td>
+            {% endfor %}
+            <td class="num total" data-sort="{{ by_year.values() | sum }}">{{ by_year.values() | sum | hours }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        {% if discharges.sites %}
+        <tfoot>
+          <tr>
+            <th scope="row">Total</th>
+            {% for year in discharges.years %}
+            <td class="num">{{ discharges.year_total(year) | hours }}</td>
+            {% endfor %}
+            <td class="num">{{ discharges.total() | hours }}</td>
+          </tr>
+        </tfoot>
+        {% endif %}
+      </table>
+    </div>
   </section>
 
   <section class="panel white outlets">
-    {{ heading("SWW Outlet Locations") }}
-    <div class="map-box"></div>
+    {{ heading(company ~ "Outlet Locations") }}
+    {{ points_map(location, root, catchment, figures.outlets(catchment.id if catchment else ""), "#c2187a", "Map of the storm overflow outlets") }}
   </section>
 
   <section class="panel clay properties">
