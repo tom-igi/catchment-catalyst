@@ -1,6 +1,7 @@
 {% extends "catchment.html" %}
-{% from "macros.html" import heading, empty_table, risk_levels, catchment_links, points_map %}
+{% from "macros.html" import heading, risk_levels, catchment_links, points_map with context %}
 {% block panels %}
+{% set catchment_id = catchment.id if catchment else "" %}
 <div class="grid land-use">
   <section class="panel white river-info">
     <table class="details">
@@ -35,7 +36,7 @@
             <td>{{ row.habitat }}</td>
             <td class="num" data-sort="{{ row.area_ha | sort_value }}">{{ row.area_ha | number(0) }}</td>
             <td class="num" data-sort="{{ row.share | sort_value }}">{% if row.share is not none %}{{ row.share | number(1) }}%{% endif %}</td>
-            <td>{# Relative coverage: no rule for it yet #}</td>
+            <td>{{ row.relative_coverage or "" }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -44,14 +45,14 @@
   </section>
 
   <section class="panel navy risks-panel">
-    {{ heading("Risk Levels", info=true) }}
-    {{ risk_levels(["Modification", "Invasive Species", "Runoff", "Livestock", "Overheating", "Running Dry"]) }}
+    {{ heading("Risk Levels", info=true, dataset=location.dataset("risk_levels")) }}
+    {{ risk_levels(figures.risks(catchment_id, ["modification", "invasive_species", "runoff", "livestock", "overheating", "running_dry"])) }}
   </section>
 
   <section class="panel sky obstacles">
     {{ heading("River Obstacles") }}
-    {% set obstacles = figures.obstacles(catchment.id if catchment else "") %}
-    {{ points_map(location, root, catchment, figures.obstacle_points(catchment.id if catchment else ""), "#2b6fd6", "Map of the river obstacles") }}
+    {% set obstacles = figures.obstacles(catchment_id) %}
+    {{ points_map(location, root, catchment, figures.obstacle_points(catchment_id), "#2b6fd6", "Map of the river obstacles") }}
     <div class="scroll">
       <table class="sortable">
         <thead>
@@ -77,17 +78,61 @@
   </section>
 
   <section class="panel purple farms">
-    {{ heading("Number of Farms:") }}
+    {% set farms = figures.farms(catchment_id) %}
+    {{ heading("Number of Farms: %s" % (farms | number) if farms is not none else "Number of Farms:") }}
   </section>
 
   <section class="panel purple livestock">
-    {{ heading("Livestock Pressures", info=true) }}
-    {{ empty_table(["Livestock", "Number", "Density per SqKm (100ha)", "Density Rating"]) }}
+    {{ heading("Livestock Pressures", info=true, dataset=location.dataset("livestock")) }}
+    <div class="scroll">
+      <table class="sortable">
+        <thead>
+          <tr>
+            <th scope="col" data-type="text">Livestock</th>
+            <th scope="col" data-type="number" class="num">Number</th>
+            <th scope="col" data-type="number" class="num">Density per SqKm (100ha)</th>
+            <th scope="col" data-type="text">Density Rating</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in (figures.livestock(catchment) if catchment else []) %}
+          <tr>
+            <td>{{ row.livestock }}</td>
+            <td class="num" data-sort="{{ row.number }}">{{ row.number | number(0) }}</td>
+            <td class="num" data-sort="{{ row.density | sort_value }}">{{ row.density | number(1) }}</td>
+            <td>{{ row.density_rating or "" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </section>
 
   <section class="panel pink phosphate">
-    {{ heading("Phosphate source (estimated)", info=true) }}
-    {{ empty_table(["Source", "2025 (%)", "2030 (%)"]) }}
+    {{ heading("Phosphate source (estimated)", info=true, dataset=location.dataset("phosphate_sources")) }}
+    {% set years, sources = figures.phosphate(catchment_id) %}
+    <div class="scroll">
+      <table class="sortable">
+        <thead>
+          <tr>
+            <th scope="col" data-type="text">Source</th>
+            {% for year in years or [2025, 2030] %}
+            <th scope="col" data-type="number" class="num">{{ year }} (%)</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for source, by_year in sources %}
+          <tr>
+            <td>{{ source }}</td>
+            {% for year in years %}
+            <td class="num" data-sort="{{ by_year.get(year) | sort_value }}">{{ by_year.get(year) | number(1) }}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </section>
 </div>
 {% endblock %}

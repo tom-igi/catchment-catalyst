@@ -58,7 +58,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{location.name}: {len(location.catchments)} catchment(s), published to {folder}/")
         for dataset in location.datasets:
             count = sum(len(rows) for rows in dataset.rows.values())
-            print(f"  {dataset.title}: {count} row(s), for {len(dataset.rows)} of the catchments")
+            about = "about the location" if dataset.key == "location_id" else f"for {len(dataset.rows)} of the catchments"
+            print(f"  {dataset.title}: {count} row(s), {about}")
     site.write_index([l.name for l in gathered], [l.slug for l in gathered], out_dir)
 
     current = {l.slug for l in gathered}

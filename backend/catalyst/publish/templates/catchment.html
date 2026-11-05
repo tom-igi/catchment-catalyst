@@ -3,9 +3,12 @@
    side, and its name across the top. Each tab fills in the panels block.
    With no catchment chosen, everything is shown empty. #}
 {% extends "base.html" %}
-{% from "macros.html" import heading, legend, status_map %}
+{% from "macros.html" import heading, legend, status_map, waterbody_tabs, about with context %}
 {% block title %}{% if catchment %}{{ catchment.name }} · {% endif %}{{ tabs[tab] }} · {{ location.name }}{% endblock %}
+{% block tabs %}{{ waterbody_tabs(tabs, tab, catchment, root, show_overview) }}{% endblock %}
+{% block about %}{{ about(text, "about_waterbody_dashboard") }}{% endblock %}
 {% block content %}
+{% set catchment_id = catchment.id if catchment else "" %}
 <div class="catchment-page">
   <div class="side">
     <section class="panel white map-panel">
@@ -15,14 +18,15 @@
     </section>
 
     <section class="panel dark ranking">
-      {{ heading("Catchment Ranking:", info=true) }}
+      {% set ranking = figures.ranking(catchment_id) %}
+      {{ heading("Catchment Ranking: %s/%s" % (ranking, figures.rivers()) if ranking else "Catchment Ranking:", info=true, dataset=location.dataset("catchment_rankings")) }}
       <p>({{ figures.rivers() }} river waterbodies in the {{ location.name }} Catchment)</p>
     </section>
 
     <section class="panel navy classification">
       {{ heading("EA Ecological Classification") }}
       <ul class="years">
-        {% for year, status in figures.classification(catchment.id if catchment else "") %}
+        {% for year, status in figures.classification(catchment_id) %}
         <li class="{{ status | status_class }}"><span>{{ year }}</span><strong>{{ status or "" }}</strong></li>
         {% endfor %}
       </ul>
@@ -32,7 +36,7 @@
       <section class="panel navy small">
         {{ heading("Failing Elements") }}
         <ul class="list">
-          {% for item in figures.failing_elements(catchment.id if catchment else "") %}
+          {% for item in figures.failing_elements(catchment_id) %}
           <li>{{ item }}</li>
           {% endfor %}
         </ul>
@@ -40,7 +44,7 @@
       <section class="panel navy small">
         {{ heading("EA RNAGs") }}
         <ul class="list">
-          {% for reason in figures.reasons(catchment.id if catchment else "") %}
+          {% for reason in figures.reasons(catchment_id) %}
           <li>{{ reason }}</li>
           {% endfor %}
         </ul>

@@ -40,9 +40,13 @@ INDEX_OPTIONS = {"columns", "unique", "using"}
 ON_DELETE = {"cascade": "CASCADE", "set null": "SET NULL", "restrict": "RESTRICT"}
 INDEX_METHODS = {"btree", "gist", "gin"}
 
-# Every data table must link each row to a catchment with this column.
+# Every data table must link each row to a catchment with this column, or (for
+# data about a whole location, such as its text) to a location with the second.
 CATCHMENT_COLUMN = "catchment_id"
 CATCHMENT_REFERENCE = "catchments.id"
+LOCATION_COLUMN = "location_id"
+LOCATION_REFERENCE = "locations.id"
+KEYS = {CATCHMENT_COLUMN: CATCHMENT_REFERENCE, LOCATION_COLUMN: LOCATION_REFERENCE}
 
 # How a table gets its data (the `filled_by` option).
 FILLED_BY = {
@@ -305,17 +309,26 @@ def _build_column(table_where, table, name, spec, known_columns, schema: Schema,
 
 
 def _check_data_table(name, spec, problems) -> None:
+    """Every row must belong to a catchment, or to a location: exactly one of the two."""
     columns = spec.get("columns") if isinstance(spec, dict) else None
-    column = columns.get(CATCHMENT_COLUMN) if isinstance(columns, dict) else None
-    if not (
-        isinstance(column, dict)
-        and column.get("references") == CATCHMENT_REFERENCE
-        and (column.get("required") is True or column.get("primary_key") is True)
-    ):
+    columns = columns if isinstance(columns, dict) else {}
+    linked = [
+        key for key, reference in KEYS.items()
+        if isinstance(columns.get(key), dict)
+        and columns[key].get("references") == reference
+        and (columns[key].get("required") is True or columns[key].get("primary_key") is True)
+    ]
+    if len(linked) != 1:
         problems.append(
-            f"data_tables.{name}: every data table needs a required '{CATCHMENT_COLUMN}' "
-            f"column that references {CATCHMENT_REFERENCE}"
+            f"data_tables.{name}: every data table needs a required '{CATCHMENT_COLUMN}' column that "
+            f"references {CATCHMENT_REFERENCE}, or (for data about a whole location) a required "
+            f"'{LOCATION_COLUMN}' column that references {LOCATION_REFERENCE}, but not both"
         )
+
+
+def key_column(table: sa.Table) -> str:
+    """The column a data table's rows belong to: catchment_id, or location_id for data about a whole location."""
+    return LOCATION_COLUMN if LOCATION_COLUMN in table.c and CATCHMENT_COLUMN not in table.c else CATCHMENT_COLUMN
 
 
 def _check_excel_table(where, table: sa.Table, problems) -> None:

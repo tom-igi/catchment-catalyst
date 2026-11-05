@@ -145,22 +145,37 @@ docker compose run --rm publish     # write every location's pages into publishe
 ```
 
 On your machine, see them at <http://localhost:8080>. The pages copy the original dashboard
-(`Reference/ReferenceImages`): the same five tabs, Overview, River Status, EA Data, Land Use
-Data and Sewerage Data. The Overview is switched off for now (`SHOW_OVERVIEW` in
-`backend/catalyst/publish/site.py`). Each location gets a folder (e.g. `published/north-devon/`) with:
+(`Reference/ReferenceImages`): four views, chosen with the cards across the top of every page.
+
+- **Waterbody Dashboard:** the original's tabs, River Status, EA Data, Land Use Data and Sewerage
+  Data, for one waterbody at a time. (Its Overview tab is switched off for now: `SHOW_OVERVIEW` in
+  `backend/catalyst/publish/site.py`.)
+- **Catchment Dashboard:** the whole location on one map, with its ecological class counts, its
+  text, and its farms, properties, storm overflows and habitat added up. Its operational catchments
+  (e.g. Torridge) each get a page too, narrowed to their waterbodies.
+- **Intervention Management** and **Catchment Insights:** placeholders for now, with their focus
+  area buttons.
+
+Each location gets a folder (e.g. `published/north-devon/`) with:
 
 - `index.html`: the front page: River Status before a catchment is chosen (or the Overview, when
   it's switched on);
-- `<tab>/<catchment ID>/`: each of the other tabs, for each catchment. Clicking the map picks
+- `<tab>/<catchment ID>/`: each Waterbody Dashboard tab, for each catchment. Clicking the map picks
   another catchment and stays on the same tab;
-- `<tab>/`: each tab before a catchment is chosen.
+- `<tab>/`: each tab before a catchment is chosen;
+- `catchment-dashboard/`, and `catchment-dashboard/<operational catchment>/` (e.g. `torridge/`);
+- `intervention-management/` and `catchment-insights/`.
 
-Panels whose data has a table are filled in: the map colours, classifications, failing elements
-and RNAGs (from the EA), the catchment details, Habitat & Land Use, river obstacles, storm
-overflow spills, and the "i" buttons (from the `datasets` table). The others are shown empty
-until their table is added. Each new data table now needs a place on a page, in
+Panels whose data has a table are filled in, from the EA's data, the Excel tables (text, risk
+levels, interventions, thresholds, farms, livestock, phosphate, sewerage and so on) and the "i"
+buttons (from the `datasets` table). A panel is shown empty while its table has no rows for that
+catchment. Each new data table needs a place on a page, in
 `backend/catalyst/publish/templates/` (calculations such as percentages go in
 `backend/catalyst/publish/figures.py`).
+
+Hand-written text (River Status Text, Location Text) can have paragraphs and lists: in Excel,
+Alt+Enter starts a new line in a cell, a blank line starts a new paragraph, and lines starting
+with a dash, `*` or `•` become a list.
 
 The styles and scripts are in `backend/catalyst/publish/static/`. The maps use Leaflet (copied
 into `static/leaflet/`) over OpenStreetMap's map images, which are the only thing the pages load

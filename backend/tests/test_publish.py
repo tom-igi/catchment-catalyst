@@ -48,7 +48,8 @@ def test_a_page_for_each_tab_and_catchment(database, tmp_path):
     page = (folder / "index.html").read_text()  # River Status, while the Overview is switched off
     assert ">Overview</a>" not in page
     assert '<a href="river-status/" aria-current="page">River Status</a>' in page
-    assert 'data-geojson="catchments.geojson" data-links="river-status/"' in page
+    version = site.version(folder)
+    assert f'data-geojson="catchments.geojson?v={version}" data-links="river-status/"' in page
 
     for tab in ["river-status", "ea-data", "land-use", "sewerage"]:
         page = (folder / tab / "index.html").read_text()  # before a catchment is chosen
@@ -58,7 +59,7 @@ def test_a_page_for_each_tab_and_catchment(database, tmp_path):
             page = (folder / tab / catchment_id / "index.html").read_text()
             assert f'data-links="../../{tab}/" data-selected="{catchment_id}"' in page
             assert f'<a href="../../ea-data/{catchment_id}/">EA Data</a>' in page or tab == "ea-data"
-            assert 'src="../../assets/map.js"' in page
+            assert f'src="../../assets/map.js?v={version}"' in page
 
     page = (folder / "river-status" / WEST_OKEMENT / "index.html").read_text()
     assert '<h1 class="title-bar">West Okement</h1>' in page
@@ -265,3 +266,207 @@ def test_the_command_publishes_every_location(database, tmp_path, monkeypatch, c
 ])
 def test_web_addresses_come_from_the_name(name, expected):
     assert collect.slug(name) == expected
+
+
+# --- The four views and the new tables ----------------------------------------
+
+def insert(engine, table, rows):
+    with engine.begin() as conn:
+        conn.execute(SCHEMA.metadata.tables[table].insert(), rows)
+
+
+def location_id(engine):
+    with engine.connect() as conn:
+        return conn.scalar(sa.text("SELECT id FROM locations"))
+
+
+def test_every_page_has_the_four_views(database, tmp_path):
+    folder = publish(database, tmp_path)
+    pages = {
+        "river-status": folder / "river-status" / WEST_OKEMENT / "index.html",
+        "catchment-dashboard": folder / "catchment-dashboard" / "index.html",
+        "intervention-management": folder / "intervention-management" / "index.html",
+        "catchment-insights": folder / "catchment-insights" / "index.html",
+    }
+    for view, path in pages.items():
+        page = path.read_text()
+        assert page.count('class="view-card"') == 4
+        assert page.count('aria-current="page">\n    <img') == 1  # one card is the current one
+        assert f'href="{"../../" if view == "river-status" else "../"}{view}/" aria-current="page"' in page
+    assert (folder / "assets" / "cards" / "catchment.jpg").is_file()
+    page = (folder / "index.html").read_text()  # the front page is the Waterbody Dashboard
+    assert '<a class="view-card" href="river-status/" aria-current="page">' in page
+
+
+def test_river_status_shows_the_text_risks_interventions_and_ranking(database, tmp_path):
+    insert(database, "river_status_text", [{
+        "catchment_id": WEST_OKEMENT, "why_failing": "Fish are poor.\n\nThe reasons:\n- Metals\n- Mining",
+        "happening_now": "<b>Surveys</b>", "intervention_hypothesis": "Treat the mine water.", "hypothesis_confidence": "Med-High",
+    }])
+    insert(database, "risk_levels", [{"catchment_id": WEST_OKEMENT, "untreated_sewage": "Very High", "running_dry": "Low"}])
+    insert(database, "catchment_rankings", [{"catchment_id": WEST_OKEMENT, "ranking": 7}])
+    insert(database, "interventions", [
+        {"catchment_id": WEST_OKEMENT, "number": 2, "priority": "Contingency", "desired_change": "Fish passage", "lead_partner": "WRT"},
+        {"catchment_id": WEST_OKEMENT, "number": 3, "priority": "Primary", "desired_change": "Less metal", "lead_partner": "EA"},
+    ])
+    page = (publish(database, tmp_path) / "river-status" / WEST_OKEMENT / "index.html").read_text()
+    assert "<p>Fish are poor.</p>\n<p>The reasons:</p>\n<ul><li>Metals</li><li>Mining</li></ul>" in page
+    assert "&lt;b&gt;Surveys&lt;/b&gt;" in page  # text is shown as typed, never as HTML
+    assert "Intervention hypothesis (confidence: Med-High)" in page
+    assert '<li class="risk-very-high"><span class="risk-name">Untreated Sewage</span><span class="risk-level">Very High</span></li>' in page
+    assert '<li class="risk-none"><span class="risk-name">Modification</span><span class="risk-level"></span></li>' in page
+    assert "Catchment Ranking: 7/2" in page  # of the location's 2 rivers
+    assert page.index("PRIMARY INTERVENTIONS") < page.index("Less metal") < page.index("CONTINGENCY INTERVENTIONS") < page.index("Fish passage")
+    page = (tmp_path / "north-devon" / "river-status" / EAST_OKEMONT / "index.html").read_text()
+    assert "Fish are poor" not in page and "Catchment Ranking:</h2>" in page
+
+
+def test_ea_data_shows_the_values_and_thresholds(database, tmp_path):
+    insert(database, "ea_scores", [
+        {"catchment_id": WEST_OKEMENT, "measure": "Fish (EQR)", "year": 2022, "value": 0.36, "status": "Good"},
+        {"catchment_id": WEST_OKEMENT, "measure": "Inverts NTAXA (EQR)", "year": 2022, "value": 0.97, "status": "High"},
+        {"catchment_id": WEST_OKEMENT, "measure": "Phosphate (mg/l)", "year": 2022, "value": 0.057, "status": None},
+        {"catchment_id": WEST_OKEMENT, "measure": "Something else", "year": 2022, "value": 1.5, "status": None},
+    ])
+    insert(database, "ea_thresholds", [
+        {"catchment_id": WEST_OKEMENT, "measure": "Fish (EQR)", "poor": 0.03, "moderate": 0.2, "good": 0.4, "high": 0.7},
+    ])
+    scoring = figures.Figures(gather(database)).scoring(WEST_OKEMENT)
+    rows = {row.item: row for row in scoring.rows}
+    # One measure: shown in the item's row, coloured by the EA's status (Fish was Poor in 2022), as on the original.
+    assert "Fish" not in rows
+    assert rows["Fish (EQR)"].by_year[2022] == figures.Cell("0.36", "Poor")
+    assert rows["Fish (EQR)"].by_year[2019] == figures.Cell("Poor", "Poor")  # no value that year: the EA's status
+    assert rows["Fish (EQR)"].thresholds["good"] == 0.4
+    # Several measures: the item's row of statuses, then a row for each, coloured by its own status.
+    items = [row.item for row in scoring.rows]
+    assert items.index("Invertebrates") + 1 == items.index("Inverts NTAXA (EQR)")
+    assert rows["Inverts NTAXA (EQR)"].by_year[2022] == figures.Cell("0.97", "High")
+    assert rows["Phosphate (mg/l)"].latest.text == "0.057"
+    assert items[-1] == "Something else"  # not on the original: at the bottom
+    page = (publish(database, tmp_path) / "ea-data" / WEST_OKEMENT / "index.html").read_text()
+    assert '<td class="status-poor">0.36</td>' in page
+    assert '<td class="status-good">0.40</td>' in page  # a threshold
+
+
+@pytest.mark.parametrize("value, shown", [(0.36, "0.36"), (0.2, "0.20"), (100, "100.00"), (0.057, "0.057"), (89.69, "89.69")])
+def test_measured_values_have_at_least_two_decimal_places(value, shown):
+    assert figures.measured(value) == shown
+
+
+def test_land_use_shows_farms_livestock_and_phosphate(database, tmp_path):
+    insert(database, "farms", [{"catchment_id": WEST_OKEMENT, "number_of_farms": 68}])
+    insert(database, "livestock", [{"catchment_id": WEST_OKEMENT, "livestock": "Sheep", "number": 5558, "density_rating": "Medium"}])
+    insert(database, "habitat_land_use", [{"catchment_id": WEST_OKEMENT, "habitat": "Woodland", "area_ha": 500, "relative_coverage": "High"}])
+    insert(database, "phosphate_sources", [
+        {"catchment_id": WEST_OKEMENT, "source": source, "year": year, "percent": percent, "discharge": discharge}
+        for year in (2025, 2030)
+        for source, percent, discharge in [("STW (SWW)", 60.9, "Continuous"), ("Livestock", 29.1, "Diffuse"), ("Arable", 10.0, "diffuse")]
+    ])
+    location = gather(database)
+    area = next(c["area_ha"] for c in location.catchments if c["id"] == WEST_OKEMENT)
+    page = (publish(database, tmp_path) / "land-use" / WEST_OKEMENT / "index.html").read_text()
+    assert "Number of Farms: 68" in page
+    assert f">{5558 / (area / 100):,.1f}</td>" in page  # sheep per km²
+    assert "<td>High</td>" in page  # relative coverage
+    assert '<th scope="col" data-type="number" class="num">2030 (%)</th>' in page
+    years, groups = figures.Figures(location).phosphate_discharges(WEST_OKEMENT)
+    assert years == [2025, 2030]
+    assert groups == [("Continuous", {2025: 60.9, 2030: 60.9}), ("Diffuse", {2025: 39.1, 2030: 39.1})]
+
+
+def test_sewerage_shows_the_properties_plans_and_location_text(database, tmp_path):
+    insert(database, "sewerage_properties", [{"catchment_id": WEST_OKEMENT, "public_sewerage_properties": 310, "private_sewerage_properties": 467}])
+    insert(database, "sewerage_improvements", [{"catchment_id": WEST_OKEMENT, "site_name": "HIGH BICKINGTON STW", "completion_year": 2035}])
+    insert(database, "location_text", [{"location_id": location_id(database), "intermittent_discharges": "When it rains.",
+                                        "contact_email": "someone@example.org"}])
+    location = gather(database)
+    area = next(c["area_ha"] for c in location.catchments if c["id"] == WEST_OKEMENT)
+    page = (publish(database, tmp_path) / "sewerage" / WEST_OKEMENT / "index.html").read_text()
+    assert "<dt>Properties on Private Sewerage:</dt><dd>467</dd>" in page
+    assert f"<dd>{467 / area:.2f}</dd>" in page
+    assert "<td>HIGH BICKINGTON STW</td>" in page
+    assert "<p>When it rains.</p>" in page
+    assert '<a href="mailto:someone@example.org">' in page
+
+
+def test_the_catchment_dashboard_adds_up_the_location(database, tmp_path):
+    insert(database, "farms", [{"catchment_id": WEST_OKEMENT, "number_of_farms": 68}])
+    insert(database, "habitat_land_use", [
+        {"catchment_id": WEST_OKEMENT, "habitat": "Woodland", "area_ha": 500},
+        {"catchment_id": EAST_OKEMONT, "habitat": "Woodland", "area_ha": 100},
+    ])
+    insert(database, "location_text", [{"location_id": location_id(database), "why_failing": "Most rivers are failing."}])
+    numbers = figures.Figures(gather(database))
+    areas = numbers.areas()
+    assert [(a.kind, a.slug) for a in areas] == [("management", ""), ("operational", "torridge")]  # North Devon is the whole location
+    ids = [WEST_OKEMENT, EAST_OKEMONT]
+    assert numbers.class_counts(ids) == [("High", None), ("Good", None), ("Moderate", None), ("Poor", 1), ("Bad", None)]
+    assert numbers.failing(ids) == 1
+    assert numbers.total("farms", "number_of_farms", ids) == figures.Total(68, 1, 2)
+    habitat, covered = numbers.habitat_totals(ids)
+    assert habitat[0]["area_ha"] == 600 and covered.known == 2
+
+    folder = publish(database, tmp_path)
+    page = (folder / "catchment-dashboard" / "index.html").read_text()
+    assert '<a href="../catchment-dashboard/" aria-current="page">North Devon</a>' in page
+    assert '<a href="../catchment-dashboard/torridge/">Torridge</a>' in page
+    assert "Number of Farms: 68 <small" in page and "(1 of 2 waterbodies)" in page
+    assert "<p>Most rivers are failing.</p>" in page
+    assert 'data-links="../river-status/"' in page  # clicking a catchment opens it in the Waterbody Dashboard
+    page = (folder / "catchment-dashboard" / "torridge" / "index.html").read_text()
+    assert '<a href="../../catchment-dashboard/torridge/" aria-current="page">Torridge</a>' in page
+    assert f'data-focus="{WEST_OKEMENT},{EAST_OKEMONT}"' in page or f'data-focus="{EAST_OKEMONT},{WEST_OKEMENT}"' in page
+
+
+def test_the_placeholder_views_show_their_focus_areas(database, tmp_path):
+    folder = publish(database, tmp_path)
+    page = (folder / "intervention-management" / "index.html").read_text()
+    assert page.count('role="tab"') == len(site.INTERVENTION_AREAS)
+    assert "Starting Position (2022)" in page and "<li>1 Failing</li>" in page
+    page = (folder / "catchment-insights" / "index.html").read_text()
+    assert '<section class="focus-panel" role="tabpanel" id="funding-delivery"' in page
+    assert (folder / "assets" / "tabs.js").is_file()
+
+
+def test_tables_about_a_whole_location_only_have_its_own_row(database):
+    with database.begin() as conn:
+        other = conn.scalar(sa.text("INSERT INTO locations (name, catchment_ids) VALUES ('Elsewhere', :ids) RETURNING id"),
+                            {"ids": [EAST_OKEMONT]})
+    insert(database, "location_text", [
+        {"location_id": location_id_of(database, "North Devon"), "why_failing": "North Devon's text"},
+        {"location_id": other, "why_failing": "Elsewhere's text"},
+    ])
+    with database.connect() as conn:
+        found = {row.name: collect.collect(conn, SCHEMA, row) for row in collect.locations(conn, SCHEMA)}
+    assert figures.Figures(found["North Devon"]).location_text()["why_failing"] == "North Devon's text"
+    assert figures.Figures(found["Elsewhere"]).location_text()["why_failing"] == "Elsewhere's text"
+
+
+def location_id_of(engine, name):
+    with engine.connect() as conn:
+        return conn.scalar(sa.text("SELECT id FROM locations WHERE name = :name"), {"name": name})
+
+
+@pytest.mark.parametrize("text, html", [
+    ("One line", "<p>One line</p>"),
+    ("Two\nlines", "<p>Two<br>lines</p>"),
+    ("A\n\nB", "<p>A</p>\n<p>B</p>"),
+    ("Groups:\n• One – 27\n- Two\n* Three", "<p>Groups:</p>\n<ul><li>One – 27</li><li>Two</li><li>Three</li></ul>"),
+    ("-27 degrees", "<p>-27 degrees</p>"),  # a dash with no space isn't a list
+    ("a < b", "<p>a &lt; b</p>"),
+    (None, ""),
+])
+def test_hand_written_text_becomes_paragraphs_and_lists(text, html):
+    assert str(site._paragraphs(text)) == html
+
+
+def test_links_to_the_assets_change_when_the_files_do(database, tmp_path):
+    """So browsers don't show an old stylesheet, script or map after a publish."""
+    folder = publish(database, tmp_path)
+    first = site.version(folder)
+    assert f'href="../../assets/style.css?v={first}"' in (folder / "ea-data" / WEST_OKEMENT / "index.html").read_text()
+    assert site.version(publish(database, tmp_path)) == first  # nothing changed: browsers can keep their copies
+    with database.begin() as conn:
+        conn.execute(sa.text("UPDATE locations SET catchment_ids = :ids"), {"ids": [WEST_OKEMENT]})
+    assert site.version(publish(database, tmp_path)) != first  # the map changed

@@ -33,29 +33,43 @@
 </div>
 {% endmacro %}
 
-{# A table with only its headings, for a panel whose data has no table yet. #}
-{% macro empty_table(headings) %}
-<div class="scroll">
-  <table>
-    <thead>
-      <tr>
-        {% for text in headings %}
-        <th scope="col">{{ text }}</th>
-        {% endfor %}
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-</div>
-{% endmacro %}
-
-{# The "Risk Levels" tiles. The levels themselves have no table yet. #}
-{% macro risk_levels(names) %}
+{# The "Risk Levels" tiles, coloured by level: a list of (name, level). #}
+{% macro risk_levels(tiles) %}
 <ul class="risks">
-  {% for name in names %}
-  <li><span class="risk-name">{{ name }}</span><span class="risk-level"></span></li>
+  {% for name, level in tiles %}
+  <li class="{{ level | risk_class }}"><span class="risk-name">{{ name }}</span><span class="risk-level">{{ level or "" }}</span></li>
   {% endfor %}
 </ul>
+{% endmacro %}
+
+{# The Waterbody Dashboard's tabs, in its header. Each keeps the chosen catchment. #}
+{% macro waterbody_tabs(tabs, tab, catchment, root, show_overview) %}
+<nav class="tabs" aria-label="Waterbody Dashboard pages">
+  {% if show_overview %}
+  <a href="{{ root or './' }}"{% if not tab %} aria-current="page"{% endif %}>Overview</a>
+  {% endif %}
+  {% for folder, name in tabs.items() %}
+  <a href="{{ root }}{{ folder }}/{% if catchment %}{{ catchment.id }}/{% endif %}"{% if tab == folder %} aria-current="page"{% endif %}>{{ name }}</a>
+  {% endfor %}
+</nav>
+{% endmacro %}
+
+{# The location's text under a dashboard (from Location Text), and its contact email. #}
+{% macro about(text, field) %}
+{% if text.get(field) or text.get("contact_email") %}
+<section class="about">
+  {{ text.get(field) | paragraphs }}
+  {% if text.get("contact_email") %}
+  <p>If you have any queries, or notice any issues with the dashboards or data, please email
+    <a href="mailto:{{ text.contact_email }}">{{ text.contact_email }}</a>.</p>
+  {% endif %}
+</section>
+{% endif %}
+{% endmacro %}
+
+{# A figure added up over several catchments, with a note when only some of them have one. #}
+{% macro total_note(total) %}
+{% if total.partial %}<small class="partial">({{ total.known }} of {{ total.of }} waterbodies)</small>{% endif %}
 {% endmacro %}
 
 {# The key to the maps' colours. #}
@@ -68,17 +82,19 @@
 </p>
 {% endmacro %}
 
-{# The map of the location's catchments, coloured by ecological status (map.js). #}
-{% macro status_map(location, root, links, selected) %}
-<div id="map" class="map" data-geojson="{{ root }}catchments.geojson" data-links="{{ links }}" data-selected="{{ selected }}"
-     role="img" aria-label="Map of the catchments in {{ location.name }}, coloured by ecological status"></div>
+{# The map of the location's catchments, coloured by ecological status (map.js).
+   `focus` lists the catchments to zoom to, with the others faded (e.g. an operational catchment's),
+   and `avoid` the panels laid over the map, to fit the catchments beside. #}
+{% macro status_map(location, root, links, selected, focus=none, avoid=none) %}
+<div id="map" class="map" data-geojson="{{ root }}catchments.geojson?v={{ version }}" data-links="{{ links }}" data-selected="{{ selected }}"
+     {% if focus %}data-focus="{{ focus | join(',') }}" {% endif %}{% if avoid %}data-avoid="{{ avoid }}" {% endif %}role="img" aria-label="Map of the catchments in {{ location.name }}, coloured by ecological status"></div>
 {% endmacro %}
 
 {# A small map of points in the catchment, over its outline (points.js). Empty
    until a catchment is chosen. #}
 {% macro points_map(location, root, catchment, points, colour, label) %}
 {% if catchment %}
-<div class="map-box points-map" data-geojson="{{ root }}catchments.geojson" data-catchment="{{ catchment.id }}"
+<div class="map-box points-map" data-geojson="{{ root }}catchments.geojson?v={{ version }}" data-catchment="{{ catchment.id }}"
      data-points='{{ points | tojson }}' data-colour="{{ colour }}" role="img" aria-label="{{ label }}"></div>
 {% else %}
 <div class="map-box"></div>

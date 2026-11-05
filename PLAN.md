@@ -1,7 +1,7 @@
 # Catchment Catalyst – Platform Plan
 
-**Status:** High-level plan, agreed in principle. Hosting changed to a single Azure VM (28 October 2026). Phase 1 (foundations) in progress: database schema tool, first tables, data map page and the development / live Docker setup built. Excel uploads, the admin page's login, and a first basic dashboard (static pages from a publish step) built (29 October 2026).
-**Last updated:** 29 October 2026
+**Status:** High-level plan, agreed in principle. Hosting changed to a single Azure VM (28 October 2026). Phase 1 (foundations) in progress: database schema tool, first tables, data map page and the development / live Docker setup built. Excel uploads, the admin page's login, and a first basic dashboard (static pages from a publish step) built (29 October 2026). The dashboard's four views (Waterbody Dashboard, Catchment Dashboard, and placeholders for Intervention Management and Catchment Insights) and a table for every panel built (5 November 2026).
+**Last updated:** 5 November 2026
 
 This document describes how we will rebuild the Catchment Catalyst water quality dashboard (currently North Devon) as a platform that can be reused for any location in the country. It covers the data model, how data gets in, how the system is hosted, and what needs to happen before development starts.
 
@@ -47,11 +47,11 @@ This document describes how we will rebuild the Catchment Catalyst water quality
 
 ### 3.1.1 Changing the database structure
 
-Every table and column is listed in one master file, `backend/catalyst/db/schema.yaml`, which separates core tables from data tables (one per dataset; each must have a `catchment_id`). A schema tool compares it with the database and makes whatever changes are needed (`plan` to preview, `apply` to make them). It runs in the same way locally and on the live server. Changes that would delete data are refused unless explicitly allowed. See `README.md`.
+Every table and column is listed in one master file, `backend/catalyst/db/schema.yaml`, which separates core tables from data tables (one per dataset; each must have a `catchment_id`, or a `location_id` for data about a whole location). A schema tool compares it with the database and makes whatever changes are needed (`plan` to preview, `apply` to make them). It runs in the same way locally and on the live server. Changes that would delete data are refused unless explicitly allowed. See `README.md`.
 
 ### 3.2 Data tables (one per thing shown on the dashboard)
 
-Each dataset has its own table, and each row has a catchment ID. Built so far: `ea_scores` and `habitat_land_use` (Excel), and `ea_classifications`, `ea_rnags`, `storm_overflows` and `river_obstacles` (importers). Data about a whole location (e.g. its intro text) will go in tables keyed by **location ID** instead; the master file's rule will be extended to allow this when the first one is added. Catchment data tables come in three kinds:
+Each dataset has its own table, and each row has a catchment ID. Built so far: `ea_classifications`, `ea_rnags`, `storm_overflows` and `river_obstacles` (importers), and, filled by Excel, `ea_scores`, `ea_thresholds`, `habitat_land_use`, `river_status_text`, `interventions`, `risk_levels`, `catchment_rankings`, `farms`, `livestock`, `phosphate_sources`, `sewerage_properties` and `sewerage_improvements`. Data about a whole location goes in tables keyed by **location ID** instead: the first is `location_text` (5 November 2026). Catchment data tables come in three kinds:
 
 - **One row per waterbody:** e.g. number of farms, properties on SWW or private sewerage, risk levels.
 - **Many rows per waterbody:** e.g. EA classification items per year, habitat types, livestock types, phosphate sources, SWW discharge sites per year, asset improvement plans.
@@ -59,7 +59,7 @@ Each dataset has its own table, and each row has a catchment ID. Built so far: `
 
 ### 3.3 Hand-written text
 
-"Why is the river failing?", "What is happening now?", the intervention hypothesis and the interventions table are written by hand for each catchment. These will be edited through **forms in the admin portal** (with optional bulk upload), not only through CSV.
+"Why is the river failing?", "What is happening now?", the intervention hypothesis and the interventions table are written by hand for each catchment; the Catchment Dashboard's text and the explanations on the Sewerage Data page once for each location. **For now they're Excel tables** (`river_status_text`, `interventions`, `location_text`), uploaded like any other, with paragraphs and lists made from the cells' line breaks. **Forms in the admin portal** may come later if editing long text in Excel proves awkward.
 
 ### 3.4 Replacing data safely
 
@@ -245,6 +245,8 @@ No code changes should be needed unless the new location brings a new kind of so
 
 This list is the starting point for the dataset inventory in Section 9. To be confirmed when the final screens are agreed.
 
+**Four views** (5 November 2026), chosen with cards across the top of every page: the **Waterbody Dashboard** (the pages below, for one waterbody at a time), the **Catchment Dashboard** (the whole location, below), and **Intervention Management** and **Catchment Insights** (placeholders for now: their focus-area buttons, with the content to come).
+
 **On every catchment page:** catchment map coloured by ecological status (click to select), catchment name, catchment ranking (e.g. 68/92), EA ecological classification for 2025 / 2022 / 2019, failing elements, EA RNAGs (reasons for not achieving Good).
 
 | Page | Panels |
@@ -254,6 +256,7 @@ This list is the starting point for the dataset inventory in Section 9. To be co
 | **EA Data** | EA scoring table: classification items × years (Latest, 2025, 2022, 2019, 2016) with thresholds (Poor / Moderate / Good / High) and colour coding |
 | **Land Use Data** | River information (area, length, upstream / downstream rivers; the current "river system" isn't EA data, so it isn't imported: if still wanted, it would come from a hand-written table), Habitat and land use (type, area, % of catchment, relative coverage), Number of farms, Livestock pressures (number, density, density rating), Phosphate source estimate (2025 / 2030 by source), River obstacles (map and table: EA ID, site name, type, origin), Risk levels |
 | **Sewerage Data** | SWW intermittent discharges (hours per year by site, 2021–2025), SWW outlet locations map, Properties on SWW / private sewerage, private sewerage per ha, Continuous discharge text, Source of phosphate (continuous / diffuse), SWW asset improvement plans (site, improvements, completion date, predicted spills), Risk levels |
+| **Catchment Dashboard** | Map of the whole location by ecological status, with management and operational catchment buttons (each narrowing the page to its waterbodies), ecological class counts, three text tabs (Why is the river system failing?, What is happening now?, Intervention hypothesis), number of farms, properties on SWW / private sewerage, SWW sewage outflows, habitat and land usage (all added up from the waterbodies) |
 
 ---
 
@@ -310,7 +313,7 @@ Agree the final set of pages and panels (Section 8), including anything to be ad
 1. **Foundations:** database design, Docker Compose local setup, waterbody boundaries loaded.
 2. **Importers:** one per dataset, with validation and preview, tested against the real raw files.
 3. **Publish step:** generate a data bundle per location, including the calculated values (rankings, counts, percentages). *(Started: `backend/catalyst/publish/`. No calculated values yet.)*
-4. **Public dashboard:** recreate the five pages, reading from the published bundles. *(Started: the five pages are laid out, filled in where there is a table.)*
+4. **Public dashboard:** recreate the five pages, reading from the published bundles. *(Started: the Waterbody Dashboard's pages and the Catchment Dashboard are built, with a table for every panel; Intervention Management and Catchment Insights are placeholders.)*
 5. **Admin portal:** upload, preview, approve, publish and the text-editing forms.
 6. **Live server:** set up the Azure VM (§6.2) with HTTPS, backups and monitoring, then deploy. Migrate North Devon.
 7. **Second location:** add a new location end to end to prove that it can be reused.

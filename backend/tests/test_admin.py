@@ -124,7 +124,9 @@ def test_settings_must_be_set(monkeypatch):
 
 def test_only_tables_filled_by_excel_can_be_updated(app, client):
     tables = page_model(client.get("/admin").text)["tables"]
-    assert {t["name"] for t in tables if "update" in t} == set(app.state.schema.excel_tables) == {"ea_scores", "habitat_land_use"}
+    assert {t["name"] for t in tables if "update" in t} == set(app.state.schema.excel_tables)
+    assert {"ea_scores", "habitat_land_use", "risk_levels", "location_text"} <= set(app.state.schema.excel_tables)
+    assert "ea_classifications" not in app.state.schema.excel_tables
     assert table_details(client)["update"]["download_url"] == "/admin/tables/ea_scores/download"
     assert table_details(client)["update"]["key"] == ["catchment_id", "measure", "year"]
     assert client.get("/admin/tables/catchments").status_code == 404

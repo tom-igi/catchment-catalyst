@@ -75,6 +75,8 @@
 #                  Every data table must have a required catchment_id column
 #                  that references catchments.id, so every row belongs to a
 #                  catchment. The catchment ID is the EA WFD waterbody ID.
+#                  Data about a whole location (e.g. its text) has a required
+#                  location_id column that references locations.id instead.
 # =============================================================================
 
 extensions:
@@ -344,39 +346,48 @@ tables:
 data_tables:
 
   # ---------------------------------------------------------------------------
-  #  One table per dataset. Every row has a catchment_id.
+  #  One table per dataset. Every row has a catchment_id, except in tables
+  #  about a whole location, which have a location_id instead.
   # ---------------------------------------------------------------------------
 
   ea_scores:
     title: EA Scores
     description: >-
-      EA water quality classification results: one row per catchment,
-      measure and year.
+      The measured values behind the EA's classifications, shown on the EA
+      Data page beside the EA's statuses (e.g. Fish EQR 0.36): one row per
+      catchment, measure and year. The measures the page shows are Fish (EQR),
+      Inverts NTAXA (EQR), Inverts ASPT (EQR), Macrophytes Sub Element (EQR),
+      Phytobenthos Sub Element (EQR), Ammonia (mg/l), Dissolved Oxygen (%),
+      Phosphate (mg/l), Temperature (C), pH Lower and pH Upper; any other
+      measure goes at the bottom of the page.
     filled_by: excel
     columns:
       catchment_id:
         type: text
-        example: GB108050008080
+        example: GB108050014460
         primary_key: true
         references: catchments.id
       measure:
         type: text
-        example: Fish
+        example: Fish (EQR)
         primary_key: true
-        description: e.g. Ecological, Fish, Phosphate
+        description: The measure, named as on the EA Data page, e.g. Fish (EQR), Phosphate (mg/l), pH Lower
       year:
         type: integer
-        example: 2025
+        example: 2022
         primary_key: true
-        description: Classification year, e.g. 2025
+        description: Classification year, e.g. 2022
       status:
         type: text
-        example: Poor
-        description: High, Good, Moderate, Poor or Bad
+        example: Moderate
+        description: >-
+          The value's status (High, Good, Moderate, Poor or Bad), which colours
+          it. Where the EA classifies the item itself (e.g. Fish), the EA's
+          status is used instead.
       value:
         type: double
-        example: 0.16
-        description: Measured value, where there is one, e.g. Fish EQR 0.16 or phosphate 0.013
+        example: 0.36
+        description: The measured value, e.g. Fish EQR 0.36 or phosphate 0.057 mg/l
 
   habitat_land_use:
     title: Habitat & Land Use
@@ -398,6 +409,13 @@ data_tables:
         example: 612
         required: true
         description: Area in hectares
+      relative_coverage:
+        type: text
+        example: High
+        description: >-
+          How much of this habitat the catchment has compared with others
+          (Low, Medium or High). Typed in until the rule for working it out is
+          agreed.
 
   ea_classifications:
     title: EA Classifications
@@ -623,3 +641,354 @@ data_tables:
       longitude:
         type: double
         example: -3.99751
+
+  # ---------------------------------------------------------------------------
+  #  Waterbody Dashboard: the hand-written analysis, one catchment at a time
+  # ---------------------------------------------------------------------------
+
+  river_status_text:
+    title: River Status Text
+    description: >-
+      The hand-written text on the Waterbody Dashboard's River Status page:
+      one row per catchment. In Excel, Alt+Enter starts a new line in a cell;
+      a blank line starts a new paragraph, and lines starting with a dash or •
+      become a list.
+    filled_by: excel
+    columns:
+      catchment_id:
+        type: text
+        example: GB108050014460
+        primary_key: true
+        references: catchments.id
+      why_failing:
+        type: text
+        example: Langham Lake is currently at Moderate Ecological Status …
+        description: Shown under "Why is the river failing?"
+      happening_now:
+        type: text
+        example: Current activity includes investigations into the causes of failure …
+        description: Shown under "What is happening now?"
+      intervention_hypothesis:
+        type: text
+        example: Langham Lake appears relatively close to recovery …
+        description: Shown under "Intervention hypothesis"
+      hypothesis_confidence:
+        type: text
+        example: Med-High
+        description: How confident the hypothesis is, shown after its heading, e.g. Low, Medium, Med-High, High
+
+  interventions:
+    title: Interventions
+    description: >-
+      The interventions table on the River Status page: what needs to change
+      in each catchment, who leads it, what will be done and how we'll know.
+      One row per intervention, grouped on the page into primary and
+      contingency interventions.
+    filled_by: excel
+    columns:
+      catchment_id:
+        type: text
+        example: GB108050014460
+        primary_key: true
+        references: catchments.id
+      number:
+        type: integer
+        example: 1
+        primary_key: true
+        description: Its place in the catchment's list (1 first), within its priority
+      priority:
+        type: text
+        example: Primary
+        required: true
+        description: Primary or Contingency, which group it's listed in
+      desired_change:
+        type: text
+        example: Reduction in continuous discharges from sewage treatment works to permitted levels
+        required: true
+      lead_partner:
+        type: text
+        example: SWW
+        description: Who leads it, e.g. SWW, Farmers, EA
+      actions:
+        type: text
+        example: Asset and operational improvements
+      how_we_will_know:
+        type: text
+        example: Effluent monitoring & permit compliance data
+        description: Shown under "How we'll know"
+
+  risk_levels:
+    title: Risk Levels
+    description: >-
+      Each catchment's risk levels, shown as the coloured Risk Levels tiles on
+      the River Status, Land Use Data and Sewerage Data pages: one row per
+      catchment, one column per risk. Each level is Very Low, Low, Medium,
+      High or Very High. Typed in until the rules for working them out are
+      agreed.
+    filled_by: excel
+    columns:
+      catchment_id:
+        type: text
+        example: GB108050014460
+        primary_key: true
+        references: catchments.id
+      untreated_sewage:
+        type: text
+        example: Very High
+        description: Untreated Sewage (storm overflows)
+      sewage_private:
+        type: text
+        example: Medium
+        description: Sewage (Private), e.g. septic tanks
+      livestock:
+        type: text
+        example: Medium
+      runoff:
+        type: text
+        example: High
+      modification:
+        type: text
+        example: Low
+        description: Physical modification of the river
+      invasive_species:
+        type: text
+        example: Low
+      overheating:
+        type: text
+        example: Low
+      running_dry:
+        type: text
+        example: Very Low
+
+  catchment_rankings:
+    title: Catchment Ranking
+    description: >-
+      Each catchment's ranking, shown as e.g. "Catchment Ranking: 68/92" on
+      every Waterbody Dashboard page (the 92 is the location's number of river
+      waterbodies). Typed in until the rule for working it out is agreed.
+    filled_by: excel
+    columns:
+      catchment_id:
+        type: text
+        example: GB108050014460
+        primary_key: true
+        references: catchments.id
+      ranking:
+        type: integer
+        example: 68
+        required: true
+
+  ea_thresholds:
+    title: EA Thresholds
+    description: >-
+      The thresholds for each measure on the EA Data page (Poor, Moderate,
+      Good and High), per catchment, as some depend on the river's type. The
+      measures are named as in EA Scores, e.g. Fish (EQR).
+    filled_by: excel
+    columns:
+      catchment_id:
+        type: text
+        example: GB108050014460
+        primary_key: true
+        references: catchments.id
+      measure:
+        type: text
+        example: Fish (EQR)
+        primary_key: true
+        description: The measure, named as on the EA Data page and in EA Scores
+      poor:
+        type: double
+        example: 0.03
+      moderate:
+        type: double
+        example: 0.2
+      good:
+        type: double
+        example: 0.4
+      high:
+        type: double
+        example: 0.7
+
+  # ---------------------------------------------------------------------------
+  #  Waterbody Dashboard: land use and sewerage, one catchment at a time
+  #  (the Catchment Dashboard adds these up for the whole location)
+  # ---------------------------------------------------------------------------
+
+  farms:
+    title: Farms
+    description: The number of farms in each catchment, shown on the Land Use Data page and added up on the Catchment Dashboard.
+    filled_by: excel
+    columns:
+      catchment_id:
+        type: text
+        example: GB108050014460
+        primary_key: true
+        references: catchments.id
+      number_of_farms:
+        type: integer
+        example: 68
+        required: true
+
+  livestock:
+    title: Livestock
+    description: >-
+      The number of each kind of livestock in each catchment, for the Land Use
+      Data page's Livestock Pressures. The density (per square kilometre) is
+      worked out from the catchment's area.
+    filled_by: excel
+    columns:
+      catchment_id:
+        type: text
+        example: GB108050014460
+        primary_key: true
+        references: catchments.id
+      livestock:
+        type: text
+        example: Dairy cattle
+        primary_key: true
+        description: e.g. Beef cattle, Dairy cattle, Pigs, Poultry, Sheep
+      number:
+        type: integer
+        example: 1137
+        required: true
+      density_rating:
+        type: text
+        example: Medium
+        description: Low, Medium or High. Typed in until the rule for working it out is agreed.
+
+  phosphate_sources:
+    title: Phosphate Sources
+    description: >-
+      Where each catchment's phosphate comes from (estimated), as a percentage
+      per source, for now (2025) and as projected (2030). Shown on the Land Use
+      Data page; the Sewerage Data page adds the sources up into continuous and
+      diffuse.
+    filled_by: excel
+    columns:
+      catchment_id:
+        type: text
+        example: GB108050014460
+        primary_key: true
+        references: catchments.id
+      source:
+        type: text
+        example: STW (SWW)
+        primary_key: true
+        description: e.g. Arable, CSOs (SWW), Highways, Industry, Livestock, STW (Private), STW (SWW), Urban
+      year:
+        type: integer
+        example: 2025
+        primary_key: true
+        description: The year the estimate is for, e.g. 2025 or 2030
+      percent:
+        type: double
+        example: 60.9
+        required: true
+        description: The source's share of the catchment's phosphate, in %
+      discharge:
+        type: text
+        example: Continuous
+        description: >-
+          Continuous (e.g. sewage treatment works) or Diffuse (everything
+          else), for the Sewerage Data page's Source of Phosphate
+
+  sewerage_properties:
+    title: Sewerage Properties
+    description: >-
+      How many properties in each catchment are on the water company's
+      sewerage and how many on private sewerage (e.g. septic tanks). Shown on
+      the Sewerage Data page, with private sewerage per hectare worked out from
+      the catchment's area, and added up on the Catchment Dashboard.
+    filled_by: excel
+    columns:
+      catchment_id:
+        type: text
+        example: GB108050014460
+        primary_key: true
+        references: catchments.id
+      public_sewerage_properties:
+        type: integer
+        example: 310
+        description: Properties on the water company's sewerage (e.g. SWW)
+      private_sewerage_properties:
+        type: integer
+        example: 467
+        description: Properties on private sewerage
+
+  sewerage_improvements:
+    title: Sewerage Improvements
+    description: >-
+      The water company's planned improvements to its sites in each catchment,
+      for the Sewerage Data page's Asset Improvement Plans.
+    filled_by: excel
+    columns:
+      catchment_id:
+        type: text
+        example: GB108050014460
+        primary_key: true
+        references: catchments.id
+      site_name:
+        type: text
+        example: HIGH BICKINGTON STW
+        primary_key: true
+      improvements:
+        type: text
+        example: Storage, New screen, Operational (e.g. blockages)
+      completion_year:
+        type: integer
+        example: 2035
+      predicted_spills_per_year:
+        type: integer
+        example: 10
+        description: Predicted number of spills a year once the work is done
+
+  # ---------------------------------------------------------------------------
+  #  About a whole location
+  # ---------------------------------------------------------------------------
+
+  location_text:
+    title: Location Text
+    description: >-
+      The hand-written text about a whole location: one row per location. In
+      Excel, Alt+Enter starts a new line in a cell; a blank line starts a new
+      paragraph, and lines starting with a dash or • become a list.
+    filled_by: excel
+    columns:
+      location_id:
+        type: integer
+        example: 1
+        primary_key: true
+        references: locations.id
+        description: The location (see the Locations table), e.g. 1 for North Devon
+      why_failing:
+        type: text
+        example: 80 of North Devon's 92 river water bodies are currently failing …
+        description: Catchment Dashboard, under "Why is the river system failing?"
+      happening_now:
+        type: text
+        example: Partners across the catchment are …
+        description: Catchment Dashboard, under "What is happening now?"
+      intervention_hypothesis:
+        type: text
+        example: Most failing waterbodies need action on both …
+        description: Catchment Dashboard, under "Intervention hypothesis"
+      intermittent_discharges:
+        type: text
+        example: Intermittent Discharges occur when the sewers are overwhelmed …
+        description: Sewerage Data page, what intermittent discharges are (the same for every catchment)
+      continuous_discharge:
+        type: text
+        example: Continuous Discharge is the release of treated sewage …
+        description: Sewerage Data page, what continuous discharge is (the same for every catchment)
+      about_waterbody_dashboard:
+        type: text
+        example: What needs to happen to bring each waterbody up to "Good" ecological status? …
+        description: Shown under the Waterbody Dashboard
+      about_catchment_dashboard:
+        type: text
+        example: The Catchment Dashboard brings together …
+        description: Shown under the Catchment Dashboard
+      contact_email:
+        type: text
+        example: biosphere-mailbox@devon.gov.uk
+        description: Shown under the dashboards, for questions about the data

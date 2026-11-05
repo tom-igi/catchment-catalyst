@@ -1,0 +1,23 @@
+{# Intervention Management: a placeholder for now. The critical path shows the
+   starting position, worked out from the EA's classifications. #}
+{% extends "focus-areas.html" %}
+{% block section %}
+{% if name == "Critical Path" %}
+<h2>Critical path to Good Ecological Status</h2>
+<div class="focus-body">
+  {% set counts = dict(figures.class_counts(ids)) %}
+  <p><strong>Starting Position{% if figures.latest_year() %} ({{ figures.latest_year() }}){% endif %}</strong><br>
+    {{ figures.rivers() }} River Water Bodies</p>
+  <ul>
+    <li>{{ (counts.get("High") or 0) + (counts.get("Good") or 0) }} Good</li>
+    <li>{{ figures.failing(ids) }} Failing</li>
+  </ul>
+  <p class="placeholder">The rest of the critical path is under development.</p>
+</div>
+{% else %}
+<h2>{{ name }}</h2>
+<div class="focus-body">
+  <p class="placeholder">This section is under development.</p>
+</div>
+{% endif %}
+{% endblock %}

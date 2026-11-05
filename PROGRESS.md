@@ -15,13 +15,13 @@ Tom to run things himself, 29 October 2026).
 ```bash
 docker compose up -d                      # start the local database, admin page and dashboard preview
 docker compose run --rm schema plan       # should say "The database already matches schema.yaml."
-docker compose run --rm test              # run the tests (130 passing at the last update)
+docker compose run --rm test              # run the tests (152 passing at the last update)
 docker compose run --rm publish           # rebuild the dashboard pages from the database
 ```
 
 - Admin page: <http://localhost:8000/admin> (name `admin`, password `admin`): a diagram of every
   table; click any table to download it, or an Excel table's **Upload data** (on the left) to upload it
-- Dashboard: <http://localhost:8080>
+- Dashboard: <http://localhost:8080> (open North Devon; Langham Lake and West Okement have sample data in every panel)
 
 The local database is on `localhost:5434` (database, user and password are all `catalyst`),
 for DBeaver or pgAdmin.
@@ -41,7 +41,7 @@ and optional extras are kept self-contained so they're easy to remove.
 | **EA and River Obstacles importers** | `backend/catalyst/importers/api/` | For every imported catchment: the EA's classifications and RNAGs (`importer classifications`), storm overflow spills from the EA's yearly returns (`importer storm-overflows`), and obstacles from River Obstacles (`importer river-obstacles`). Each replaces its table, with a preview first, and keeps the downloads. |
 | **Excel uploads** | `backend/catalyst/importers/excel/` | For every table marked `filled_by: excel`: download it as Excel, upload an edited copy, see what will be added, changed and deleted, then approve. No code per table. |
 | **Admin page** | `backend/catalyst/admin/` | One page behind a login (one name and password per person): a diagram of every table (`diagram.py`, `diagram.yaml`) showing where its data comes from (downloaded or Excel), how the tables join up by Catchment ID, and each table's columns when clicked. Any table can be downloaded as Excel from there; each Excel table has its own **Upload data** box on the left, and the upload's preview is its own page. Made from `schema.yaml` each time it's opened. Runs with `docker compose up -d`. |
-| **Publish step and dashboard** | `backend/catalyst/publish/`, `published/` | Writes each location's dashboard as plain web pages, laid out like the original (`Reference/ReferenceImages`): River Status, EA Data, Land Use Data and Sewerage Data (the Overview is built but switched off for now). Panels with a table are filled in (map colours, classifications, failing elements, RNAGs, catchment details, Habitat & Land Use, river obstacles, storm overflow spills); the rest are empty until their table exists. Previewed at <http://localhost:8080>. |
+| **Publish step and dashboard** | `backend/catalyst/publish/`, `published/` | Writes each location's dashboard as plain web pages, laid out like the original (`Reference/ReferenceImages`), with four views chosen by cards across the top of every page. **Waterbody Dashboard:** River Status, EA Data, Land Use Data and Sewerage Data, one waterbody at a time (the Overview tab is built but switched off). **Catchment Dashboard:** the whole location on one big map, with its panels over it, and a page per operational catchment. **Intervention Management** and **Catchment Insights:** placeholders with their focus-area buttons. Every panel now has a table. Previewed at <http://localhost:8080>. |
 | **Dev and live setup** | `docker-compose*.yml`, `.env*.example` | The same commands on your machine and on the live server. Only the settings differ. |
 | **Tests** | `backend/tests/` | Cover the schema tool, the importers, the Excel uploads, the admin page (and its diagram) and the publish step. |
 
@@ -52,22 +52,41 @@ and optional extras are kept self-contained so they're easy to remove.
 | `catchments` | Core | Every EA river waterbody: details, outline, river line, area, length, upstream/downstream IDs. Filled only by the importer. | 92 (every North Devon river) |
 | `locations` | Core | ID, name, and the list of catchment IDs | 1 (North Devon, with the 92 catchments) |
 | `datasets` | Core | One row per data table: name, source, caveats (for the "i" buttons) | 0 |
-| `uploads` | Core | Every Excel upload: table, file, who, when, status, rows added / changed / deleted | 2 |
-| `ea_scores` | Data, Excel upload | EA classification results per catchment, measure and year | 48, **made up** |
-| `habitat_land_use` | Data, Excel upload | Area of each habitat type per catchment | 14, **made up** |
+| `uploads` | Core | Every Excel upload: table, file, who, when, status, rows added / changed / deleted | 15 |
 | `ea_classifications` | Data, EA | The EA's status for each classification item and year (2009 to 2022), per catchment | 27,294 |
 | `ea_rnags` | Data, EA | The EA's reasons for not achieving good: element, activity, sector | 513 |
 | `storm_overflows` | Data, EA | Each storm overflow's spills (hours, count) per year, 2021 to 2025, with its location | 755 (about 150 overflows into 57 catchments) |
 | `river_obstacles` | Data, River Obstacles | Weirs, culverts, fords and so on, with their location | 423 (in 80 catchments) |
+| `ea_scores` | Data, Excel | The measured values behind the EA's statuses (e.g. Fish (EQR) 0.36), per measure and year: EA Data page | 24, **sample** |
+| `ea_thresholds` | Data, Excel | Poor / Moderate / Good / High thresholds per measure: EA Data page | 16, **sample** |
+| `habitat_land_use` | Data, Excel | Area of each habitat type, and its relative coverage (typed in): Land Use Data, Catchment Dashboard | 19, **sample** |
+| `river_status_text` | Data, Excel | Why is the river failing?, What is happening now?, the intervention hypothesis and its confidence | 2, **sample** |
+| `interventions` | Data, Excel | The interventions table: priority (Primary / Contingency), desired change, lead partner, actions, how we'll know | 4, **sample** |
+| `risk_levels` | Data, Excel | One column per risk (8), each Very Low … Very High (typed in) | 2, **sample** |
+| `catchment_rankings` | Data, Excel | The ranking, e.g. 68 for "68/92" (typed in) | 2, **sample** |
+| `farms` | Data, Excel | Number of farms | 2, **sample** |
+| `livestock` | Data, Excel | Number of each kind of livestock, and its density rating (typed in) | 8, **sample** |
+| `phosphate_sources` | Data, Excel | Each source's % of the phosphate, per year (2025, 2030), and whether it's Continuous or Diffuse | 28, **sample** |
+| `sewerage_properties` | Data, Excel | Properties on public (SWW) and on private sewerage | 2, **sample** |
+| `sewerage_improvements` | Data, Excel | The water company's planned improvements: site, improvements, completion year, predicted spills | 3, **sample** |
+| `location_text` | Data (by location), Excel | One row per location: the Catchment Dashboard's three texts, the Sewerage Data page's two explanations, the text under each dashboard, the contact email | 1, **sample** |
 
-`catchments` and the four tables after it are filled by importers; `ea_scores` and
-`habitat_land_use` by Excel upload.
+`catchments` and the four EA / River Obstacles tables are filled by importers; the rest of the
+data tables by Excel upload.
 
-**The EA Scores and Habitat rows in the local database are invented,** to have something to
-show on the dashboard. They were uploaded through the admin page on 29 October 2026 (uploads
-1 and 2), for the first 2 catchments only. Uploading the real data replaces them completely.
-**EA Scores is no longer shown on the dashboard:** the EA's real classifications replaced it
-(see "EA data" below).
+**Every Excel table's rows in the local database are samples** (uploaded through the admin page
+on 5 November 2026, uploads 3 to 15), so every panel has something to show:
+- **Langham Lake** (GB108050014460): copied from the reference screenshots (1–5.jpg), so the
+  pages can be compared with the originals.
+- **West Okement** (GB108050008080): made up. Its text starts "(Made-up text, for testing.)".
+- **North Devon's Location Text**: the Catchment Dashboard's "Why is the river system failing?"
+  and the Sewerage and Waterbody Dashboard texts are copied from the screenshots; "What is
+  happening now?" and "Intervention hypothesis" are made up (and say so).
+- **Habitat** for West and East Okement are the made-up rows from 29 October, now with a relative
+  coverage. The old made-up EA Scores rows were replaced.
+
+Uploading the real data replaces them completely. The script that uploaded them was a one-off,
+kept outside the project.
 
 ---
 
@@ -108,8 +127,8 @@ show on the dashboard. They were uploaded through the admin page on 29 October 2
 - **The publish step has two halves:** `collect.py` gathers a location's data and knows nothing about web pages; `site.py` and the templates turn it into pages. A different front end could reuse the first half.
 - **The pages copy the original dashboard's five tabs and colours** (29 October 2026). Each tab except the Overview has a page per catchment (`<tab>/<catchment ID>/`) and one before a catchment is chosen (`<tab>/`). Clicking the map stays on the same tab, as in the original.
 - **The Overview is switched off for now** (Tom, 29 October 2026; he'll bring it back later). It's still built and tested: `SHOW_OVERVIEW = True` in `site.py` brings it back as the front page. Until then the front page is River Status before a catchment is chosen.
-- **Panels with no table yet are shown empty,** with their headings (and table headings) only. That includes the location's text, photo and logo, ranking, risk levels, thresholds, farms, livestock, phosphate sources, sewerage properties and SWW improvement plans.
-- **Calculations are in `figures.py`:** each catchment's latest ecological status (for the map colours and the Overview counts), the EA scoring grid, failing elements, RNAGs, each habitat's % of the catchment, and the storm overflow table. Ranking and "Relative Coverage" are still empty: their rules aren't agreed (PLAN.md §9.3).
+- **A panel is shown empty while its table has no rows for the catchment,** with its headings (and table headings) only. Every panel now has a table (5 November 2026), except the Overview's photo and the logo.
+- **Calculations are in `figures.py`:** each catchment's latest ecological status (for the map colours and the Overview counts), the EA scoring grid, failing elements, RNAGs, each habitat's % of the catchment, the storm overflow table, and (5 November 2026) livestock densities, the phosphate split, sewerage per ha and the Catchment Dashboard's totals. Ranking and "Relative Coverage" are typed in until their rules are agreed (PLAN.md §9.3).
 - **A new data table no longer appears by itself:** it needs a place on a page. The original layout has no space for a generic table.
 - **The "i" buttons show the table's row in `datasets`,** and are greyed out until it has one.
 - **Tables are sortable** by clicking a heading (a small script, `static/sort.js`). Numbers sort as numbers, and empty cells always go last.
@@ -118,7 +137,7 @@ show on the dashboard. They were uploaded through the admin page on 29 October 2
 - **A location's web address comes from its name** (North Devon → `north-devon`), for now.
 
 **EA data** (29 October 2026)
-- **The EA's real classifications replace EA Scores on the dashboard.** They come from the Catchment Data Explorer (`importer classifications`), one download per management catchment, so all 92 rivers take two downloads. They give a status for each item and year but **no values** (e.g. Fish EQR 0.36), so the EA Data grid shows statuses. EA Scores (Excel, invented rows) is still in the admin page but not shown.
+- **The EA's real classifications replace EA Scores on the dashboard.** They come from the Catchment Data Explorer (`importer classifications`), one download per management catchment, so all 92 rivers take two downloads. They give a status for each item and year but **no values** (e.g. Fish EQR 0.36). Since 5 November 2026 the values come from EA Scores (Excel), shown beside the EA's statuses (see "The new tables").
 - **The latest classification year is 2022.** The Catchment Data Explorer doesn't have 2025 yet (the EA publishes it separately on data.gov.uk), so the side panel shows 2022, 2019 and 2016.
 - **Where a year was classified in two cycles** (2019 in cycles 2 and 3), the later cycle is used.
 - **The EA Data grid shows the items on the original dashboard** (Ecological, Fish, Phosphate and so on, plus Specific pollutants and Chemical), not the EA's 60-odd single chemicals.
@@ -129,6 +148,65 @@ show on the dashboard. They were uploaded through the admin page on 29 October 2
 - **The storm overflow returns are read for every water company,** by their column headings, so other locations work too. The years read start at 2021; the dashboard shows the latest five.
 - **River obstacles come from River Obstacles** (the EA and The Rivers Trust), via its public map service, and are tied to the catchment whose outline they're inside. Obstacle 39245 in Langham Lake matches the original.
 - **Licences:** the EA data is Open Government Licence; River Obstacles is CC BY-SA 4.0. Both are credited in the dashboard's footer. Offering River Obstacles as a download would bring in CC BY-SA's "share alike" condition.
+
+**The four views** (Tom, 5 November 2026)
+- **Cards across the top of every page** choose the view: Waterbody Dashboard (the four tabs we
+  already had, unchanged in layout), Catchment Dashboard, Intervention Management and Catchment
+  Insights, as in the new reference images (`Overview.jpg`, `Catchment Dashboard.jpg`, ...). The
+  current one is greyed. The front page is still the Waterbody Dashboard's River Status.
+- **The card pictures are stand-ins,** cut from the reference screenshots
+  (`publish/static/cards/`), so they're small. Replace them with the real pictures, keeping the
+  names.
+- **The "EA Inspections" tab** in the newer Waterbody Dashboard in `Overview.jpg` was left out:
+  Tom said to keep the Waterbody Dashboard as in 1–5.jpg.
+- **The Catchment Dashboard is one big map with its panels laid over it,** as in the image. On a
+  phone the panels go below the map. The map fits the catchments into the space beside the panels.
+- **Its operational catchment buttons each open a page** (`catchment-dashboard/torridge/`) with
+  the map zoomed to them (the rest faded) and every count and total narrowed to their waterbodies.
+  A management catchment that is the whole location is the Catchment Dashboard's front page.
+  Clicking a waterbody opens it in the Waterbody Dashboard.
+- **The Catchment Dashboard's text is one set per location** (`location_text`), and stays the
+  same when an operational catchment is chosen, as a Power BI text box would. Text per
+  operational catchment would be a small change if it's wanted.
+- **Its figures are added up from the waterbodies' rows** (farms, properties, habitat), so
+  nothing is stored twice. When only some waterbodies have figures, the total says so, e.g.
+  "(2 of 92 waterbodies)". Habitat % is of the area of the waterbodies with habitat figures.
+- **"SWW sewage outflows (CSO & STW)" is counted from the storm overflow returns**: the overflows
+  into the location's waterbodies in the latest year (152 for North Devon, against 167 on the
+  original, because overflows with no waterbody ID are left out; see Open questions).
+- **The water company's name comes from the storm overflow data** ("South West Water"), so the
+  labels say "Properties on South West Water sewerage" rather than "SWW".
+- **Intervention Management and Catchment Insights are placeholders:** the focus-area buttons
+  work, each showing a section that says it's under development. Intervention Management's
+  critical path already shows the starting position (rivers, good, failing), worked out from the
+  EA's classifications. A small script (`static/tabs.js`) switches between sections; without it
+  every section is shown.
+
+**The new tables** (Tom, 5 November 2026)
+- **A table for every panel,** all filled by Excel upload, so the data can be uploaded as it
+  arrives. Each shows on the pages as soon as it has rows.
+- **Tables about a whole location have a `location_id` instead of a `catchment_id`** (the rule
+  in the master file now allows either, but not both). `location_text` is the first. In its
+  Excel file, North Devon is location 1. The admin diagram joins it to Locations.
+- **Worked out, not stored:** livestock density (number per 100 ha of the catchment), % of
+  catchment, private sewerage per ha, the Continuous / Diffuse split of phosphate (adding up the
+  sources by their `discharge` column), and the Catchment Dashboard's totals.
+- **Typed in until their rules are agreed:** ranking, risk levels, relative coverage and
+  density rating (PLAN.md §9.3). Each could be replaced by a calculation later.
+- **Risk levels are one column per risk** (eight), rather than a row per risk, so the Excel file
+  is one row per waterbody and the risk names can't be mistyped.
+- **Hand-written text is in Excel cells:** Alt+Enter starts a new line, a blank line a new
+  paragraph, and lines starting with "- ", "* " or "•" become a list. It's always shown as typed,
+  never as HTML.
+- **EA Scores now holds the measured values behind the EA's statuses** (e.g. Fish (EQR) 0.36),
+  named as on the original's EA Data page; EA Thresholds holds each measure's thresholds, per
+  catchment because some depend on the river's type. The EA Data grid places each measure as on
+  the original (the list is `MEASURES` in `figures.py`): an item with one measure shows its values
+  in its own row (e.g. "Fish (EQR)" instead of "Fish"), coloured by the EA's status; an item with
+  several (Invertebrates, pH) keeps its row of statuses with a row for each measure below. Any
+  other measure goes at the bottom. Values show at least 2 decimal places, more if given (0.057).
+- **The Sewerage page's two explanations** (intermittent and continuous discharges) are the same
+  for every waterbody, so they're in Location Text.
 
 **Locations**
 - **Just a name and a list of catchment IDs.** Other location details (intro text, photo, branding, contact email) will go in location tables. Whatever saves a location must check the IDs exist, because the database can't check IDs inside a list.
@@ -152,20 +230,24 @@ show on the dashboard. They were uploaded through the admin page on 29 October 2
 - **Several locations in one table:** when that happens, replace only the rows for the catchments in the file (PLAN.md §3.4), so locations don't have to share one Excel file.
 - **Estuaries and coastal waters:** import them too, so every upstream/downstream ID finds a name?
 - **When the VM is set up:** is UK South the right region? Does the private repository need a deploy key?
-- **EA Data values:** the EA's download has statuses but not the numbers on the original (EQRs, mg/l). Where did the original's come from? If they come as a spreadsheet, EA Scores could become a values-only Excel table shown alongside the EA's statuses.
+- **EA Data values:** the EA's download has statuses but not the numbers on the original (EQRs, mg/l), so they go in EA Scores (Excel) for now. Where did the original's come from, and could they be downloaded instead?
 - **2025 classifications:** wait for the Catchment Data Explorer, or import the EA's separate 2025 download?
 - **Storm overflows with no waterbody ID:** also tie them to a catchment by location? That would add a few North Devon stream outfalls (e.g. Fremington) the original doesn't show.
+- **Catchment Dashboard text per operational catchment?** For now one set per location.
+- **The card pictures:** the real images for the four cards (the stand-ins are cut from the screenshots).
+- **Phosphate Continuous / Diffuse:** adding up Langham Lake's sources gives 60.9 / 39.1; the original shows 61.0 / 39.0, so it may come from its own figures. Is a separate table needed, or is adding up right?
 - The remaining questions in PLAN.md §9.3 (ranking, risk levels, rating bands, phosphate sources, branding, admin users).
 
 ---
 
 ## Suggested next steps
 
-1. **Try the admin page with real data.** Download Habitat & Land Use, paste in real rows for any of the 92 rivers, upload, approve, then `docker compose run --rm publish`.
-2. **The next datasets,** for the empty panels. Each needs a table in the master file and filling in its panel. Simple ones can be `filled_by: excel` with no code; fiddly raw files (PLAN.md §9.1) may still need an importer. Not available from the EA: farms and livestock (Defra), land use (e.g. UKCEH Land Cover), phosphate sources, sewerage properties, SWW improvement plans, risk levels and the written text.
-3. **Decide what happens to EA Scores** (see Open questions).
-4. **Have GitHub run the tests on every push** (offered, not yet agreed).
-5. **More from the EA, if wanted:** the Catchment Data Explorer also has `objectives` (target status and date per item), `investigations` and `site-classifications` (monitoring sites) per management catchment. None has a panel on the original.
+1. **Look over the four views** at <http://localhost:8080> (Langham Lake and West Okement have every panel filled) and the new tables in the admin page.
+2. **Upload real data** into the new tables as it arrives: download each from the admin page, replace the sample rows, upload, approve, then `docker compose run --rm publish`.
+3. **The details of Intervention Management and Catchment Insights,** when Tom is ready.
+4. **Agree the rules** for ranking, risk levels, relative coverage and density rating, so they can be worked out rather than typed in.
+5. **Have GitHub run the tests on every push** (offered, not yet agreed).
+6. **More from the EA, if wanted:** the Catchment Data Explorer also has `objectives` (target status and date per item), `investigations` and `site-classifications` (monitoring sites) per management catchment.
 
 ---
 
@@ -181,4 +263,5 @@ show on the dashboard. They were uploaded through the admin page on 29 October 2
 - **On the live server, every `docker compose` command needs `ADMIN_USERS` and `ADMIN_SECRET_KEY` in `.env`,** even commands that don't use the admin page. Make the `ADMIN_USERS` entries on your own machine.
 - **The admin page's port is 8000, and the dashboard preview's is 8080** (change `ADMIN_PORT` or `WEB_PORT` in `.env` if either is taken).
 - **The dashboard doesn't update by itself:** after approving an upload, run `docker compose run --rm publish`.
+- **Browsers keep copies of the dashboard's styles, scripts and map file,** so every link to them ends with `?v=` and a fingerprint of the files (`version()` in `publish/site.py`). It changes whenever one of them does, so a publish is always seen straight away. (Before this, a browser could show an old stylesheet: Ctrl+F5 fixes that.)
 - **OpenStreetMap's map images are free for light use only** (their tile usage policy). Fine for now; a busy public site may need a paid map provider, which is a one-line change in `static/map.js`.

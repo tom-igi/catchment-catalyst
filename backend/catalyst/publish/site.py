@@ -1,49 +1,85 @@
 """Write a location's dashboard as plain web pages, from the data collect.py gathered.
 
-The pages follow the tabs of the original dashboard (Reference/ReferenceImages).
-Each location gets its own folder, which has everything its pages need, so it
-can be served at its own address:
+The pages follow the original (Reference/ReferenceImages): four views, chosen
+with the cards across the top of every page (VIEWS). The Waterbody Dashboard
+has a tab per page and a page per catchment; the Catchment Dashboard shows the
+whole location, or one of its operational catchments; Intervention Management
+and Catchment Insights are placeholders for now. Each location gets its own
+folder, which has everything its pages need, so it can be served at its own
+address:
 
-    <location>/index.html                      the front page: the Overview tab (switched off for now:
-                                               see SHOW_OVERVIEW), or River Status before a catchment is chosen
-    <location>/<tab>/index.html                another tab, before a catchment is chosen
+    <location>/index.html                       the front page: the Overview tab (switched off for now:
+                                                see SHOW_OVERVIEW), or River Status before a catchment is chosen
+    <location>/<tab>/index.html                 a Waterbody Dashboard tab, before a catchment is chosen
     <location>/<tab>/<catchment ID>/index.html  that tab for one catchment
+    <location>/catchment-dashboard/index.html   the Catchment Dashboard, for the whole location
+    <location>/catchment-dashboard/<area>/      ... for one operational (or management) catchment
+    <location>/intervention-management/         Intervention Management
+    <location>/catchment-insights/              Catchment Insights
     <location>/catchments.geojson               the outlines, rivers and ecological statuses, for the maps
-    <location>/assets/                          styles, scripts and the map library
+    <location>/assets/                          styles, scripts, pictures and the map library
 
 where <tab> is river-status, ea-data, land-use or sewerage. Clicking the map
 picks a catchment and stays on the same tab, as in the original.
 
 The folder is built next to the old one and swapped in at the end, so a
 half-written dashboard is never served.
+
+Every link to a file in assets/ (and to catchments.geojson) ends with
+?v=<version>, a fingerprint of those files. Browsers keep copies of such
+files, so without it a visitor could be shown an old stylesheet or map after a
+publish. The version only changes when one of the files does, so browsers can
+still keep them between publishes.
 """
 
 from __future__ import annotations
 
 import datetime
+import hashlib
 import json
+import re
 import shutil
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
+from markupsafe import Markup, escape
 
 from .collect import Location
-from .figures import Figures
+from .figures import Figures, measured
 
 HERE = Path(__file__).parent
 ASSETS = HERE / "static"
 # The Overview tab is switched off for now (29 October 2026): the front page is
 # River Status instead. Set this to True to bring it back.
 SHOW_OVERVIEW = False
-# Folder name -> the tab's name. Each has a template of the same name.
+# The Waterbody Dashboard's tabs: folder name -> the tab's name. Each has a template of the same name.
 TABS = {
     "river-status": "River Status",
     "ea-data": "EA Data",
     "land-use": "Land Use Data",
     "sewerage": "Sewerage Data",
 }
+# The four views, as the cards across the top of every page: (folder, name, what it's for, picture in assets/cards/).
+VIEWS = [
+    ("river-status", "Waterbody Dashboard",
+     "Explore the evidence and analysis for individual river water bodies within this catchment.", "waterbody.jpg"),
+    ("catchment-dashboard", "Catchment Dashboard",
+     "Understand ecological condition, environmental pressures and recovery priorities across this catchment.", "catchment.jpg"),
+    ("intervention-management", "Intervention Management",
+     "Identify and track the programmes, projects and investments needed to improve river health.", "interventions.jpg"),
+    ("catchment-insights", "Catchment Insights",
+     "Explore key questions about agriculture, wastewater, fish and river recovery for the catchment.", "insights.jpg"),
+]
+# The focus areas on the two placeholder views, as their buttons. Each is "under development" for now.
+INTERVENTION_AREAS = [
+    "Critical Path", "Unit Cost of Interventions", "Intervention Summary", "Interventions Detail", "Community Action",
+]
+INSIGHT_AREAS = [
+    "State of the Catchment", "Agriculture", "Wastewater", "Fish",
+    "Intervention Strategy", "Funding & Delivery", "Community Involvement", "Other",
+]
 
 
 def write_location(location: Location, out_dir: Path) -> Path:
@@ -58,16 +94,41 @@ def write_location(location: Location, out_dir: Path) -> Path:
     shutil.copytree(ASSETS, building / "assets")
     (building / "catchments.geojson").write_text(json.dumps(_map(location, figures), separators=(",", ":")), encoding="utf-8")
     env = _environment()
-    shared = {"location": location, "figures": figures, "tabs": TABS, "show_overview": SHOW_OVERVIEW, "published": _today()}
+    shared = {
+        "location": location, "figures": figures, "text": figures.location_text(), "tabs": TABS, "views": VIEWS,
+        "show_overview": SHOW_OVERVIEW, "published": _today(), "version": version(building),
+    }
+    waterbody = {**shared, "view": "river-status"}
     front, tab = ("overview.html", "") if SHOW_OVERVIEW else ("river-status.html", "river-status")
-    _write(building / "index.html", env.get_template(front).render(**shared, tab=tab, catchment=None, root=""))
+    _write(building / "index.html", env.get_template(front).render(**waterbody, tab=tab, catchment=None, root=""))
     for tab in TABS:
         template = env.get_template(f"{tab}.html")
-        _write(building / tab / "index.html", template.render(**shared, tab=tab, catchment=None, root="../"))
+        _write(building / tab / "index.html", template.render(**waterbody, tab=tab, catchment=None, root="../"))
         for catchment in location.catchments:
             _write(building / tab / catchment["id"] / "index.html", template.render(
-                **shared, tab=tab, catchment=catchment, root="../../",
+                **waterbody, tab=tab, catchment=catchment, root="../../",
             ))
+
+    # The Catchment Dashboard: the whole location, then each of its areas.
+    template = env.get_template("catchment-dashboard.html")
+    areas = figures.areas()
+    everything = [c["id"] for c in location.catchments]
+    whole = next((a for a in areas if not a.slug), None)
+    _write(building / "catchment-dashboard" / "index.html", template.render(
+        **shared, view="catchment-dashboard", tab="", catchment=None, root="../",
+        areas=areas, area=whole, ids=everything,
+    ))
+    for area in areas:
+        if area.slug:
+            _write(building / "catchment-dashboard" / area.slug / "index.html", template.render(
+                **shared, view="catchment-dashboard", tab="", catchment=None, root="../../",
+                areas=areas, area=area, ids=area.catchment_ids,
+            ))
+
+    for view, focus_areas in (("intervention-management", INTERVENTION_AREAS), ("catchment-insights", INSIGHT_AREAS)):
+        _write(building / view / "index.html", env.get_template(f"{view}.html").render(
+            **shared, view=view, tab="", catchment=None, root="../", focus_areas=focus_areas, ids=everything,
+        ))
 
     if final.exists():
         final.rename(old)
@@ -81,6 +142,15 @@ def write_index(names: list[str], slugs: list[str], out_dir: Path) -> Path:
     path = out_dir / "index.html"
     _write(path, _environment().get_template("index.html").render(locations=list(zip(names, slugs)), root=""))
     return path
+
+
+def version(folder: Path) -> str:
+    """A fingerprint of a location folder's assets and map file, added to their links so browsers fetch them again when they change."""
+    digest = hashlib.sha256()
+    files = sorted(p for p in (folder / "assets").rglob("*") if p.is_file()) + [folder / "catchments.geojson"]
+    for path in files:
+        digest.update(path.relative_to(folder).as_posix().encode() + b"\0" + path.read_bytes() + b"\0")
+    return digest.hexdigest()[:10]
 
 
 def _map(location: Location, figures: Figures) -> dict:
@@ -105,7 +175,10 @@ def _environment() -> Environment:
         trim_blocks=True,
         lstrip_blocks=True,
     )
-    env.filters.update(show=_show, sort_value=_sort_value, number=_number, hours=_hours, status_class=_status_class)
+    env.filters.update(
+        show=_show, sort_value=_sort_value, number=_number, hours=_hours, status_class=_status_class,
+        paragraphs=_paragraphs, risk_class=_risk_class, anchor=_anchor, measured=measured,
+    )
     return env
 
 
@@ -154,6 +227,44 @@ def _hours(value: float | None) -> str:
 def _status_class(status: str | None) -> str:
     """The CSS class that colours a status, e.g. 'Supports Good' -> 'status-supports-good'."""
     return "status-" + "-".join(status.lower().split()) if status else "status-none"
+
+
+def _risk_class(level: str | None) -> str:
+    """The CSS class that colours a risk level, e.g. 'Very High' -> 'risk-very-high'."""
+    return "risk-" + "-".join(level.lower().split()) if level and level.strip() else "risk-none"
+
+
+def _anchor(text: str) -> str:
+    """A name as a link within a page, e.g. 'Funding & Delivery' -> 'funding-delivery'."""
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+
+
+BULLET = re.compile(r"^(?:•\s*|[-–*]\s+)")
+
+
+def _paragraphs(text: str | None) -> Markup:
+    """Hand-written text as paragraphs: a blank line starts a new one, and lines starting with •, - or * become a list."""
+    if not text or not text.strip():
+        return Markup("")
+    html = []
+    for block in re.split(r"\n\s*\n", text.replace("\r\n", "\n").replace("\r", "\n").strip()):
+        lines, items = [], []
+        for line in (l.strip() for l in block.split("\n") if l.strip()):
+            if BULLET.match(line):
+                if lines:
+                    html.append(Markup("<p>%s</p>") % Markup("<br>").join(lines))
+                    lines = []
+                items.append(BULLET.sub("", line))
+            else:
+                if items:
+                    html.append(Markup("<ul>%s</ul>") % Markup("").join(Markup("<li>%s</li>") % i for i in items))
+                    items = []
+                lines.append(escape(line))
+        if lines:
+            html.append(Markup("<p>%s</p>") % Markup("<br>").join(lines))
+        if items:
+            html.append(Markup("<ul>%s</ul>") % Markup("").join(Markup("<li>%s</li>") % i for i in items))
+    return Markup("\n").join(html)
 
 
 def _today() -> str:

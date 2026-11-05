@@ -1,11 +1,13 @@
 {% extends "catchment.html" %}
-{% from "macros.html" import heading, empty_table, risk_levels, points_map %}
+{% from "macros.html" import heading, risk_levels, points_map with context %}
 {% block panels %}
-{% set discharges = figures.discharges(catchment.id if catchment else "") %}
+{% set catchment_id = catchment.id if catchment else "" %}
+{% set discharges = figures.discharges(catchment_id) %}
 {% set company = discharges.company ~ " " if discharges.company else "" %}
 <div class="grid sewerage">
   <section class="panel clay intermittent">
     {{ heading("Intermittent Discharges") }}
+    <div class="text">{{ text.get("intermittent_discharges") | paragraphs }}</div>
   </section>
 
   <section class="panel clay discharges">
@@ -49,34 +51,79 @@
 
   <section class="panel white outlets">
     {{ heading(company ~ "Outlet Locations") }}
-    {{ points_map(location, root, catchment, figures.outlets(catchment.id if catchment else ""), "#c2187a", "Map of the storm overflow outlets") }}
+    {{ points_map(location, root, catchment, figures.outlets(catchment_id), "#c2187a", "Map of the storm overflow outlets") }}
   </section>
 
   <section class="panel clay properties">
+    {% set properties = figures.properties(catchment) if catchment else {} %}
     <dl>
-      <dt>Properties on SWW sewerage:</dt><dd></dd>
-      <dt>Properties on Private Sewerage:</dt><dd></dd>
-      <dt>Private sewerage per ha of catchment:</dt><dd></dd>
+      <dt>Properties on {{ discharges.company or "public" }} sewerage:</dt><dd>{{ properties.get("public") | number }}</dd>
+      <dt>Properties on Private Sewerage:</dt><dd>{{ properties.get("private") | number }}</dd>
+      <dt>Private sewerage per ha of catchment:</dt><dd>{{ properties.get("private_per_ha") | number(2) }}</dd>
     </dl>
   </section>
 
   <section class="panel clay continuous">
     {{ heading("Continuous Discharge") }}
+    <div class="text">{{ text.get("continuous_discharge") | paragraphs }}</div>
   </section>
 
   <section class="panel clay phosphate">
-    {{ heading("Source of Phosphate", info=true) }}
-    {{ empty_table(["Source", "2025 (%)", "2030 (%)"]) }}
+    {{ heading("Source of Phosphate", info=true, dataset=location.dataset("phosphate_sources")) }}
+    {% set years, groups = figures.phosphate_discharges(catchment_id) %}
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Source</th>
+            {% for year in years or [2025, 2030] %}
+            <th scope="col" class="num">{{ year }} (%)</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for group, by_year in groups %}
+          <tr>
+            <td>{{ group }}</td>
+            {% for year in years %}
+            <td class="num">{{ by_year.get(year) | number(1) }}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </section>
 
   <section class="panel navy risks-panel">
-    {{ heading("Risk Levels", info=true) }}
-    {{ risk_levels(["Untreated Sewage", "Sewage (Private)"]) }}
+    {{ heading("Risk Levels", info=true, dataset=location.dataset("risk_levels")) }}
+    {{ risk_levels(figures.risks(catchment_id, ["untreated_sewage", "sewage_private"])) }}
   </section>
 
   <section class="panel clay plans">
-    {{ heading("South West Water Asset Improvement Plans") }}
-    {{ empty_table(["Site Name", "Improvements", "Completion Date", "Predicted no of spills pa"]) }}
+    {{ heading(company ~ "Asset Improvement Plans", info=true, dataset=location.dataset("sewerage_improvements")) }}
+    <div class="scroll">
+      <table class="sortable">
+        <thead>
+          <tr>
+            <th scope="col" data-type="text">Site Name</th>
+            <th scope="col" data-type="text">Improvements</th>
+            <th scope="col" data-type="number" class="num">Completion Date</th>
+            <th scope="col" data-type="number" class="num">Predicted no of spills pa</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in figures.improvements(catchment_id) %}
+          <tr>
+            <td>{{ row.site_name }}</td>
+            <td>{{ row.improvements or "" }}</td>
+            <td class="num">{{ row.completion_year | show }}</td>
+            <td class="num">{{ row.predicted_spills_per_year | show }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </section>
 </div>
 {% endblock %}

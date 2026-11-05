@@ -6,6 +6,10 @@
 //   data-geojson   the file of outlines and rivers (catchments.geojson), with each catchment's status
 //   data-links     what goes before a catchment ID to link to its page
 //   data-selected  the catchment to highlight, if one is chosen
+//   data-focus     the catchments to zoom to, with the others faded (e.g. an
+//                  operational catchment's on the Catchment Dashboard), if any
+//   data-avoid     panels laid over the map (a CSS selector): the catchments
+//                  are fitted into the space beside them, if there's room
 //
 // The colours come from the --status-... colours in style.css.
 (function () {
@@ -15,6 +19,7 @@
   if (!element || !window.L) return;
 
   const selected = element.dataset.selected;
+  const focus = element.dataset.focus ? new Set(element.dataset.focus.split(",")) : null;
   const styles = getComputedStyle(document.documentElement);
 
   const RIVER = "#1f78b4";
@@ -53,22 +58,44 @@
         style: function (feature) { return { color: RIVER, weight: feature.properties.id === selected ? 2.5 : 1.5 }; },
         interactive: false,
       }).addTo(map);
-      map.fitBounds(outlines.getBounds(), { padding: [4, 4] });
+
+      let bounds = outlines.getBounds();
+      if (focus) {
+        const focused = L.featureGroup(outlines.getLayers().filter(function (layer) { return focus.has(layer.feature.properties.id); }));
+        if (focused.getLayers().length) bounds = focused.getBounds();
+      }
+      map.fitBounds(bounds, padding());
     })
     .catch(function () {
       element.innerHTML = '<p class="map-message">Sorry, the map couldn\'t be loaded.</p>';
     });
 
+  // Room around the catchments when fitting them in: beside any panels laid over the map.
+  function padding() {
+    const box = element.getBoundingClientRect();
+    let left = 4, right = 4;
+    document.querySelectorAll(element.dataset.avoid || ":not(*)").forEach(function (panel) {
+      const r = panel.getBoundingClientRect();
+      if (!r.width || r.bottom <= box.top || r.top >= box.bottom) return;  // not over the map
+      if (r.left + r.width / 2 < box.left + box.width / 2) left = Math.max(left, r.right - box.left + 8);
+      else right = Math.max(right, box.right - r.left + 8);
+    });
+    if (box.width - left - right < box.width * 0.3) left = right = 4;  // too little room left: use it all
+    return { paddingTopLeft: [left, 4], paddingBottomRight: [right, 4] };
+  }
+
   function outline(feature, isHovered) {
     const isSelected = feature.properties.id === selected;
-    // With a catchment chosen, the others are faded, as on the original. The
-    // colours are partly see-through, so the background map shows.
-    const faded = selected && !isSelected;
+    // With a catchment chosen, the others are faded, as on the original (and
+    // so are those outside the focus). The colours are partly see-through, so
+    // the background map shows.
+    const outside = focus && !focus.has(feature.properties.id);
+    const faded = (selected && !isSelected) || outside;
     return {
       color: isSelected ? "#333333" : isHovered ? "#555555" : "#ffffff",
       weight: isSelected ? 2.5 : isHovered ? 2 : 1,
       fillColor: colour(feature.properties.status),
-      fillOpacity: isHovered ? 0.8 : faded ? 0.3 : 0.65,
+      fillOpacity: isHovered ? 0.8 : outside ? 0.15 : faded ? 0.3 : 0.65,
     };
   }
 

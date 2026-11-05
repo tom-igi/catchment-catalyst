@@ -38,7 +38,8 @@ data_tables:
   title: Data tables
   description: >-
     One table per dataset, such as EA scores or habitat. Every row belongs to
-    a catchment, linked by Catchment ID.
+    a catchment, linked by Catchment ID, except in tables about a whole
+    location (such as Location Text), which are linked by Location ID.
 
 # How each table gets its data, shown in its box on the left of the diagram ("where the
 # data comes from"). Tables marked `filled_by: api` in schema.yaml give where they're

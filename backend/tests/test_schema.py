@@ -65,6 +65,28 @@ def test_data_tables_must_link_every_row_to_a_catchment():
             make_schema(data_table(bad))
 
 
+LOCATIONS = CATCHMENTS + """
+      locations:
+        columns:
+          id: {type: integer, primary_key: true}
+    data_tables:
+      words:
+        columns:
+"""
+
+
+def test_data_about_a_whole_location_is_linked_to_the_location():
+    schema = make_schema(LOCATIONS + "          location_id: {type: integer, primary_key: true, references: locations.id}\n")
+    assert schema.data_tables == ["words"]
+    for bad in [
+        "          location_id: {type: integer, references: locations.id}\n",  # not required
+        "          location_id: {type: integer, primary_key: true, references: locations.id}\n"  # both
+        "          catchment_id: {type: text, required: true, references: catchments.id}\n",
+    ]:
+        with pytest.raises(SchemaError, match="or \\(for data about a whole location\\) a required 'location_id'"):
+            make_schema(LOCATIONS + bad)
+
+
 def test_all_mistakes_are_reported_together():
     with pytest.raises(SchemaError) as error:
         make_schema("""
@@ -111,7 +133,9 @@ def test_duplicate_names_are_rejected(tmp_path):
 
 def test_which_tables_are_filled_by_excel():
     schema = load_schema()
-    assert schema.excel_tables == ["ea_scores", "habitat_land_use"]
+    assert schema.excel_tables[:2] == ["ea_scores", "habitat_land_use"]
+    assert {"river_status_text", "interventions", "risk_levels", "location_text"} <= set(schema.excel_tables)
+    assert not {"catchments", "ea_classifications", "storm_overflows"} & set(schema.excel_tables)
     assert schema.metadata.tables["catchments"].info["filled_by"] == "api"
 
 

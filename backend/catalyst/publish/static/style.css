@@ -32,18 +32,46 @@
   --status-bad: #bf2228;
   --status-fail: #bf2228;
   --status-none: #d2d2d2;
+
+  /* Risk levels, on the Risk Levels tiles */
+  --risk-very-high: #bf2228;
+  --risk-high: #e6993b;
+  --risk-medium: #f0d13c;
+  --risk-low: #95cf62;
+  --risk-very-low: #5f9f45;
 }
 * { box-sizing: border-box; }
 body {
   display: flex; flex-direction: column; min-height: 100vh;
   margin: 0;
-  background: var(--page);
+  background: #fff;
   color: var(--text);
   font: 15px/1.45 "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
-  border-top: 12px solid var(--bar);
 }
 a { color: inherit; }
 :focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+
+/* The four views, as cards across the top of every page */
+.views { display: flex; flex-wrap: wrap; justify-content: center; gap: 24px; padding: 16px 16px 24px; }
+.view-card {
+  display: flex; flex-direction: column; align-items: center; width: 216px; padding: 22px 14px 24px;
+  border: 1px solid #ddd; background: #f8f8f8; color: #222; text-align: center; text-decoration: none;
+}
+.view-card:hover { border-color: #999; }
+.view-card[aria-current="page"] { background: #d4d4d4; }
+.view-card img { width: 179px; max-width: 100%; height: auto; margin-bottom: 18px; }
+.view-card strong { margin-bottom: 10px; font: 700 1.55rem/1.15 Arial, Helvetica, sans-serif; }
+.view-card span { font: .9rem/1.6 Arial, Helvetica, sans-serif; }
+
+/* The dashboard's frame: the teal bars at the top and bottom, and the pale yellow inside */
+.dashboard {
+  display: flex; flex-direction: column; flex: 1 0 auto;
+  background: var(--page); border-top: 12px solid var(--bar); border-bottom: 12px solid var(--bar);
+}
+
+/* The location's text under a dashboard */
+.about { width: 100%; max-width: 1100px; margin: 0 auto; padding: 24px 16px 8px; font-size: 1rem; }
+.about p, .about ul { margin: 0 0 14px; }
 
 /* Header: the name, the tabs, and a space for the location's logo */
 .site-header { display: flex; align-items: flex-end; gap: 12px; padding: 16px 16px 0; background: #fff; }
@@ -60,7 +88,7 @@ a { color: inherit; }
 .tabs a:hover { background: #e3d36a; }
 .tabs a[aria-current="page"] { background: var(--page); }
 .logo { flex: 0 1 210px; }
-main { flex: 1 0 auto; padding: 8px; }
+.dashboard main { flex: 1 0 auto; padding: 8px; }
 .site-footer { padding: 8px 16px; background: var(--bar); color: #fff; font-size: .8rem; }
 
 /* Panels */
@@ -77,6 +105,10 @@ main { flex: 1 0 auto; padding: 8px; }
 .sky { background: var(--sky); --row: var(--sky-light); }
 .clay { background: var(--clay); --row: var(--clay-light); }
 .grid { display: grid; gap: 8px; }
+.text { font-size: .95rem; }
+.text p, .text ul { margin: 0 0 .6em; }
+.text ul { padding-left: 1.2em; }
+.partial { font-size: .8rem; font-weight: 400; opacity: .85; white-space: nowrap; }
 .scroll { overflow-x: auto; }
 .map-box { height: 300px; margin-bottom: 10px; border-radius: 6px; background: rgba(255, 255, 255, .35); }
 
@@ -158,7 +190,7 @@ th[aria-sort="descending"] button::after { content: "▼"; opacity: 1; font-size
 .catchment-page { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(0, 3fr); gap: 8px; }
 .side, .main { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .map-panel .head h2 { font-weight: 400; }
-.ranking .head h2 { font-size: 1.9rem; }
+.ranking .head h2 { font-size: clamp(1.3rem, 1.6vw, 1.75rem); }
 .ranking p { margin: 0; font-size: .9rem; }
 .classification .head { justify-content: center; }
 .years { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; padding: 0; list-style: none; }
@@ -186,6 +218,12 @@ th[aria-sort="descending"] button::after { content: "▼"; opacity: 1; font-size
   min-height: 66px; padding: 4px; border-radius: 6px; background: rgba(255, 255, 255, .14); text-align: center;
 }
 .risk-level { min-height: 1.3em; font-size: 1.6rem; line-height: 1.3; }
+.risks li:not(.risk-none) { color: var(--text); }
+.risks li.risk-very-high { background: var(--risk-very-high); color: #fff; }
+.risks .risk-high { background: var(--risk-high); }
+.risks .risk-medium { background: var(--risk-medium); }
+.risks .risk-low { background: var(--risk-low); }
+.risks .risk-very-low { background: var(--risk-very-low); }
 
 /* River Status */
 .river-status {
@@ -199,7 +237,11 @@ th[aria-sort="descending"] button::after { content: "▼"; opacity: 1; font-size
 .hypothesis { grid-area: hypothesis; }
 .interventions { grid-area: interventions; }
 .interventions thead th { background: var(--dark); color: #fff; border: 0; padding: 6px 8px 22px; }
+.interventions .group th { padding-top: 8px; background: #fff; font-weight: 700; }
+.interventions tbody td { background: #ececec; border-bottom: 1px solid #fff; }
+.interventions tbody td + td { border-left: 1px solid #9aa9e0; }
 .why .head h2, .now .head h2, .hypothesis .head h2 { font-size: 1.05rem; }
+.why .text, .now .text, .hypothesis .text { max-height: 340px; overflow-y: auto; padding-right: 6px; }
 
 /* EA Data */
 .scoring { padding-bottom: 40px; }
@@ -258,9 +300,76 @@ th[aria-sort="descending"] button::after { content: "▼"; opacity: 1; font-size
 .properties dt { font-weight: 700; }
 .properties dd { margin: 0; }
 .continuous { grid-area: continuous; min-height: 130px; }
+.intermittent .text, .continuous .text { max-height: 130px; overflow-y: auto; }
 .sewerage .phosphate { grid-area: phosphate; }
 .sewerage .risks-panel { grid-area: risks; }
 .plans { grid-area: plans; min-height: 200px; }
+
+/* ---------------------------------------------------------------------------
+   The Catchment Dashboard: one big map, with the panels laid over it
+   --------------------------------------------------------------------------- */
+.catchment-dashboard {
+  display: grid; gap: 12px; min-height: 780px; padding: 12px; overflow: hidden;
+  border-radius: 10px; background: #fff;
+  grid-template-columns: minmax(220px, 270px) minmax(0, 1fr) minmax(0, 300px) minmax(0, 380px);
+  grid-template-rows: auto minmax(24px, 1fr) auto;
+}
+.catchment-dashboard > .map { grid-area: 1 / 1 / -1 / -1; z-index: 0; height: auto; margin: -12px; }
+.catchment-dashboard > :not(.map) { z-index: 1; box-shadow: 0 1px 4px rgba(0, 0, 0, .25); }
+.catchment-dashboard .leaflet-top.leaflet-left { left: 290px; }
+.cd-areas { grid-area: 1 / 1 / 2 / 2; align-self: start; }
+.cd-areas h2 { margin: 0 0 6px; font-size: 1rem; font-weight: 400; }
+.area-buttons { display: grid; gap: 6px; margin: 0 0 12px; padding: 0; list-style: none; }
+.area-buttons:last-child { margin-bottom: 0; }
+.area-buttons a {
+  display: block; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; background: #fff;
+  font-size: .9rem; text-decoration: none;
+}
+.area-buttons a:hover { border-color: #666; }
+.area-buttons a[aria-current="page"] { border-color: #222; background: #222; color: #fff; }
+.cd-counts { grid-area: 3 / 1 / 4 / 2; align-self: end; padding: 6px; }
+.cd-counts thead th { font-weight: 700; }
+.cd-counts tbody td { border-bottom: 1px solid #fff; }
+.cd-story { grid-area: 1 / 3 / 2 / 5; min-height: 420px; }
+.story-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-bottom: 10px; }
+.story-buttons button {
+  min-width: 120px; padding: 6px 10px; border: 1px solid #555; background: #ece7a0;
+  color: var(--text); font: inherit; font-size: .88rem; line-height: 1.25; cursor: pointer;
+}
+.story-buttons button[aria-selected="true"] { background: var(--dark); color: #fff; }
+.cd-story .text { max-height: 360px; overflow-y: auto; }
+.tabs-ready .tab-title { display: none; }
+.tab-title { margin: 0 0 6px; font-size: 1.05rem; }
+.cd-figures {
+  grid-area: 3 / 3 / 4 / 4; align-self: end;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 8px; box-shadow: none !important;
+}
+.pill { margin: 0; padding: 6px 12px; border-radius: 6px; font-weight: 600; box-shadow: 0 1px 4px rgba(0, 0, 0, .25); }
+.cd-habitat { grid-area: 3 / 4 / 4 / 5; align-self: end; }
+.cd-habitat .scroll { max-height: 180px; overflow-y: auto; }
+
+/* ---------------------------------------------------------------------------
+   Intervention Management and Catchment Insights: focus areas (placeholders)
+   --------------------------------------------------------------------------- */
+.focus-view { flex: 1 0 auto; width: 100%; max-width: 1000px; margin: 0 auto; padding: 8px 16px 40px; }
+.under-development { margin: 0 0 18px; padding: 6px; background: #72b88f; font-weight: 700; text-align: center; }
+.focus-heading { margin: 0 0 26px; font: 700 1.6rem/1.3 Arial, Helvetica, sans-serif; text-align: center; }
+.focus-buttons { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin-bottom: 30px; }
+.intervention-management .focus-buttons { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.focus-buttons button {
+  min-height: 54px; padding: 8px 14px; border: 1px solid #1d1d1d; border-radius: 28px;
+  background: #1d1d1d; color: #fff; cursor: pointer;
+  font: 700 .72rem/1.7 Arial, Helvetica, sans-serif; letter-spacing: .22em; text-transform: uppercase;
+}
+.focus-buttons button[aria-selected="true"] { background: #fff; color: #1d1d1d; }
+[data-tabs]:not(.tabs-ready) [role="tablist"] { display: none; }
+.focus-panel { margin-bottom: 16px; padding: 8px 16px 16px; background: #ddd27b; }
+.catchment-insights .focus-panel { background: #5b84a0; }
+.focus-panel h2 { margin: 0 0 8px; font: 700 1.5rem/1.3 Arial, Helvetica, sans-serif; }
+.focus-body { padding: 16px; background: #f5f6f8; }
+.focus-body p, .focus-body ul { margin: 0 0 12px; }
+.focus-body > :last-child { margin-bottom: 0; }
+.placeholder { color: #555; font-style: italic; }
 
 /* ---------------------------------------------------------------------------
    Narrower screens: one column
@@ -281,4 +390,20 @@ th[aria-sort="descending"] button::after { content: "▼"; opacity: 1; font-size
   .why, .now, .hypothesis { min-height: 160px; }
   .overview-map .map { min-height: 420px; }
   .title-bar { font-size: 2rem; }
+  .views { gap: 10px; padding: 10px 8px 14px; }
+  .view-card { width: calc(50% - 5px); padding: 12px 8px 14px; }
+  .view-card img { width: 120px; margin-bottom: 8px; }
+  .view-card strong { margin-bottom: 4px; font-size: 1.15rem; }
+  .view-card span { display: none; }
+  .catchment-dashboard { display: flex; flex-direction: column; min-height: 0; padding: 8px; }
+  .catchment-dashboard > .map { order: 0; height: 420px; margin: -8px -8px 0; }
+  .catchment-dashboard > :not(.map) { align-self: stretch; box-shadow: none; }
+  .catchment-dashboard .leaflet-top.leaflet-left { left: 0; }
+  .cd-areas { order: 1; }
+  .cd-story { order: 2; min-height: 0; }
+  .cd-figures { order: 3; align-items: stretch; }
+  .cd-counts { order: 4; }
+  .cd-habitat { order: 5; }
+  .story-buttons { justify-content: flex-start; }
+  .focus-buttons, .intervention-management .focus-buttons { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 }

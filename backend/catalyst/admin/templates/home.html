@@ -228,6 +228,8 @@
   .wire.t-src circle, .wire.t-bridge circle { fill: var(--f); }
   .wire.t-hub path, .wire.t-dash path { stroke: var(--catchment); }
   .wire.t-hub circle, .wire.t-dash circle { fill: var(--catchment); }
+  .wire.t-loc path { stroke: var(--quiet); }
+  .wire.t-loc circle { fill: var(--quiet); }
   .wire.t-soft path { stroke: var(--muted); stroke-dasharray: 4 5; stroke-width: 1.6; }
   .wire.t-soft circle { fill: var(--muted); }
   .wire { opacity: .62; }
@@ -645,7 +647,9 @@ function makePlan(model) {
   for (const l of links) {
     if (l.from === l.to) continue; // e.g. upstream / downstream: shown in the details only
     const toHub = hub && l.to === hub.name && isIdLink(l);
-    const type = toHub ? (onDash.has(l.from) ? "dash" : "hub") : "soft";
+    // A data table about a whole location, linked by its ID to a dashboard table (Locations).
+    const toDash = onDash.has(l.to) && l.kind === "id" && byName.get(l.from).kind === "data";
+    const type = toHub ? (onDash.has(l.from) ? "dash" : "hub") : toDash ? "loc" : "soft";
     const k = type + "|" + l.from + "|" + l.to;
     if (seen.has(k)) continue;
     seen.add(k);
@@ -724,6 +728,21 @@ function geometry(plan, rectOf) {
       const y2 = P ? midY(P) : midY(A);
       const y1 = Math.min(Math.max(y2, B.t + 14), B.b - 14);
       return { id: w.id, d: sCurve(B.r, y1, A.l, y2), dots: [[B.r, y1], [A.l, y2]] };
+    }
+    if (w.type === "loc") {
+      // A table about a whole location, to Locations: right, under the hub, then up between the hub and Locations.
+      const H = plan.hub ? rectOf("tbl:" + plan.hub.name) : null;
+      const x1 = A.r, y1 = midY(A), x2 = B.l, y2 = B.b - 18;
+      const gx = H ? (H.r + B.l) / 2 : (x1 + x2) / 2;
+      if (!H || (y1 > H.t - 8 && y1 < H.b + 8) || gx - x1 < 40 || x2 - gx < 12 || Math.abs(y1 - y2) < 30) {
+        return { id: w.id, d: sCurve(x1, y1, x2, y2), dots: [[x1, y1], [x2, y2]] };
+      }
+      const r = Math.min(14, Math.abs(y1 - y2) / 2, x2 - gx);
+      const up = y2 < y1 ? -1 : 1;
+      const d = "M" + num(x1) + " " + num(y1) + "H" + num(gx - r) +
+        "Q" + num(gx) + " " + num(y1) + " " + num(gx) + " " + num(y1 + up * r) + "V" + num(y2 - up * r) +
+        "Q" + num(gx) + " " + num(y2) + " " + num(gx + r) + " " + num(y2) + "H" + num(x2);
+      return { id: w.id, d, dots: [[x1, y1], [x2, y2]] };
     }
     // Faint links (e.g. a table's name): a loop on the right if both are in the same column.
     if (Math.abs(A.l - B.l) < 8) {

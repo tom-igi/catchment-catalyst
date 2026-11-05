@@ -1,0 +1,24 @@
+{# What Intervention Management and Catchment Insights share: a row of focus
+   area buttons, each showing its own section below (tabs.js). They're
+   placeholders for now. Each page fills in the `section` block for each focus
+   area (`name`). Without scripts, every section is shown, one after another. #}
+{% extends "base.html" %}
+{% block title %}{% for folder, name, _, _ in views if folder == view %}{{ name }}{% endfor %} · {{ location.name }}{% endblock %}
+{% block body %}
+<main class="focus-view {{ view }}">
+  <p class="under-development">- Please note this page is currently under development and is not fully populated -</p>
+  <div class="focus" data-tabs>
+    <h1 class="focus-heading">Select one of the focus areas:</h1>
+    <div class="focus-buttons" role="tablist">
+      {% for name in focus_areas %}
+      <button type="button" role="tab" id="tab-{{ name | anchor }}" aria-controls="{{ name | anchor }}">{{ name }}</button>
+      {% endfor %}
+    </div>
+    {% for name in focus_areas %}
+    <section class="focus-panel" role="tabpanel" id="{{ name | anchor }}" aria-labelledby="tab-{{ name | anchor }}">
+      {% block section scoped %}{% endblock %}
+    </section>
+    {% endfor %}
+  </div>
+</main>
+{% endblock %}

@@ -4,33 +4,44 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}{% endblock %}</title>
-<link rel="stylesheet" href="{{ root }}assets/leaflet/leaflet.css">
-<link rel="stylesheet" href="{{ root }}assets/style.css">
+<link rel="stylesheet" href="{{ root }}assets/leaflet/leaflet.css?v={{ version }}">
+<link rel="stylesheet" href="{{ root }}assets/style.css?v={{ version }}">
 </head>
 <body>
-<header class="site-header">
-  <a class="brand" href="{{ root or './' }}">Catchment Catalyst</a>
-  <nav class="tabs" aria-label="Dashboard pages">
-    {% if show_overview %}
-    <a href="{{ root or './' }}"{% if not tab %} aria-current="page"{% endif %}>Overview</a>
-    {% endif %}
-    {% for folder, name in tabs.items() %}
-    <a href="{{ root }}{{ folder }}/{% if catchment %}{{ catchment.id }}/{% endif %}"{% if tab == folder %} aria-current="page"{% endif %}>{{ name }}</a>
-    {% endfor %}
-  </nav>
-  <div class="logo"></div>
-</header>
-<main>
-{% block content %}{% endblock %}
-</main>
+{# The four views, as cards across the top of every page. #}
+<nav class="views" aria-label="Dashboards">
+  {% for folder, name, about, picture in views %}
+  <a class="view-card" href="{{ root }}{{ folder }}/"{% if view == folder %} aria-current="page"{% endif %}>
+    <img src="{{ root }}assets/cards/{{ picture }}?v={{ version }}" alt="" width="179" height="119">
+    <strong>{{ name }}</strong>
+    <span>{{ about }}</span>
+  </a>
+  {% endfor %}
+</nav>
+
+{% block body %}
+<div class="dashboard">
+  <header class="site-header">
+    <a class="brand" href="{{ root or './' }}">Catchment Catalyst</a>
+    {% block tabs %}{% endblock %}
+    <div class="logo"></div>
+  </header>
+  <main>
+  {% block content %}{% endblock %}
+  </main>
+</div>
+{% block about %}{% endblock %}
+{% endblock %}
+
 <footer class="site-footer">
   {{ location.name }}. Published {{ published }}. Catchment details, outlines, classifications, reasons for not
   achieving good and storm overflow returns: © Environment Agency copyright and/or database right, Open Government
   Licence. River obstacles: River Obstacles (Environment Agency and The Rivers Trust), CC BY-SA 4.0.
 </footer>
-<script src="{{ root }}assets/leaflet/leaflet.js"></script>
-<script src="{{ root }}assets/map.js"></script>
-<script src="{{ root }}assets/points.js"></script>
-<script src="{{ root }}assets/sort.js"></script>
+<script src="{{ root }}assets/leaflet/leaflet.js?v={{ version }}"></script>
+<script src="{{ root }}assets/map.js?v={{ version }}"></script>
+<script src="{{ root }}assets/points.js?v={{ version }}"></script>
+<script src="{{ root }}assets/sort.js?v={{ version }}"></script>
+<script src="{{ root }}assets/tabs.js?v={{ version }}"></script>
 </body>
 </html>

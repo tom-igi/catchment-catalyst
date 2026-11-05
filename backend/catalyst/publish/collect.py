@@ -5,7 +5,8 @@ data (a Location), which site.py turns into pages. A different kind of
 dashboard could use the same data.
 
 Every data table is collected the same way, so a new table's data is ready
-for the pages with no code to write here.
+for the pages with no code to write here. Tables about a whole location (keyed
+by location_id) only have the location's own row(s).
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ import sqlalchemy as sa
 from geoalchemy2 import Geometry
 
 from catalyst.db import Schema
-from catalyst.db.schema import CATCHMENT_COLUMN
+from catalyst.db.schema import LOCATION_COLUMN, key_column
 
 # Outlines are simplified for the web: corners closer than about 10 m are
 # dropped, and coordinates are rounded to about 1 m.
@@ -44,12 +45,14 @@ class Dataset:
     table: str
     title: str
     description: str | None
-    columns: list[Column]  # every column except catchment_id
-    rows: dict[str, list[dict[str, Any]]]  # catchment ID -> its rows
+    columns: list[Column]  # every column except catchment_id (or location_id)
+    rows: dict[Any, list[dict[str, Any]]]  # catchment ID (or location ID) -> its rows
     info: dict[str, Any] | None  # its row in the datasets table (source, caveats), for the "i" buttons
+    key: str = "catchment_id"  # what the rows belong to: catchment_id, or location_id for data about a whole location
 
-    def rows_for(self, catchment_id: str) -> list[dict[str, Any]]:
-        return self.rows.get(catchment_id, [])
+    def rows_for(self, key: Any) -> list[dict[str, Any]]:
+        """The rows for a catchment ID (or, in a table about a whole location, the location's ID)."""
+        return self.rows.get(key, [])
 
 
 @dataclass
@@ -60,6 +63,7 @@ class Location:
     names: dict[str, str]  # catchment ID -> name, including upstream/downstream ones outside the location
     datasets: list[Dataset]
     map: dict  # GeoJSON: each catchment's outline and river, for the maps
+    id: int | None = None  # its ID in the locations table
 
     def catchment_ids(self) -> set[str]:
         return {c["id"] for c in self.catchments}
@@ -103,8 +107,12 @@ def collect(conn: sa.Connection, schema: Schema, location: sa.Row) -> Location:
         slug=slug(location.name),
         catchments=catchments,
         names=_names(conn, schema, set(ids) | linked),
-        datasets=[_dataset(conn, schema.metadata.tables[name], ids, info.get(name)) for name in schema.data_tables],
+        datasets=[
+            _dataset(conn, schema.metadata.tables[name], [location.id] if key_column(schema.metadata.tables[name]) == LOCATION_COLUMN else ids, info.get(name))
+            for name in schema.data_tables
+        ],
         map=_map(conn, schema, ids),
+        id=location.id,
     )
 
 
@@ -126,13 +134,14 @@ def _info(conn: sa.Connection, schema: Schema) -> dict[str, dict[str, Any]]:
     return {row["table_name"]: dict(row) for row in conn.execute(sa.select(table)).mappings()}
 
 
-def _dataset(conn: sa.Connection, table: sa.Table, ids: list[str], info: dict[str, Any] | None) -> Dataset:
-    catchment_id = table.c[CATCHMENT_COLUMN]
-    shown = [c for c in table.columns if c.name != CATCHMENT_COLUMN]
-    rows: dict[str, list[dict[str, Any]]] = {}
-    query = sa.select(table).where(catchment_id.in_(ids)).order_by(*table.primary_key.columns)
+def _dataset(conn: sa.Connection, table: sa.Table, ids: list, info: dict[str, Any] | None) -> Dataset:
+    """A data table's rows for these catchment IDs (or, in a table about a whole location, this location ID)."""
+    key = key_column(table)
+    shown = [c for c in table.columns if c.name != key]
+    rows: dict[Any, list[dict[str, Any]]] = {}
+    query = sa.select(table).where(table.c[key].in_(ids)).order_by(*table.primary_key.columns)
     for row in conn.execute(query).mappings():
-        rows.setdefault(row[CATCHMENT_COLUMN], []).append({c.name: row[c.name] for c in shown})
+        rows.setdefault(row[key], []).append({c.name: row[c.name] for c in shown})
     return Dataset(
         table=table.name,
         title=table.info.get("title") or table.name.replace("_", " ").capitalize(),
@@ -140,6 +149,7 @@ def _dataset(conn: sa.Connection, table: sa.Table, ids: list[str], info: dict[st
         columns=[Column(c.name, _label(c.name), _kind(c)) for c in shown],
         rows=rows,
         info=info,
+        key=key,
     )
 
 

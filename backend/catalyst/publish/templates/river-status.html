@@ -1,26 +1,58 @@
 {% extends "catchment.html" %}
-{% from "macros.html" import heading, empty_table, risk_levels %}
+{% from "macros.html" import heading, risk_levels with context %}
 {% block panels %}
+{% set catchment_id = catchment.id if catchment else "" %}
+{% set words = figures.river_text(catchment_id) %}
 <div class="grid river-status">
   <section class="panel yellow why">
     {{ heading("Why is the river failing?") }}
+    <div class="text">{{ words.get("why_failing") | paragraphs }}</div>
   </section>
 
   <section class="panel yellow now">
     {{ heading("What is happening now?") }}
+    <div class="text">{{ words.get("happening_now") | paragraphs }}</div>
   </section>
 
   <section class="panel navy risks-panel">
-    {{ heading("Risk Levels", info=true) }}
-    {{ risk_levels(["Untreated Sewage", "Modification", "Sewage (Private)", "Invasive Species", "Livestock", "Overheating", "Runoff", "Running Dry"]) }}
+    {{ heading("Risk Levels", info=true, dataset=location.dataset("risk_levels")) }}
+    {{ risk_levels(figures.risks(catchment_id, ["untreated_sewage", "modification", "sewage_private", "invasive_species", "livestock", "overheating", "runoff", "running_dry"])) }}
   </section>
 
   <section class="panel yellow hypothesis">
-    {{ heading("Intervention hypothesis") }}
+    {% set confidence = words.get("hypothesis_confidence") %}
+    {{ heading("Intervention hypothesis" ~ (" (confidence: %s)" % confidence if confidence else "")) }}
+    <div class="text">{{ words.get("intervention_hypothesis") | paragraphs }}</div>
   </section>
 
   <section class="panel white interventions">
-    {{ empty_table(["Desired change", "Lead partner", "Actions", "How we'll know"]) }}
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Desired change</th>
+            <th scope="col">Lead partner</th>
+            <th scope="col">Actions</th>
+            <th scope="col">How we'll know</th>
+          </tr>
+        </thead>
+        {% for priority, rows in figures.interventions(catchment_id) %}
+        <tbody>
+          <tr class="group"><th scope="rowgroup" colspan="4">{{ priority | upper }} INTERVENTIONS</th></tr>
+          {% for row in rows %}
+          <tr>
+            <td>{{ row.desired_change }}</td>
+            <td>{{ row.lead_partner or "" }}</td>
+            <td>{{ row.actions or "" }}</td>
+            <td>{{ row.how_we_will_know or "" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        {% else %}
+        <tbody></tbody>
+        {% endfor %}
+      </table>
+    </div>
   </section>
 </div>
 {% endblock %}

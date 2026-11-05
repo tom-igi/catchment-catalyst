@@ -1,9 +1,9 @@
 {% extends "catchment.html" %}
-{% from "macros.html" import heading %}
+{% from "macros.html" import heading with context %}
 
-{# A classification result, coloured by its status. #}
-{% macro score_cell(status) %}
-<td class="{{ status | status_class }}">{{ status or "" }}</td>
+{# A status or measured value, coloured by its status. #}
+{% macro score_cell(cell) %}
+<td class="{{ (cell.status if cell else none) | status_class }}">{{ cell.text if cell else "" }}</td>
 {% endmacro %}
 
 {% block panels %}
@@ -31,17 +31,17 @@
       </thead>
       <tbody>
         {% for row in scoring.rows %}
+        {% set limits = row.thresholds or {} %}
         <tr>
           <th scope="row" class="item">{{ row.item }}</th>
           {{ score_cell(row.latest) }}
           {% for year in scoring.years %}
           {{ score_cell(row.by_year.get(year)) }}
           {% endfor %}
-          {# The thresholds have no table yet. #}
-          <td class="status-poor first-threshold"></td>
-          <td class="status-moderate"></td>
-          <td class="status-good"></td>
-          <td class="status-high"></td>
+          <td class="status-poor first-threshold">{{ limits.get("poor") | measured }}</td>
+          <td class="status-moderate">{{ limits.get("moderate") | measured }}</td>
+          <td class="status-good">{{ limits.get("good") | measured }}</td>
+          <td class="status-high">{{ limits.get("high") | measured }}</td>
         </tr>
         {% endfor %}
       </tbody>

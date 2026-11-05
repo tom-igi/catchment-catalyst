@@ -1,6 +1,8 @@
 {% extends "base.html" %}
-{% from "macros.html" import heading, legend, status_map %}
+{% from "macros.html" import heading, legend, status_map, waterbody_tabs, about with context %}
 {% block title %}{{ location.name }} · Catchment Catalyst{% endblock %}
+{% block tabs %}{{ waterbody_tabs(tabs, tab, catchment, root, show_overview) }}{% endblock %}
+{% block about %}{{ about(text, "about_waterbody_dashboard") }}{% endblock %}
 {% block content %}
 {% set year = " (%s)" % figures.years[0] if figures.years else "" %}
 <div class="grid overview">
