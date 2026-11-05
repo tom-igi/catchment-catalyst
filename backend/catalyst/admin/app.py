@@ -1,15 +1,18 @@
 """The admin page's web pages.
 
     /admin                            every table, as a diagram (see diagram.py). Click a
-                                      table to see its columns; for an Excel table, to
-                                      download it, upload an edited copy, and see its uploads
-    /admin/tables/<table>/download    the table as an Excel file
-    /admin/tables/<table>/upload      upload an edited copy
+                                      table to see its columns and download it. Each Excel
+                                      table also has its own "Upload data" on the left, to
+                                      upload an edited copy and see its uploads
+    /admin#<table>                    the diagram with a table's details open
+    /admin#upload-<table>             ...or with an Excel table's upload open
+    /admin/tables/<table>/download    any table as an Excel file
+    /admin/tables/<table>/upload      upload an edited copy (Excel tables only)
     /admin/uploads/<id>               preview what an upload will change; approve or cancel
 
-Every page needs a login. Only tables marked `filled_by: excel` in schema.yaml
-can be downloaded and uploaded, and each works the same way (see
-catalyst.importers.excel).
+Every page needs a login. Every table can be downloaded, but only tables marked
+`filled_by: excel` in schema.yaml can be uploaded, and each works the same way
+(see catalyst.importers.excel).
 """
 
 from __future__ import annotations
@@ -139,11 +142,21 @@ def _render_home(request: Request, status_code: int = 200, problems: dict | None
     with state.engine.connect() as conn:
         last = uploads.last_approved(conn, schema)
         for t in model["tables"]:
+            t["download"] = _download_details(schema.metadata.tables[t["name"]])
             if t["name"] in schema.excel_tables:
                 t["update"] = _excel_details(conn, state, schema.metadata.tables[t["name"]], last.get(t["name"]))
     if problems:
         model["problems"] = problems
     return _render(request, "home.html", model=model, status_code=status_code)
+
+
+def _download_details(table: sa.Table) -> dict:
+    """What a table's details need for its download."""
+    included = excel.downloadable_columns(table)
+    return {
+        "url": f"/admin/tables/{table.name}/download",
+        "left_out": [c.name for c in table.columns if c not in included],  # map shapes
+    }
 
 
 def _excel_details(conn: sa.Connection, state, table: sa.Table, last: sa.Row | None) -> dict:
@@ -173,6 +186,16 @@ def _excel_details(conn: sa.Connection, state, table: sa.Table, last: sa.Row | N
 
 # --- Tables ----------------------------------------------------------------------
 
+def any_table(request: Request, table_name: str, user: User) -> sa.Table:
+    tables = request.app.state.schema.metadata.tables
+    if table_name not in tables:
+        raise HTTPException(404, "There's no table by that name.")
+    return tables[table_name]
+
+
+AnyTable = Annotated[sa.Table, Depends(any_table)]
+
+
 def excel_table(request: Request, table_name: str, user: User) -> sa.Table:
     schema = request.app.state.schema
     if table_name not in schema.excel_tables:
@@ -184,14 +207,15 @@ ExcelTable = Annotated[sa.Table, Depends(excel_table)]
 
 
 @router.get("/tables/{table_name}")
-def table_page(table: ExcelTable):  # each table's own page, before the diagram had its details
-    return RedirectResponse(_home(table), 303)
+def table_page(table: ExcelTable):  # each Excel table's own page, before the diagram had its details
+    return RedirectResponse(_upload_panel(table), 303)
 
 
 @router.get("/tables/{table_name}/download")
-def download(request: Request, table: ExcelTable):
+def download(request: Request, table: AnyTable):
+    columns = excel.downloadable_columns(table)  # only these are read: map shapes can be large
     with request.app.state.engine.connect() as conn:
-        rows = conn.execute(sa.select(table).order_by(*table.primary_key.columns)).mappings().all()
+        rows = conn.execute(sa.select(*columns).order_by(*table.primary_key.columns)).mappings().all()
     name = f"{table.name}_{datetime.datetime.now(UK):%Y-%m-%d}.xlsx"
     return Response(
         excel.write_table(table, rows),
@@ -215,7 +239,7 @@ def upload(request: Request, user: User, table: ExcelTable, file: Annotated[Uplo
             comparison = excel.compare(conn, table, rows)
             if not comparison.has_changes:
                 request.session["message"] = f"{file.filename} is the same as the table, so there's nothing to change."
-                return RedirectResponse(_home(table), 303)
+                return RedirectResponse(_upload_panel(table), 303)
             upload_id = uploads.create(
                 conn, state.schema, state.settings.raw_files_dir, table, file.filename, data, user, len(rows), comparison
             )
@@ -225,7 +249,7 @@ def upload(request: Request, user: User, table: ExcelTable, file: Annotated[Uplo
 
 
 def _upload_problems(request: Request, table: sa.Table, file_name: str | None, problems: list[str]):
-    """The diagram again, with the table's details open and the file's problems in them."""
+    """The diagram again, with the table's upload open and the file's problems in it."""
     return _render_home(request, status_code=422, problems={
         "table": table.name,
         "file": file_name,
@@ -234,9 +258,9 @@ def _upload_problems(request: Request, table: sa.Table, file_name: str | None, p
     })
 
 
-def _home(table: sa.Table) -> str:
-    """The diagram, with the table's details open."""
-    return f"/admin#{table.name}"
+def _upload_panel(table: sa.Table) -> str:
+    """The diagram, with the Excel table's upload open."""
+    return f"/admin#upload-{table.name}"
 
 
 # --- Uploads ---------------------------------------------------------------------
@@ -290,7 +314,7 @@ def approve(request: Request, user: User, upload_id: int, check: Annotated[str, 
         f"Done. {_title(table)} now matches {upload.file_name}: {len(comparison.added)} added, "
         f"{len(comparison.changed)} changed, {len(comparison.removed)} deleted."
     )
-    return RedirectResponse(_home(table), 303)
+    return RedirectResponse(_upload_panel(table), 303)
 
 
 @router.post("/uploads/{upload_id}/cancel")
@@ -303,7 +327,7 @@ def cancel(request: Request, user: User, upload_id: int):
             return RedirectResponse(f"/admin/uploads/{upload_id}", 303)
         uploads.cancel(conn, state.schema, upload_id)
     request.session["message"] = f"Cancelled {upload.file_name}. Nothing has been changed."
-    return RedirectResponse(_home(state.schema.metadata.tables[upload.table_name]), 303)
+    return RedirectResponse(_upload_panel(state.schema.metadata.tables[upload.table_name]), 303)
 
 
 @router.get("/uploads/{upload_id}/file")

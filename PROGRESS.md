@@ -15,12 +15,12 @@ Tom to run things himself, 29 October 2026).
 ```bash
 docker compose up -d                      # start the local database, admin page and dashboard preview
 docker compose run --rm schema plan       # should say "The database already matches schema.yaml."
-docker compose run --rm test              # run the tests (128 passing at the last update)
+docker compose run --rm test              # run the tests (130 passing at the last update)
 docker compose run --rm publish           # rebuild the dashboard pages from the database
 ```
 
 - Admin page: <http://localhost:8000/admin> (name `admin`, password `admin`): a diagram of every
-  table; click an Excel table to download or upload it
+  table; click any table to download it, or an Excel table's **Upload data** (on the left) to upload it
 - Dashboard: <http://localhost:8080>
 
 The local database is on `localhost:5434` (database, user and password are all `catalyst`),
@@ -40,7 +40,7 @@ and optional extras are kept self-contained so they're easy to remove.
 | **Catchments importer** | `backend/catalyst/importers/api/`, `imports/` | Fills the catchments table from the EA's Catchment Data Explorer, for the management catchments (all their rivers) and IDs in `imports/catchments.json`. Preview first, safe to re-run, keeps the downloaded files. |
 | **EA and River Obstacles importers** | `backend/catalyst/importers/api/` | For every imported catchment: the EA's classifications and RNAGs (`importer classifications`), storm overflow spills from the EA's yearly returns (`importer storm-overflows`), and obstacles from River Obstacles (`importer river-obstacles`). Each replaces its table, with a preview first, and keeps the downloads. |
 | **Excel uploads** | `backend/catalyst/importers/excel/` | For every table marked `filled_by: excel`: download it as Excel, upload an edited copy, see what will be added, changed and deleted, then approve. No code per table. |
-| **Admin page** | `backend/catalyst/admin/` | One page behind a login (one name and password per person): a diagram of every table (`diagram.py`, `diagram.yaml`) showing where its data comes from (downloaded or Excel), how the tables join up by Catchment ID, and each table's columns when clicked. Excel tables are downloaded and uploaded from there; the upload's preview is its own page. Made from `schema.yaml` each time it's opened. Runs with `docker compose up -d`. |
+| **Admin page** | `backend/catalyst/admin/` | One page behind a login (one name and password per person): a diagram of every table (`diagram.py`, `diagram.yaml`) showing where its data comes from (downloaded or Excel), how the tables join up by Catchment ID, and each table's columns when clicked. Any table can be downloaded as Excel from there; each Excel table has its own **Upload data** box on the left, and the upload's preview is its own page. Made from `schema.yaml` each time it's opened. Runs with `docker compose up -d`. |
 | **Publish step and dashboard** | `backend/catalyst/publish/`, `published/` | Writes each location's dashboard as plain web pages, laid out like the original (`Reference/ReferenceImages`): River Status, EA Data, Land Use Data and Sewerage Data (the Overview is built but switched off for now). Panels with a table are filled in (map colours, classifications, failing elements, RNAGs, catchment details, Habitat & Land Use, river obstacles, storm overflow spills); the rest are empty until their table exists. Previewed at <http://localhost:8080>. |
 | **Dev and live setup** | `docker-compose*.yml`, `.env*.example` | The same commands on your machine and on the live server. Only the settings differ. |
 | **Tests** | `backend/tests/` | Cover the schema tool, the importers, the Excel uploads, the admin page (and its diagram) and the publish step. |
@@ -140,6 +140,7 @@ show on the dashboard. They were uploaded through the admin page on 29 October 2
 - **The data map is a page in the admin site, behind the login** (Tom, 5 November 2026), rather than a file opened from disk or a page at an unlisted address. The admin page makes it from `schema.yaml` when it's opened, so there's no file to rebuild and it's on the live server with no extra setup.
 - **The data map is a flow diagram** (Tom, 5 November 2026), chosen from five designs: where the data comes from → tables → Catchments → dashboards, with a panel of details when a table is clicked. It replaced the original page of text and tables.
 - **The data map became the admin page** (Tom, 5 November 2026). Logging in goes straight to the diagram, headed "Your data"; the list of tables and each table's own page are gone. An Excel table's details panel has the download, the upload and its recent uploads (and any upload waiting to be approved, also shown on the table's box). The preview stays a full page, because it can list hundreds of rows; approving or cancelling goes back to the diagram with the table's panel open. An upload's problems are shown in the panel too. Its code moved from `datamap/` into `admin/` (`diagram.py`, `diagram.yaml`, `templates/home.html`), since it's no longer optional. The old addresses (`/admin/data-map`, `/admin/tables/<table>`) redirect to it.
+- **Upload on the left, download for every table** (Tom, 5 November 2026). The diagram's key and introduction were removed, and its column headings now say which are tables: "Data tables", "Catchments table", "Locations table". Each Excel table has its own box in the left-hand column ("where the data comes from") with an **Upload data** button, which opens the upload (download, edit, upload, recent uploads, any upload waiting to be approved); approving, cancelling or a problem with the file comes back to it (`/admin#upload-<table>`). Clicking any table, Excel or not, shows its details and a **Download as Excel** button (`/admin#<table>`). Only Excel tables can be uploaded. Map shapes (the catchment outline and river line) are left out of downloads: each is thousands of coordinates, no use in Excel, and the longest North Devon outline (22,555 characters) is already two-thirds of what an Excel cell holds, so bigger catchments elsewhere could go over; lists of IDs become comma-separated text, and times are in UK time.
 
 ---
 

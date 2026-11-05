@@ -6,7 +6,7 @@
 {% endmacro %}
 
 {% block content %}
-<p class="crumb"><a href="/admin#{{ table.name }}">← {{ title(table) }}</a></p>
+<p class="crumb"><a href="/admin#upload-{{ table.name }}">← Upload data to {{ title(table) }}</a></p>
 <h1>{{ "Check the changes" if upload.status == "preview" else "Upload " ~ upload.id }}</h1>
 <p class="lead">
   <a href="/admin/uploads/{{ upload.id }}/file">{{ upload.file_name }}</a>

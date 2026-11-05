@@ -8,8 +8,8 @@
 <title>Your data · Catchment Catalyst</title>
 <style>
   /* The admin page's home: a left-to-right flow diagram of every table, drawn from the model
-     below (made by diagram.py and app.py), with a details panel for each table. Excel tables
-     are downloaded and uploaded from their details. */
+     below (made by diagram.py and app.py), with a details panel for each table, where it can be
+     downloaded. Each Excel table also has its own source on the left, which opens its upload. */
   :root {
     color-scheme: light dark;
     --bg: #f3f6f7;
@@ -97,40 +97,11 @@
   .message { margin: 0 0 16px; padding: 12px 16px; border-radius: 10px; background: var(--api-soft); }
 
   /* Header */
-  h1 { margin: 10px 0 2px; font-size: 2.1rem; line-height: 1.15; letter-spacing: -.01em; }
-  .lead { margin: 0 0 18px; color: var(--muted); font-size: 1.08rem; max-width: 46em; }
-
-  /* Key */
-  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; padding: 0; list-style: none; }
-  .legend > li { display: flex; }
-  .key {
-    display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 14px 8px 8px;
-    background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
-    text-align: left; cursor: pointer; transition: border-color .15s, box-shadow .15s;
-  }
-  .key:hover { border-color: var(--f, var(--catchment)); }
-  .key[aria-pressed="true"] { border-color: var(--f, var(--catchment)); box-shadow: 0 0 0 2px var(--f, var(--catchment)); }
-  .key-icon {
-    flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px;
-    background: var(--f); color: var(--on-solid);
-  }
-  .key.quiet .key-icon { background: var(--quiet-soft); color: var(--quiet); }
-  .key-text { display: block; line-height: 1.3; }
-  .key-text strong { display: block; font-size: .95rem; }
-  .key-sub { display: block; font-size: .8rem; color: var(--muted); }
-  .key-count {
-    flex: none; margin-left: 4px; min-width: 26px; padding: 2px 8px; border-radius: 999px; text-align: center;
-    font-size: .8rem; font-weight: 700; background: var(--f-soft, var(--catchment-soft)); color: var(--f, var(--catchment));
-  }
+  h1 { margin: 10px 0 26px; font-size: 2.1rem; line-height: 1.15; letter-spacing: -.01em; }
   .pill {
     display: inline-block; padding: 3px 10px; border-radius: 999px; white-space: nowrap;
     background: var(--catchment); color: var(--on-solid); font-weight: 700; font-size: .8rem; line-height: 1.4;
   }
-  .caption {
-    height: 3em; margin: 14px 0 10px; color: var(--muted); font-size: .92rem; line-height: 1.5;
-    overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  }
-  .caption strong { color: var(--text); }
 
   /* ------- The diagram (narrow first: a stacked flow) ------- */
   .flow { position: relative; }
@@ -144,7 +115,13 @@
     transition: opacity .15s, border-color .15s, box-shadow .15s;
   }
   .src:hover { border-color: var(--f); }
-  .src[aria-pressed="true"] { border-color: var(--f); box-shadow: 0 0 0 2px var(--f); }
+  .src[aria-pressed="true"], .src.is-selected { border-color: var(--f); box-shadow: 0 0 0 2px var(--f); }
+  .src-action {
+    display: inline-flex; align-items: center; gap: 6px; margin-top: 7px; padding: 4px 11px 4px 9px; border-radius: 7px;
+    background: var(--f); color: var(--on-solid); font-weight: 700; font-size: .84rem; line-height: 1.4;
+  }
+  .src:hover .src-action { filter: brightness(1.08); }
+  .src-waiting { display: block; margin-top: 5px; font-size: .8rem; font-weight: 650; color: var(--warn); }
   .src-icon {
     flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%;
     background: var(--f); color: var(--on-solid);
@@ -262,18 +239,18 @@
   .flow.tracing .wire.t-soft.on { opacity: .9; }
   .flow.tracing .wire.t-soft.on path { stroke-width: 1.8; }
 
-  .col-head { display: flex; align-items: center; gap: 8px; font-size: .86rem; font-weight: 650; color: var(--muted); line-height: 1.25; }
+  .col-head { display: flex; align-items: flex-start; gap: 8px; font-size: .92rem; font-weight: 650; color: var(--text); line-height: 1.3; }
   .col-head .num {
     flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
     background: var(--text); color: var(--bg); font-size: .75rem; font-weight: 700;
   }
+  .col-head .col-text { padding-top: 1px; }
+  .col-head .col-sub { display: block; margin-top: 1px; font-size: .82rem; font-weight: 400; color: var(--muted); }
 
   @media (max-width: 859.98px) {
     main { padding: 18px 16px 104px; }
-    h1 { font-size: 1.8rem; }
+    h1 { font-size: 1.8rem; margin-bottom: 18px; }
     .wide-only { display: none !important; }
-    .legend > li { flex: 1 1 100%; }
-    .key { width: 100%; }
     .hub-col, .dash-col { margin-bottom: 4px; }
     .dash-end { margin-top: 0; }
     .dash-end .dashboard { max-width: 100%; }
@@ -292,7 +269,7 @@
       align-items: start;
       padding-bottom: 8px;
     }
-    .col-head { grid-row: 1; align-self: end; }
+    .col-head { grid-row: 1; align-self: start; }
     .col-head[data-col="1"] { grid-column: 1; }
     .col-head[data-col="2"] { grid-column: 3; }
     .col-head[data-col="3"] { grid-column: 5; }
@@ -408,6 +385,9 @@
   .alert.waiting { background: var(--warn-soft); border-color: var(--warn); }
   .alert.waiting .a-head { color: var(--warn); }
   .alert .btn { margin-top: 8px; background: var(--warn); }
+  .get { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 14px; }
+  .get .btn { margin-top: 0; }
+  .get p { flex: 1 1 220px; margin: 0; font-size: .88rem; color: var(--muted); }
   .a-head { display: block; font-weight: 700; }
   #panel-body > .alert:first-child, #panel-body > .message:first-child { margin-top: 14px; }  /* clear of the title's focus ring */
   .uploads { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 10px; }
@@ -416,7 +396,6 @@
   .u-when { font-weight: 650; }
   .u-what { display: block; color: var(--muted); }
   .u-what a { font-weight: 650; }
-  .node-meta .waiting-tag { color: var(--warn); font-weight: 650; }
 
   .facts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
   .fact { padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: .9rem; line-height: 1.6; }
@@ -503,13 +482,7 @@
 </header>
 <main>
   {% if message %}<p class="message" id="message" role="status">{{ message }}</p>{% endif %}
-  <header>
-    <h1>Your data</h1>
-    <p class="lead">Where each table's data comes from and how they join up. Click a table to see its columns, or to update it if it's filled in Excel.</p>
-  </header>
-
-  <ul class="legend" id="legend" aria-label="Key"></ul>
-  <p class="caption" id="caption" aria-hidden="true"></p>
+  <h1>Your data</h1>
 
   <section class="flow" id="flow" aria-labelledby="flow-title">
     <h2 class="visually-hidden" id="flow-title">The tables, from where their data comes from to the dashboards</h2>
@@ -546,6 +519,8 @@ const FILLS = {
   admin: { word: "Admin page", long: "Kept by the admin page", icon: "window" },
 };
 const QUIET = { command: true, admin: true };
+// "#ea_scores" opens a table's details, and "#upload-ea_scores" its upload. Table names can't have a "-".
+const UPLOAD_HASH = "upload-";
 const fillOf = t => (FILLS[t.fill] ? t.fill : "command");
 
 const ICONS = {
@@ -559,6 +534,8 @@ const ICONS = {
   check: "M20 6 9 17l-5-5",
   right: "M5 12h14M13 6l6 6-6 6",
   down: "M12 4v15M6 13l6 6 6-6",
+  download: "M12 3v12M7 10l5 5 5-5M5 21h14",
+  upload: "M12 15V3M7 8l5-5 5 5M5 21h14",
   key: "M10.5 13.5a4 4 0 1 1-5.66 5.66 4 4 0 0 1 5.66-5.66zM10.5 13.5 19 5M15.5 8.5l2.5 2.5M18 6l2 2",
   link: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71",
 };
@@ -632,16 +609,19 @@ function makePlan(model) {
     links.some(l => l.from === t.name && l.to === hub.name && l.kind === "list")) : [];
   const onDash = new Set(dash.map(t => t.name));
 
-  // Everything else is grouped by where its data comes from.
+  // Everything else is grouped by where its data comes from. Each Excel table is a group of its own,
+  // because its source on the left is where it's uploaded.
   const groups = [];
+  const uploadGroups = new Map();  // Excel table name -> its group
   const groupFor = t => {
     const fill = fillOf(t);
-    const key = fill === "api" ? "api|" + (t.source || "") : fill;
+    const key = fill === "api" ? "api|" + (t.source || "") : fill === "excel" ? "excel|" + t.name : fill;
     let g = groups.find(x => x.key === key);
     if (!g) {
       g = { key, id: "src:g" + groups.length, order: groups.length, fill, source: fill === "api" ? (t.source || null) : null,
-            quiet: !!QUIET[fill], tables: [], feedsHub: false };
+            quiet: !!QUIET[fill], tables: [], feedsHub: false, upload: fill === "excel" && t.update ? t : null };
       groups.push(g);
+      if (g.upload) uploadGroups.set(t.name, g);
     }
     return g;
   };
@@ -681,19 +661,15 @@ function makePlan(model) {
   for (const [label, n] of hubLabels) if (n > most) { hubLabel = label; most = n; }
   const hubIdColumn = hub ? ((hub.columns || []).find(c => c.catchment_id) || (hub.columns || []).find(c => c.unique_id) || null) : null;
   if (hub && !hubLabel) hubLabel = hubIdColumn ? (hubIdColumn.label || hubIdColumn.name) : "ID";
-  const example = hubIdColumn && hubIdColumn.example ? hubIdColumn.example : null;
-
-  const counts = { api: 0, excel: 0, quiet: 0 };
-  for (const t of tables) { const f = fillOf(t); counts[QUIET[f] ? "quiet" : f] += 1; }
 
   return {
-    tables, byName, links, hub, dash, groups, main, house, houseRow, wires, hubGroup,
-    hubLabel, dashLabels, example, counts,
+    tables, byName, links, hub, dash, groups, main, house, houseRow, wires, hubGroup, uploadGroups,
+    hubLabel, dashLabels,
     span: "3 / span " + Math.max(1, main.length),
   };
 }
 
-// Which nodes and lines light up for a key ("tbl:name", "src:g0", "fill:api", "link").
+// Which nodes and lines light up for a key ("tbl:name" or "src:g0").
 function relations(plan, key) {
   const nodes = new Set([key]);
   const wires = new Set();
@@ -706,17 +682,6 @@ function relations(plan, key) {
       if (n === key) continue;
       for (const w of touching(n)) if (w.type === "hub" && w.a === n) { wires.add(w.id); nodes.add(w.b); }
     }
-  } else if (key.startsWith("fill:")) {
-    const f = key.slice(5);
-    const match = x => (f === "quiet" ? !!QUIET[x] : x === f);
-    for (const t of plan.tables) if (match(fillOf(t))) nodes.add("tbl:" + t.name);
-    for (const g of plan.groups) if (match(g.fill)) nodes.add(g.id);
-    for (const w of plan.wires) {
-      if ((w.type === "src" || w.type === "bridge") && nodes.has(w.a) && nodes.has(w.b)) wires.add(w.id);
-    }
-  } else if (key === "link" && plan.hub) {
-    nodes.add("tbl:" + plan.hub.name);
-    for (const w of plan.wires) if (w.type === "hub" || w.type === "dash") { wires.add(w.id); nodes.add(w.a); nodes.add(w.b); }
   }
   return { nodes, wires };
 }
@@ -783,7 +748,7 @@ function start() {
   const plan = makePlan(model);
   const problems = model.problems && plan.byName.has(model.problems.table) ? model.problems : null;
   const $ = id => document.getElementById(id);
-  const flow = $("flow"), legend = $("legend"), caption = $("caption");
+  const flow = $("flow");
   const panel = $("panel"), panelBadge = $("panel-badge"), panelTitle = $("panel-title"), panelBody = $("panel-body");
   const closeBtn = $("panel-close");
   const wideQuery = window.matchMedia ? window.matchMedia("(min-width: 860px)") : { matches: true };
@@ -791,64 +756,27 @@ function start() {
   const nodeEls = new Map();   // key -> element that lights up
   const anchors = new Map();   // key -> element the lines are measured from
   const wireEls = new Map();   // wire id -> { g, path }
-  const keyEls = new Map();    // key -> legend button
+  // `current` is the open panel: { name, upload }, where upload is true for an Excel table's upload.
   let hoverKey = null, focusKey = null, pinnedKey = null, current = null, opener = null;
-
-  /* Key */
-  const keyItems = [
-    { key: "fill:api", cls: "f-api", icon: "cloud", strong: FILLS.api.long, sub: "API · downloaded again when someone runs a command", n: plan.counts.api },
-    { key: "fill:excel", cls: "f-excel", icon: "sheet", strong: FILLS.excel.long, sub: "By you, here", n: plan.counts.excel },
-    { key: "fill:quiet", cls: "f-command quiet", icon: "terminal", strong: "Housekeeping", sub: "A database command or the admin page", n: plan.counts.quiet },
-  ];
-  for (const item of keyItems) {
-    if (!item.n) continue;
-    const li = el("li");
-    const b = el("button", "key " + item.cls);
-    b.type = "button";
-    b.setAttribute("aria-pressed", "false");
-    const ic = el("span", "key-icon");
-    ic.appendChild(icon(item.icon, 18));
-    const tx = el("span", "key-text");
-    tx.appendChild(el("strong", null, item.strong));
-    tx.appendChild(el("span", "key-sub", item.sub));
-    const n = el("span", "key-count", item.n);
-    n.setAttribute("aria-label", item.n === 1 ? "1 table" : item.n + " tables");
-    b.append(ic, tx, n, el("span", "visually-hidden", ": highlight these tables"));
-    wireKey(b, item.key);
-    li.appendChild(b);
-    legend.appendChild(li);
-  }
-  if (plan.hub) {
-    const li = el("li");
-    const b = el("button", "key");
-    b.type = "button";
-    b.setAttribute("aria-pressed", "false");
-    const tx = el("span", "key-text");
-    tx.appendChild(el("strong", null, "Links each row to its catchment"));
-    tx.appendChild(el("span", "key-sub", plan.example ? "For example " + plan.example : "Every data table has one"));
-    b.append(el("span", "pill", plan.hubLabel), tx, el("span", "visually-hidden", ": highlight these links"));
-    wireKey(b, "link");
-    li.appendChild(b);
-    legend.appendChild(li);
-  }
-  function wireKey(b, key) {
-    keyEls.set(key, b);
-    b.addEventListener("click", () => { pinnedKey = pinnedKey === key ? null : key; trace(); });
-    hoverable(b, key);
-  }
 
   /* Diagram */
   const svg = svgEl("svg", { class: "wires wide-only", "aria-hidden": "true", focusable: "false" });
   flow.appendChild(svg);
 
-  const heads = [["1", "Where the data comes from"], ["2", "Tables"]];
-  if (plan.hub) heads.push(["3", "Joined up by " + plan.hubLabel]);
-  if (plan.dash.length) heads.push(["4", "Shown on dashboards"]);
-  for (const [n, text] of heads) {
+  // Every column but the first is tables, so the headings say so.
+  const heads = [["1", "Where the data comes from"], ["2", "Data tables"]];
+  if (plan.hub) heads.push(["3", titleOf(plan.hub) + " table", "Joins them up by " + plan.hubLabel]);
+  if (plan.dash.length) {
+    const name = plan.dash.length === 1 ? titleOf(plan.dash[0]) + " table" : "Dashboard tables";
+    heads.push(["4", name, "Picks the " + titleOf(plan.hub).toLowerCase() + " on each dashboard"]);
+  }
+  for (const [n, text, sub] of heads) {
     const h = el("div", "col-head wide-only");
     h.dataset.col = n;
     h.setAttribute("aria-hidden", "true");
-    h.append(el("span", "num", n), el("span", null, text));
+    const tx = el("span", "col-text", text);
+    if (sub) tx.appendChild(el("span", "col-sub", sub));
+    h.append(el("span", "num", n), tx);
     flow.appendChild(h);
   }
   const band = el("div", "band wide-only");
@@ -909,15 +837,27 @@ function start() {
     wrap.style.setProperty("--row", String(g.row));
     const b = el("button", "src f-" + g.fill);
     b.type = "button";
-    b.setAttribute("aria-pressed", "false");
     b.dataset.node = g.id;
     const ic = el("span", "src-icon");
     ic.appendChild(icon(FILLS[g.fill].icon, g.quiet ? 16 : 20));
     const tx = el("span", "src-text");
     const words = groupWords(g);
     tx.append(el("span", "src-eyebrow", words.eyebrow), el("span", "src-name", words.name));
-    b.append(ic, tx, el("span", "visually-hidden", ": highlight its tables"));
-    b.addEventListener("click", () => { pinnedKey = pinnedKey === g.id ? null : g.id; trace(); });
+    b.append(ic, tx);
+    if (g.upload) {
+      // An Excel table's source is where it's uploaded: it opens the upload.
+      const action = el("span", "src-action");
+      action.append(icon("upload", 15), el("span", null, "Upload data"), el("span", "visually-hidden", " to " + titleOf(g.upload)));
+      tx.appendChild(action);
+      const waiting = waitingUploads(g.upload).length;
+      if (waiting) tx.appendChild(el("span", "src-waiting", waiting + (waiting === 1 ? " upload" : " uploads") + " to approve"));
+      b.setAttribute("aria-haspopup", "dialog");
+      b.addEventListener("click", () => openPanel(g.upload.name, true, b));
+    } else {
+      b.setAttribute("aria-pressed", "false");
+      b.appendChild(el("span", "visually-hidden", ": highlight its tables"));
+      b.addEventListener("click", () => { pinnedKey = pinnedKey === g.id ? null : g.id; trace(); });
+    }
     hoverable(b, g.id);
     nodeEls.set(g.id, b);
     anchors.set(g.id, b);
@@ -943,7 +883,7 @@ function start() {
 
   function groupWords(g) {
     if (g.fill === "api") return { eyebrow: FILLS.api.long, name: g.source || "A website" };
-    if (g.fill === "excel") return { eyebrow: "Uploaded here", name: "You, in Excel" };
+    if (g.fill === "excel") return { eyebrow: FILLS.excel.long, name: "By you, here" };
     if (g.fill === "admin") return { eyebrow: "Housekeeping", name: "The admin page" };
     return { eyebrow: "Housekeeping", name: "A database command" };
   }
@@ -955,8 +895,6 @@ function start() {
     fw.append(icon(FILLS[f].icon, 14), document.createTextNode(FILLS[f].word));
     m.appendChild(fw);
     if (t.rows != null) { m.appendChild(el("span", null, "·")); m.appendChild(el("span", null, rowsText(t.rows))); }
-    const waiting = waitingUploads(t).length;
-    if (waiting) { m.appendChild(el("span", null, "·")); m.appendChild(el("span", "waiting-tag", waiting + " to approve")); }
     return m;
   }
 
@@ -965,7 +903,7 @@ function start() {
     b.type = "button";
     b.dataset.node = "tbl:" + t.name;
     b.setAttribute("aria-haspopup", "dialog");
-    b.addEventListener("click", () => openDetails(t.name, b));
+    b.addEventListener("click", () => openPanel(t.name, false, b));
     hoverable(b, "tbl:" + t.name);
     nodeEls.set("tbl:" + t.name, b);
     anchors.set("tbl:" + t.name, b);
@@ -1035,42 +973,24 @@ function start() {
     elm.addEventListener("blur", () => { if (focusKey === key) { focusKey = null; trace(); } });
   }
 
+  // The diagram's key for the open panel: the table, or for an upload, the Excel table's source.
+  function currentKey() {
+    if (!current) return null;
+    const g = current.upload ? plan.uploadGroups.get(current.name) : null;
+    return g ? g.id : "tbl:" + current.name;
+  }
+
   function trace() {
-    const key = hoverKey || focusKey || pinnedKey || (current ? "tbl:" + current : null);
+    const selected = currentKey();
+    const key = hoverKey || focusKey || pinnedKey || selected;
     const rel = key ? relations(plan, key) : null;
     flow.classList.toggle("tracing", !!rel);
     for (const [k, e] of nodeEls) {
       e.classList.toggle("on", !!rel && rel.nodes.has(k));
-      e.classList.toggle("is-selected", current != null && k === "tbl:" + current);
-      if (k.startsWith("src:")) e.setAttribute("aria-pressed", String(pinnedKey === k));
+      e.classList.toggle("is-selected", k === selected);
+      if (e.hasAttribute("aria-pressed")) e.setAttribute("aria-pressed", String(pinnedKey === k));
     }
     for (const [id, w] of wireEls) w.g.classList.toggle("on", !!rel && rel.wires.has(id));
-    for (const [k, b] of keyEls) b.setAttribute("aria-pressed", String(pinnedKey === k));
-    showCaption(key);
-  }
-
-  function showCaption(key) {
-    caption.replaceChildren();
-    const put = (strong, rest) => { caption.append(el("strong", null, strong), document.createTextNode(rest)); };
-    if (!key) { caption.textContent = "Point at (or tap) a source to trace its tables. Click a table to see its columns."; return; }
-    if (key.startsWith("tbl:")) {
-      const t = plan.byName.get(key.slice(4));
-      if (t) put(titleOf(t), t.summary ? "  " + t.summary : "");
-    } else if (key.startsWith("src:")) {
-      const g = plan.groups.find(x => x.id === key);
-      if (!g) return;
-      const names = g.tables.map(titleOf);
-      if (g.feedsHub && plan.hub) names.push(titleOf(plan.hub));
-      put(groupWords(g).name, ": " + joinWords(names) + ".");
-    } else if (key === "fill:api") {
-      put(FILLS.api.long, ": downloaded again only when someone runs the command shown in each table's details.");
-    } else if (key === "fill:excel") {
-      put(FILLS.excel.long, ": you download these, change them in Excel and upload them again here. Click one to start.");
-    } else if (key === "fill:quiet") {
-      put("Housekeeping", ": changed with a database command, or kept by the admin page as you use it.");
-    } else if (key === "link" && plan.hub) {
-      put(plan.hubLabel, ": every table with a line to " + titleOf(plan.hub) + " has this column, so each of its rows belongs to one catchment.");
-    }
   }
 
   /* Drawing the lines (wide screens only) */
@@ -1109,14 +1029,16 @@ function start() {
   if (wideQuery.addEventListener) wideQuery.addEventListener("change", queueDraw);
   queueDraw();
 
-  /* Details panel */
-  function openDetails(name, from, instant) {
+  /* Details panel: a table's details, or an Excel table's upload */
+  function openPanel(name, upload, from, instant) {
     const t = plan.byName.get(name);
     if (!t) return;
+    upload = !!(upload && plan.uploadGroups.has(name));
     if (!current) opener = from || document.activeElement;
-    current = name;
+    current = { name, upload };
     pinnedKey = null;
-    renderDetails(t);
+    if (upload) renderUpload(t, t.update);
+    else renderDetails(t);
     if (instant) {
       panel.classList.add("instant");
       requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.remove("instant")));
@@ -1124,40 +1046,42 @@ function start() {
     panel.classList.add("open");
     document.body.classList.toggle("panel-open-narrow", !wideQuery.matches);
     panel.scrollTop = 0;
-    const hash = "#" + encodeURIComponent(name);
+    const hash = "#" + (upload ? UPLOAD_HASH : "") + encodeURIComponent(name);
     if (location.hash !== hash) history.replaceState(null, "", hash);
     trace();
     panelTitle.focus({ preventScroll: true });
   }
 
-  function closeDetails() {
+  function closePanel() {
     if (!current) return;
-    const name = current;
+    const key = currentKey();
     current = null;
     panel.classList.remove("open");
     document.body.classList.remove("panel-open-narrow");
     history.replaceState(null, "", location.pathname + location.search);
-    const node = nodeEls.get("tbl:" + name);
+    const node = nodeEls.get(key);
     const back = node || (opener && document.body.contains(opener) ? opener : null);
     opener = null;
     trace();
     if (back) back.focus({ preventScroll: false });
   }
 
-  closeBtn.addEventListener("click", closeDetails);
+  closeBtn.addEventListener("click", closePanel);
   document.addEventListener("keydown", e => {
     if (e.key !== "Escape") return;
-    if (current) { e.preventDefault(); closeDetails(); }
+    if (current) { e.preventDefault(); closePanel(); }
     else if (pinnedKey) { pinnedKey = null; trace(); }
   });
   window.addEventListener("hashchange", () => {
-    const name = hashName();
-    if (name && plan.byName.has(name)) openDetails(name);
-    else if (!name) closeDetails();
+    const want = fromHash();
+    if (want && plan.byName.has(want.name)) openPanel(want.name, want.upload);
+    else if (!want) closePanel();
   });
-  function hashName() {
-    const raw = location.hash.replace(/^#/, "");
-    try { return decodeURIComponent(raw); } catch (e) { return raw; }
+  function fromHash() {
+    let raw = location.hash.replace(/^#/, "");
+    try { raw = decodeURIComponent(raw); } catch (e) { /* use it as it is */ }
+    if (!raw) return null;
+    return raw.startsWith(UPLOAD_HASH) ? { name: raw.slice(UPLOAD_HASH.length), upload: true } : { name: raw, upload: false };
   }
 
   function jumpButton(t) {
@@ -1166,26 +1090,29 @@ function start() {
     const ic = el("span", "j-icon");
     ic.appendChild(icon(FILLS[fillOf(t)].icon, 16));
     b.append(ic, el("span", null, titleOf(t)));
-    b.addEventListener("click", () => openDetails(t.name));
+    b.addEventListener("click", () => openPanel(t.name, false));
     return b;
   }
 
-  function renderDetails(t) {
-    const f = fillOf(t);
+  function badgeFor(f) {
     const quiet = !!QUIET[f];
-
-    // 1. Title and how it's filled
     const badge = el("span", "p-badge f-" + f + (quiet ? " quiet" : ""));
     const bi = el("span", "b-icon");
     bi.appendChild(icon(FILLS[f].icon, 16));
     badge.append(bi, el("span", null, FILLS[f].long));
     if (FILLS[f].tag && f === "api") badge.appendChild(el("span", "tag", FILLS[f].tag));
-    panelBadge.replaceChildren(badge);
+    return badge;
+  }
+
+  function renderDetails(t) {
+    const f = fillOf(t);
+
+    // 1. Title and how it's filled
+    panelBadge.replaceChildren(badgeFor(f));
     panelBody.className = "f-" + f;
     panelTitle.textContent = titleOf(t);
 
     const out = [];
-    if (problems && problems.table === t.name) out.push(problemsBox(problems));
     const tech = el("p", "tech");
     tech.append(document.createTextNode("In the database: "), el("code", null, t.name));
     out.push(tech);
@@ -1216,8 +1143,8 @@ function start() {
     }
     if (facts.childNodes.length) out.push(facts);
 
-    // 4b. Updating it (Excel tables)
-    if (t.update && f === "excel") out.push(...updateBlock(t, t.update));
+    // 4b. Downloading it (every table)
+    if (t.download && isLocal(t.download.url)) out.push(downloadBlock(t, f));
 
     // 5. Columns
     if ((t.columns || []).length) out.push(...columnsBlock(t));
@@ -1256,12 +1183,29 @@ function start() {
         box.append(cmd, status);
       }
     } else if (f === "excel") {
-      box.appendChild(el("p", null, "You keep it up to date: download it, change it in Excel, and upload it again (below)."));
-      const last = t.update && t.update.last;
-      box.appendChild(el("p", "muted", last ? "Last updated " + last.when + " by " + last.who + "." : "Not uploaded yet."));
+      box.appendChild(el("p", null, "You keep it up to date in Excel, with its Upload data on the left of the diagram."));
+      box.appendChild(el("p", "muted", lastUpdated(t)));
     } else if (t.note) {
       box.appendChild(el("p", null, t.note));
     }
+    return box;
+  }
+
+  function lastUpdated(t) {
+    const last = t.update && t.update.last;
+    return last ? "Last updated " + last.when + " by " + last.who + "." : "Not uploaded yet.";
+  }
+
+  function downloadBlock(t, f) {
+    const box = el("div", "get");
+    const dl = link("btn ghost", t.download.url, "Download as Excel");
+    dl.prepend(icon("download", 16));
+    const notes = [];
+    if (f === "excel") notes.push("A copy of the whole table. To change it, use its Upload data on the left.");
+    else notes.push("A copy to look at or share. It can't be uploaded here.");
+    const left = (t.download.left_out || []).map(name => columnLabel(t, name));
+    if (left.length) notes.push("Leaves out " + joinWords(left) + ": map shapes, thousands of coordinates long.");
+    box.append(dl, el("p", null, notes.join(" ")));
     return box;
   }
 
@@ -1278,8 +1222,20 @@ function start() {
     return box;
   }
 
-  function updateBlock(t, u) {
-    const out = [el("h3", null, "Update this table")];
+  // An Excel table's upload, opened from its source on the left of the diagram.
+  function renderUpload(t, u) {
+    panelBadge.replaceChildren(badgeFor("excel"));
+    panelBody.className = "f-excel";
+    panelTitle.textContent = "Upload data to " + titleOf(t);
+
+    const out = [];
+    if (problems && problems.table === t.name) out.push(problemsBox(problems));
+    const intro = el("p", "desc");
+    intro.append(
+      document.createTextNode("Download the "), el("strong", null, titleOf(t)),
+      document.createTextNode(" table, change it in Excel, and upload it again. " + lastUpdated(t)),
+    );
+    out.push(intro);
 
     for (const w of waitingUploads(t)) {
       const box = el("div", "alert waiting");
@@ -1320,7 +1276,9 @@ function start() {
       once.appendChild(document.createTextNode(" can only appear once."));
       rules.appendChild(once);
     }
-    rules.appendChild(el("li", null, "What each column means is under Columns, below."));
+    const meaning = el("li");
+    meaning.append(document.createTextNode("To see what each column means, open the table: "), jumpButton(t));
+    rules.appendChild(meaning);
     edit.append(el("span", "step-name", "Edit it in Excel"), rules);
 
     const upload = el("li");
@@ -1351,7 +1309,8 @@ function start() {
     const recent = Array.isArray(u.recent) ? u.recent : [];
     if (!recent.length) {
       out.push(el("p", "none", "Nothing has been uploaded to this table yet."));
-      return out;
+      panelBody.replaceChildren(...out);
+      return;
     }
     const list = el("ul", "uploads");
     for (const r of recent) {
@@ -1365,7 +1324,7 @@ function start() {
       list.appendChild(li);
     }
     out.push(list, el("p", "hint", "To go back to an earlier version, download its file here and upload it again."));
-    return out;
+    panelBody.replaceChildren(...out);
   }
 
   function copyText(text, code, label, status) {
@@ -1553,8 +1512,8 @@ function start() {
   /* Go */
   trace();
   if (problems) history.replaceState(null, "", "/admin");  // the page was the answer to an upload
-  const first = problems ? problems.table : hashName();
-  if (first && plan.byName.has(first)) openDetails(first, null, true);
+  const first = problems ? { name: problems.table, upload: true } : fromHash();
+  if (first && plan.byName.has(first.name)) openPanel(first.name, first.upload, null, true);
   const message = $("message");
   if (message && current) panelBody.prepend(message);  // where it'll be seen
 }

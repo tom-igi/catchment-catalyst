@@ -12,9 +12,9 @@ The admin page (backend/catalyst/admin/) does these steps through a web page.
 """
 
 from .replace import Changed, Comparison, compare, key_columns, lock, replace
-from .workbook import FileRow, UploadError, read_upload, show_value, type_label, write_table
+from .workbook import FileRow, UploadError, downloadable_columns, read_upload, show_value, type_label, write_table
 
 __all__ = [
-    "Changed", "Comparison", "FileRow", "UploadError", "compare", "key_columns", "lock",
+    "Changed", "Comparison", "FileRow", "UploadError", "compare", "downloadable_columns", "key_columns", "lock",
     "read_upload", "replace", "show_value", "type_label", "write_table",
 ]

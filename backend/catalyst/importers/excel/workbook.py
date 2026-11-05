@@ -3,25 +3,35 @@
 The download has one sheet: the column names in row 1, then one row per row
 of the table. An upload must look the same (the columns can be in any order),
 and is read from its first sheet.
+
+Any table can be downloaded, but only Excel tables can be uploaded. Map shapes
+are left out of downloads: each is thousands of coordinates, no use in Excel,
+and a large one can be longer than an Excel cell holds (32,767 characters).
 """
 
 from __future__ import annotations
 
 import datetime
+import decimal
 import io
+import json
 import math
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import sqlalchemy as sa
+from geoalchemy2 import Geometry
 from openpyxl import Workbook, load_workbook
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 
 TRUE_WORDS = {"true", "yes", "y", "1"}
 FALSE_WORDS = {"false", "no", "n", "0"}
 INTEGER_LIMITS = {sa.SmallInteger: 2**15, sa.BigInteger: 2**63, sa.Integer: 2**31}
+UK = ZoneInfo("Europe/London")  # times are shown in UK time, as on the admin page
 
 
 @dataclass
@@ -56,21 +66,31 @@ def type_label(column: sa.Column) -> str:
 
 # --- Writing the download ----------------------------------------------------
 
+def downloadable_columns(table: sa.Table) -> list[sa.Column]:
+    """The columns in the table's download: all but map shapes."""
+    return [c for c in table.columns if not isinstance(c.type, Geometry)]
+
+
 def write_table(table: sa.Table, rows: Iterable[Mapping[str, Any]]) -> bytes:
-    """An Excel file of the table's rows."""
+    """An Excel file of the table's rows, with the columns from downloadable_columns."""
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = table.name[:31]  # Excel's limit
-    columns = list(table.columns)
+    columns = downloadable_columns(table)
     sheet.append([c.name for c in columns])
     for row in rows:
-        sheet.append([row[c.name] for c in columns])
+        sheet.append([_cell_value(row[c.name]) for c in columns])
 
     for i, column in enumerate(columns, start=1):
         letter = get_column_letter(i)
         # Applies to the whole column, including rows typed in later, so Excel
         # keeps text as typed (e.g. an ID stays an ID, not a number or date).
-        number_format = "@" if isinstance(column.type, sa.String) else "yyyy-mm-dd" if isinstance(column.type, sa.Date) else None
+        number_format = (
+            "@" if isinstance(column.type, sa.String)
+            else "yyyy-mm-dd hh:mm" if isinstance(column.type, sa.DateTime)
+            else "yyyy-mm-dd" if isinstance(column.type, sa.Date)
+            else None
+        )
         if number_format:
             sheet.column_dimensions[letter].number_format = number_format
             for (cell,) in sheet.iter_rows(min_row=2, min_col=i, max_col=i):
@@ -84,6 +104,21 @@ def write_table(table: sa.Table, rows: Iterable[Mapping[str, Any]]) -> bytes:
     out = io.BytesIO()
     workbook.save(out)
     return out.getvalue()
+
+
+def _cell_value(value: Any) -> Any:
+    """A value as Excel can hold it. Only tables that can't be uploaded have values that need changing."""
+    if isinstance(value, datetime.datetime) and value.tzinfo is not None:
+        return value.astimezone(UK).replace(tzinfo=None)  # Excel has no time zones
+    if isinstance(value, (list, tuple)):  # e.g. a list of catchment IDs
+        return ", ".join(str(v) for v in value) or None
+    if isinstance(value, dict):
+        return json.dumps(value, ensure_ascii=False)
+    if isinstance(value, str):
+        return ILLEGAL_CHARACTERS_RE.sub("", value)  # control characters Excel can't store
+    if value is None or isinstance(value, (bool, int, float, decimal.Decimal, datetime.date, datetime.time)):
+        return value
+    return str(value)  # e.g. a UUID
 
 
 # --- Reading an upload -------------------------------------------------------

@@ -151,6 +151,22 @@ def test_a_download_reads_back_exactly():
     assert sheet["A2"].number_format == "@"  # catchment IDs stay as text
 
 
+def test_any_table_can_be_downloaded():
+    catchments = SCHEMA.metadata.tables["catchments"]
+    assert "boundary" not in [c.name for c in excel.downloadable_columns(catchments)]  # map shapes are left out
+    row = {c.name: None for c in excel.downloadable_columns(catchments)} | {
+        "id": WEST, "name": "West\x07 Okement", "area_ha": 3174.75,
+        "upstream_ids": [], "downstream_ids": [EAST, "GB2"],
+        "imported_at": datetime.datetime(2026, 7, 1, 9, 30, tzinfo=datetime.UTC),
+    }
+    sheet = load_workbook(io.BytesIO(excel.write_table(catchments, [row]))).active
+    values = dict(zip((c.value for c in sheet[1]), (c.value for c in sheet[2])))
+    assert "boundary" not in values and "river_line" not in values
+    assert (values["id"], values["name"], values["area_ha"]) == (WEST, "West Okement", 3174.75)  # without the control character
+    assert (values["upstream_ids"], values["downstream_ids"]) == (None, f"{EAST}, GB2")
+    assert values["imported_at"] == datetime.datetime(2026, 7, 1, 10, 30)  # UK summer time; Excel has no time zones
+
+
 # --- Comparing with the table and replacing it ------------------------------------
 
 def test_an_upload_adds_changes_and_deletes_rows(engine):

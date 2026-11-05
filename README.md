@@ -22,7 +22,7 @@ backend/                     all Python code, built into one Docker image
                              storm overflows; River Obstacles)
   catalyst/importers/excel/  tables filled by Excel upload (one shared piece of code for all of them)
   catalyst/admin/            the admin page: a diagram of every table (diagram.py, diagram.yaml);
-                             download an Excel table, upload it, preview, approve
+                             download any table; upload an Excel table, preview, approve
   catalyst/publish/          the publish step: writes each location's dashboard as web pages
   tests/
 imports/                     lists of what to import, and copies of every download and upload (see imports/README.md)
@@ -45,8 +45,9 @@ The admin page is at <http://localhost:8000/admin> (name `admin`, password `admi
 published dashboards at <http://localhost:8080>.
 
 The admin page is a diagram of every table: where its data comes from and how they join up.
-Click a table to see its columns; for a table filled by Excel upload, that's also where you
-download it and upload an edited copy. It's made from `schema.yaml` each time it's opened, plus
+Click a table to see its columns and download it as Excel (any table; map shapes are left
+out). Each table filled by Excel upload also has its own **Upload data** box on the left,
+where its data comes from, to upload an edited copy. It's made from `schema.yaml` each time it's opened, plus
 `backend/catalyst/admin/diagram.yaml` (the sections, and where each downloaded table comes
 from: add a new importer's table there).
 
@@ -102,7 +103,7 @@ other tables are replaced. Everything downloaded is kept in `imports/raw/`. See
 
 ### From Excel (the admin page)
 
-1. Log in to the admin page and choose the table.
+1. Log in to the admin page and click the table's **Upload data**, on the left.
 2. Download it as an Excel file.
 3. Add, change or delete rows. Keep the column names in row 1 as they are.
 4. Upload it. Every row is checked, then a preview shows exactly what will be added, changed
@@ -111,7 +112,7 @@ other tables are replaced. Everything downloaded is kept in `imports/raw/`. See
    changes.
 
 Each upload replaces the whole table, so always start from a fresh download. Every uploaded
-file is kept (in `imports/raw/<table>/`) and listed on the table's page: to go back to an
+file is kept (in `imports/raw/<table>/`) and listed under its Upload data: to go back to an
 earlier version, download its file and upload it again.
 
 To make another table uploadable, add `filled_by: excel` to it in `schema.yaml` and run

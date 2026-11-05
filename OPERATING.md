@@ -49,9 +49,9 @@ It shows the data as it was when it was last published (see step 5).
 
 ## 4. View the tables in the database
 
-- **Tables updated by Excel upload** (e.g. EA Scores): go to the admin page,
-  <http://localhost:8000/admin> (login `admin` / `admin`), click the table and click
-  **Download as Excel**.
+- **Any table, in Excel:** go to the admin page, <http://localhost:8000/admin> (login
+  `admin` / `admin`), click the table and click **Download as Excel**. (Catchment outlines
+  and river lines are left out: they're thousands of map coordinates.)
 - **Every table:** connect a database client such as DBeaver: host `localhost`, port `5434`,
   database, user and password all `catalyst`.
 - **What each table and column means:** the admin page shows every table. Click one to see
@@ -67,12 +67,13 @@ commands after that.
 
 ### Tables updated by Excel upload (e.g. EA Scores, Habitat & Land Use)
 
-They're marked **Uploaded in Excel** (green) on the admin page.
+They're marked **Uploaded in Excel** (green) on the admin page, and each has its own box on
+the left of the diagram with an **Upload data** button.
 
 1. Go to <http://localhost:8000/admin> and log in.
-2. Click the table, then **Download as Excel**.
+2. Click the table's **Upload data**, then **Download as Excel**.
 3. In Excel, add, change or delete rows. Keep the column names in row 1 as they are.
-4. Back on the table, upload the file, check the preview, and click **Approve**.
+4. Back in **Upload data**, upload the file, check the preview, and click **Approve**.
 
 Each upload replaces the whole table, so always start from a fresh download.
 
