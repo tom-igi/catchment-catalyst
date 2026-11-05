@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- Shared by link only: ask search engines not to list it. -->
+<!-- Behind the admin login; ask search engines not to list it anyway. -->
 <meta name="robots" content="noindex, nofollow">
 <title>Catchment Catalyst data map</title>
 <style>
@@ -52,6 +52,7 @@
   }
 
   /* Introduction */
+  .back { display: inline-block; margin-bottom: 20px; font-size: .95rem; }
   .eyebrow { margin: 0; color: var(--accent); font-weight: 600; letter-spacing: .02em; }
   h1 { margin: 4px 0 8px; font-size: 2.4rem; line-height: 1.15; }
   .lead { margin: 0 0 24px; font-size: 1.15rem; color: var(--muted); max-width: 46em; }
@@ -146,6 +147,7 @@
 <body>
 <main id="top">
   <header>
+    <a class="back" href="/admin">← Admin</a>
     <p class="eyebrow">Catchment Catalyst</p>
     <h1>Data map</h1>
     <p class="lead">Every table in the database: what it holds, what each column means, and an example of the values that go in it.</p>
@@ -160,8 +162,8 @@
   ${tables}
 
   <footer>
-    Built on ${generated} from the database's master file (<code>backend/catalyst/db/schema.yaml</code>).
-    It is rebuilt automatically whenever the database structure is updated, so don't edit this page by hand.
+    Made from the database's master file (<code>backend/catalyst/db/schema.yaml</code>), the same file
+    that sets the database's structure, so it always matches it.
   </footer>
 </main>
 </body>

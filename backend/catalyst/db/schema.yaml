@@ -46,7 +46,7 @@
 #                  restrict. If left out, the delete is refused.
 #    renamed_from  The column's previous name (see RENAMING above).
 #    example       An example value, shown on the data map page
-#                  (datamap/). Not stored in the database.
+#                  (catalyst/datamap/). Not stored in the database.
 #
 #  Table options:  title, description, filled_by, columns, indexes, renamed_from
 #    title         Friendly name, e.g. EA Scores. Shown on the data map page.

@@ -54,11 +54,8 @@ It shows the data as it was when it was last published (see step 5).
   **Download as Excel**.
 - **Every table:** connect a database client such as DBeaver: host `localhost`, port `5434`,
   database, user and password all `catalyst`.
-- **What each table and column means:** open the data map:
-
-  ```bash
-  explorer.exe "$(wslpath -w datamap/site/index.html)"
-  ```
+- **What each table and column means:** the data map, in the admin page. Click **Data map**
+  at the top, or go to <http://localhost:8000/admin/data-map>.
 
 ---
 

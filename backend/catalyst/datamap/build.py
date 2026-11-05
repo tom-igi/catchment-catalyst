@@ -1,12 +1,11 @@
-"""Build the data map page from the master schema file.
+"""Make the data map page from the master schema file.
 
-The page is plain HTML and CSS with no scripts or outside files, so it can be
-opened straight from disk or hosted anywhere as a single file.
+The admin page shows it at /admin/data-map. It's plain HTML and CSS, with no
+scripts or outside files.
 """
 
 from __future__ import annotations
 
-import datetime
 import html
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,7 +19,6 @@ from sqlalchemy.dialects import postgresql
 from catalyst.db.schema import CATCHMENT_REFERENCE, Schema, load_schema
 
 HERE = Path(__file__).parent
-SITE_DIR = HERE / "site"
 
 MAP_SHAPES = {
     "POINT": "Map point", "MULTIPOINT": "Map points",
@@ -45,21 +43,14 @@ class Section:
     data: bool = False  # the data tables section
 
 
-def build(schema: Schema | None = None, out_dir: Path = SITE_DIR, sections_file: Path = HERE / "sections.yaml") -> Path:
-    """Write the page to out_dir/index.html and return its path."""
+def render(schema: Schema | None = None, sections_file: Path = HERE / "sections.yaml") -> str:
+    """The page's HTML."""
     schema = schema or load_schema()
     sections = _sections(schema, sections_file)
-    today = datetime.date.today()
-
-    page = Template((HERE / "page.html").read_text(encoding="utf-8")).substitute(
+    return Template((HERE / "page.html").read_text(encoding="utf-8")).substitute(
         sections="\n".join(_section(s) for s in sections),
         tables="\n".join(_card(t, s) for s in sections for t in s.tables),
-        generated=f"{today.day} {today:%B %Y}",
     )
-    out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / "index.html"
-    path.write_text(page, encoding="utf-8")
-    return path
 
 
 def _sections(schema: Schema, sections_file: Path) -> list[Section]:
@@ -71,12 +62,12 @@ def _sections(schema: Schema, sections_file: Path) -> list[Section]:
     for entry in config["sections"]:
         unknown = [name for name in entry["tables"] if name not in core]
         if unknown:
-            raise ValueError(f"datamap/sections.yaml lists {', '.join(unknown)}, which isn't a core table in schema.yaml")
+            raise ValueError(f"catalyst/datamap/sections.yaml lists {', '.join(unknown)}, which isn't a core table in schema.yaml")
         sections.append(Section(entry["title"], entry["description"], [tables[name] for name in entry["tables"]]))
         placed.update(entry["tables"])
     others = [tables[name] for name in core if name not in placed]
     if others:
-        sections.append(Section("Other tables", "Core tables not yet given a section in datamap/sections.yaml.", others))
+        sections.append(Section("Other tables", "Core tables not yet given a section in catalyst/datamap/sections.yaml.", others))
     data = config["data_tables"]
     sections.append(Section(data["title"], data["description"], [tables[n] for n in schema.data_tables], data=True))
     return [s for s in sections if s.tables]

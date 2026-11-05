@@ -3,6 +3,7 @@
     /admin                       choose a table
     /admin/tables/<table>        download it, upload an edited copy, recent uploads
     /admin/uploads/<id>          preview what an upload will change; approve or cancel
+    /admin/data-map              every table in plain English (if catalyst/datamap is there)
 
 Every page needs a login. Only tables marked `filled_by: excel` in schema.yaml
 appear, and each works the same way (see catalyst.importers.excel).
@@ -17,7 +18,7 @@ from zoneinfo import ZoneInfo
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
@@ -27,6 +28,13 @@ from catalyst.importers import excel
 
 from . import passwords, uploads
 from .settings import Settings
+
+try:  # the data map is optional: see catalyst/datamap/README.md
+    import catalyst.datamap as datamap
+except ModuleNotFoundError as e:
+    if e.name != "catalyst.datamap":
+        raise
+    datamap = None
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 MAX_UPLOAD_MB = 20
@@ -257,6 +265,18 @@ def upload_file(request: Request, user: User, upload_id: int):
     return FileResponse(path, media_type=XLSX, filename=upload.file_name)
 
 
+# --- Data map --------------------------------------------------------------------
+
+if datamap:
+    @router.get("/data-map")
+    def data_map(request: Request, user: User):
+        try:
+            page = datamap.render(request.app.state.schema)
+        except ValueError as e:  # e.g. sections.yaml names a table that's been renamed
+            raise HTTPException(500, f"The data map couldn't be made: {e}") from e
+        return HTMLResponse(page)
+
+
 def _get_upload(conn: sa.Connection, state, upload_id: int, for_update: bool = False) -> sa.Row:
     upload = uploads.get(conn, state.schema, upload_id, for_update=for_update)
     if upload is None or upload.table_name not in state.schema.excel_tables:
@@ -293,7 +313,7 @@ def _database_error_page(request: Request, exc: sa.exc.DBAPIError):
 
 def _templates() -> Jinja2Templates:
     templates = Jinja2Templates(directory=Path(__file__).with_name("templates"))
-    templates.env.globals.update(title=_title, type_label=excel.type_label)
+    templates.env.globals.update(title=_title, type_label=excel.type_label, data_map=datamap is not None)
     templates.env.filters.update(cell=_cell, when=_when, rows=_rows)
     return templates
 

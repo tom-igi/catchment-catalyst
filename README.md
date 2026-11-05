@@ -23,10 +23,10 @@ backend/                     all Python code, built into one Docker image
   catalyst/importers/excel/  tables filled by Excel upload (one shared piece of code for all of them)
   catalyst/admin/            the admin page: log in, download a table, upload it, preview, approve
   catalyst/publish/          the publish step: writes each location's dashboard as web pages
+  catalyst/datamap/          optional data map page in the admin page: every table in plain English
   tests/
 imports/                     lists of what to import, and copies of every download and upload (see imports/README.md)
 published/                   the published dashboards (not in git; see published/README.md)
-datamap/                     optional data map page: every table in plain English (see datamap/README.md)
 ```
 
 ## Running locally
@@ -36,7 +36,7 @@ Only Docker is needed.
 ```bash
 docker compose up -d                    # start the database, the admin page and the dashboard preview
 docker compose run --rm schema plan     # preview changes needed to match schema.yaml
-docker compose run --rm schema apply    # make them (asks first), and rebuild the data map
+docker compose run --rm schema apply    # make them (asks first)
 docker compose run --rm publish         # write the dashboards' pages
 docker compose run --rm test            # run the backend tests
 ```
@@ -44,8 +44,8 @@ docker compose run --rm test            # run the backend tests
 The admin page is at <http://localhost:8000/admin> (name `admin`, password `admin`), and the
 published dashboards at <http://localhost:8080>.
 
-To see the data map, open `datamap/site/index.html` in a browser. From WSL:
-`explorer.exe "$(wslpath -w datamap/site/index.html)"`.
+The data map (every table and column in plain English) is in the admin page: click **Data map**
+at the top, or go to <http://localhost:8000/admin/data-map>.
 
 To connect a database client (DBeaver, pgAdmin, etc.): host `localhost`, port `5434`,
 database / user / password `catalyst`. To change these, copy `.env.example` to `.env`.
@@ -192,7 +192,7 @@ settings file Docker Compose adds to `docker-compose.yml`:
 | Database port | Open on this machine for DBeaver | Only reachable from the server itself |
 | Admin page | <http://localhost:8000/admin>, login `admin` / `admin` | Logins from `.env`; only through an SSH tunnel until the web server is added |
 | Published dashboards | Previewed at <http://localhost:8080> | Written to `published/`; the web server will serve them once it's added |
-| Tests and data map | Yes | No |
+| Tests | Yes | No |
 
 The differences are only settings, never code: the same images run in both places.
 
