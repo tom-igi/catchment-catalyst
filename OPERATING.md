@@ -50,29 +50,29 @@ It shows the data as it was when it was last published (see step 5).
 ## 4. View the tables in the database
 
 - **Tables updated by Excel upload** (e.g. EA Scores): go to the admin page,
-  <http://localhost:8000/admin> (login `admin` / `admin`), choose the table and click
+  <http://localhost:8000/admin> (login `admin` / `admin`), click the table and click
   **Download as Excel**.
 - **Every table:** connect a database client such as DBeaver: host `localhost`, port `5434`,
   database, user and password all `catalyst`.
-- **What each table and column means:** the data map, in the admin page. Click **Data map**
-  at the top, or go to <http://localhost:8000/admin/data-map>.
+- **What each table and column means:** the admin page shows every table. Click one to see
+  its columns.
 
 ---
 
 ## 5. Update the tables in the database
 
-Most tables are updated in one of the two ways below; the data map (step 4) marks each table
+Most tables are updated in one of the two ways below; the admin page (step 4) marks each table
 **Downloaded** or **Excel upload**. Locations are the exception, and are changed with the
 commands after that.
 
 ### Tables updated by Excel upload (e.g. EA Scores, Habitat & Land Use)
 
-The admin page lists every one of them.
+They're marked **Uploaded in Excel** (green) on the admin page.
 
 1. Go to <http://localhost:8000/admin> and log in.
-2. Choose the table and click **Download as Excel**.
+2. Click the table, then **Download as Excel**.
 3. In Excel, add, change or delete rows. Keep the column names in row 1 as they are.
-4. Upload the file, check the preview, and click **Approve**.
+4. Back on the table, upload the file, check the preview, and click **Approve**.
 
 Each upload replaces the whole table, so always start from a fresh download.
 

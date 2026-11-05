@@ -5,9 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- Behind the admin login; ask search engines not to list it anyway. -->
 <meta name="robots" content="noindex, nofollow">
-<title>Catchment Catalyst data map</title>
+<title>Your data · Catchment Catalyst</title>
 <style>
-  /* "Where the data comes from": a left-to-right flow diagram, drawn from the model below. */
+  /* The admin page's home: a left-to-right flow diagram of every table, drawn from the model
+     below (made by diagram.py and app.py), with a details panel for each table. Excel tables
+     are downloaded and uploaded from their details. */
   :root {
     color-scheme: light dark;
     --bg: #f3f6f7;
@@ -23,6 +25,10 @@
     --quiet-soft: #eef2f3;
     --catchment: #b0245a;
     --catchment-soft: #fbe9f0;
+    --warn: #8a5a00;
+    --warn-soft: #fdf3dc;
+    --bad: #b3261e;
+    --bad-soft: #fce8e6;
     --on-solid: #ffffff;
     --focus: #2563eb;
     --shadow: 0 1px 2px rgba(20, 40, 50, .06), 0 3px 10px rgba(20, 40, 50, .05);
@@ -44,6 +50,10 @@
       --quiet-soft: #1f2a2f;
       --catchment: #ff8db4;
       --catchment-soft: #3a1b27;
+      --warn: #f0c063;
+      --warn-soft: #33280f;
+      --bad: #ff8a80;
+      --bad-soft: #3a1a18;
       --on-solid: #10171a;
       --focus: #93b4ff;
       --shadow: none;
@@ -75,9 +85,18 @@
 
   main { max-width: 1360px; margin: 0 auto; padding: 24px 32px 104px; }
 
+  /* Top bar (as on the admin page's other pages) */
+  .bar {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px;
+    padding: 12px 16px; background: var(--card); border-bottom: 1px solid var(--border);
+  }
+  .brand { font-weight: 700; color: var(--text); text-decoration: none; }
+  .brand span { color: var(--api); font-weight: 600; }
+  .who { display: flex; align-items: center; gap: 12px; margin: 0; font-size: .95rem; color: var(--muted); }
+  .link { background: none; border: none; padding: 0; font: inherit; color: var(--api); text-decoration: underline; cursor: pointer; }
+  .message { margin: 0 0 16px; padding: 12px 16px; border-radius: 10px; background: var(--api-soft); }
+
   /* Header */
-  .back { display: inline-block; font-size: .95rem; text-decoration: none; font-weight: 600; }
-  .back:hover { text-decoration: underline; }
   h1 { margin: 10px 0 2px; font-size: 2.1rem; line-height: 1.15; letter-spacing: -.01em; }
   .lead { margin: 0 0 18px; color: var(--muted); font-size: 1.08rem; max-width: 46em; }
 
@@ -361,6 +380,43 @@
     background: var(--f); color: var(--on-solid); font-weight: 700; text-decoration: none;
   }
   .btn:hover { filter: brightness(1.08); }
+  button.btn { border: 0; cursor: pointer; font: inherit; font-weight: 700; }
+  .btn.ghost { background: transparent; color: var(--f); box-shadow: inset 0 0 0 1.5px var(--f); }
+
+  /* Updating an Excel table */
+  .steps { list-style: none; margin: 0; padding: 0; counter-reset: step; display: grid; gap: 10px; }
+  .steps > li {
+    counter-increment: step; position: relative; padding: 12px 14px 14px 52px;
+    border: 1px solid var(--border); border-radius: 10px;
+  }
+  .steps > li::before {
+    content: counter(step); position: absolute; left: 14px; top: 11px; display: grid; place-items: center;
+    width: 26px; height: 26px; border-radius: 50%; background: var(--f); color: var(--on-solid); font-weight: 700; font-size: .85rem;
+  }
+  .step-name { display: block; font-weight: 700; line-height: 1.6; }
+  .steps p, .steps ul { margin: 4px 0 0; font-size: .92rem; }
+  .steps ul { padding-left: 18px; }
+  .steps li li + li { margin-top: 3px; }
+  .upload-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px; }
+  .upload-form input[type=file] { font: inherit; font-size: .9rem; max-width: 100%; }
+  .upload-form .btn { margin-top: 0; }
+  .alert { margin: 0 0 16px; padding: 12px 16px; border-radius: 10px; border: 1px solid; }
+  .alert p { margin: 4px 0 0; }
+  .alert ul { margin: 6px 0 0; padding-left: 20px; }
+  .alert.problems { background: var(--bad-soft); border-color: var(--bad); }
+  .alert.problems .a-head { color: var(--bad); }
+  .alert.waiting { background: var(--warn-soft); border-color: var(--warn); }
+  .alert.waiting .a-head { color: var(--warn); }
+  .alert .btn { margin-top: 8px; background: var(--warn); }
+  .a-head { display: block; font-weight: 700; }
+  #panel-body > .alert:first-child, #panel-body > .message:first-child { margin-top: 14px; }  /* clear of the title's focus ring */
+  .uploads { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 10px; }
+  .uploads > li { padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: .9rem; overflow-wrap: anywhere; }
+  .uploads > li:last-child { border-bottom: 0; }
+  .u-when { font-weight: 650; }
+  .u-what { display: block; color: var(--muted); }
+  .u-what a { font-weight: 650; }
+  .node-meta .waiting-tag { color: var(--warn); font-weight: 650; }
 
   .facts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
   .fact { padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: .9rem; line-height: 1.6; }
@@ -438,11 +494,18 @@
 </style>
 </head>
 <body>
+<header class="bar">
+  <a class="brand" href="/admin">Catchment Catalyst <span>admin</span></a>
+  <form class="who" method="post" action="/admin/logout">
+    <span>Logged in as <strong>{{ user }}</strong></span>
+    <button class="link">Log out</button>
+  </form>
+</header>
 <main>
+  {% if message %}<p class="message" id="message" role="status">{{ message }}</p>{% endif %}
   <header>
-    <a class="back" href="/admin">← Admin</a>
-    <h1>Data map</h1>
-    <p class="lead">Where each table's data comes from, and how the tables join up. Click a table to see its columns.</p>
+    <h1>Your data</h1>
+    <p class="lead">Where each table's data comes from and how they join up. Click a table to see its columns, or to update it if it's filled in Excel.</p>
   </header>
 
   <ul class="legend" id="legend" aria-label="Key"></ul>
@@ -469,8 +532,9 @@
   </div>
 </aside>
 
-<script id="model" type="application/json">__DATA__</script>
+<script id="model" type="application/json">{{ model | tojson }}</script>
 <script>
+{% raw %}
 "use strict";
 
 /* ---------- What each way of filling a table is called ---------- */
@@ -531,6 +595,16 @@ function joinWords(words) {
   return words.slice(0, -1).join(", ") + " and " + words[words.length - 1];
 }
 function titleOf(t) { return t.title || t.name; }
+function isLocal(url) { return typeof url === "string" && /^\/(?!\/)/.test(url); }  // a link within this site
+function link(cls, url, text) {
+  const a = el("a", cls, text);
+  if (isLocal(url)) a.setAttribute("href", url);
+  return a;
+}
+function waitingUploads(t) {
+  const recent = t.update && Array.isArray(t.update.recent) ? t.update.recent : [];
+  return recent.filter(r => r.status === "preview");
+}
 function columnOf(t, name) { return (t.columns || []).find(c => c.name === name) || null; }
 function columnLabel(t, name) { const c = columnOf(t, name); return c ? (c.label || c.name) : name; }
 function columnLetters(i) {
@@ -707,6 +781,7 @@ function start() {
   let model;
   try { model = JSON.parse(document.getElementById("model").textContent); } catch (e) { model = { tables: [], links: [], sections: [] }; }
   const plan = makePlan(model);
+  const problems = model.problems && plan.byName.has(model.problems.table) ? model.problems : null;
   const $ = id => document.getElementById(id);
   const flow = $("flow"), legend = $("legend"), caption = $("caption");
   const panel = $("panel"), panelBadge = $("panel-badge"), panelTitle = $("panel-title"), panelBody = $("panel-body");
@@ -722,7 +797,7 @@ function start() {
   /* Key */
   const keyItems = [
     { key: "fill:api", cls: "f-api", icon: "cloud", strong: FILLS.api.long, sub: "API · downloaded again when someone runs a command", n: plan.counts.api },
-    { key: "fill:excel", cls: "f-excel", icon: "sheet", strong: FILLS.excel.long, sub: "By you, in the admin page", n: plan.counts.excel },
+    { key: "fill:excel", cls: "f-excel", icon: "sheet", strong: FILLS.excel.long, sub: "By you, here", n: plan.counts.excel },
     { key: "fill:quiet", cls: "f-command quiet", icon: "terminal", strong: "Housekeeping", sub: "A database command or the admin page", n: plan.counts.quiet },
   ];
   for (const item of keyItems) {
@@ -868,7 +943,7 @@ function start() {
 
   function groupWords(g) {
     if (g.fill === "api") return { eyebrow: FILLS.api.long, name: g.source || "A website" };
-    if (g.fill === "excel") return { eyebrow: "Uploaded in the admin page", name: "You, in Excel" };
+    if (g.fill === "excel") return { eyebrow: "Uploaded here", name: "You, in Excel" };
     if (g.fill === "admin") return { eyebrow: "Housekeeping", name: "The admin page" };
     return { eyebrow: "Housekeeping", name: "A database command" };
   }
@@ -880,6 +955,8 @@ function start() {
     fw.append(icon(FILLS[f].icon, 14), document.createTextNode(FILLS[f].word));
     m.appendChild(fw);
     if (t.rows != null) { m.appendChild(el("span", null, "·")); m.appendChild(el("span", null, rowsText(t.rows))); }
+    const waiting = waitingUploads(t).length;
+    if (waiting) { m.appendChild(el("span", null, "·")); m.appendChild(el("span", "waiting-tag", waiting + " to approve")); }
     return m;
   }
 
@@ -988,7 +1065,7 @@ function start() {
     } else if (key === "fill:api") {
       put(FILLS.api.long, ": downloaded again only when someone runs the command shown in each table's details.");
     } else if (key === "fill:excel") {
-      put(FILLS.excel.long, ": you download and upload these as Excel files in the admin page.");
+      put(FILLS.excel.long, ": you download these, change them in Excel and upload them again here. Click one to start.");
     } else if (key === "fill:quiet") {
       put("Housekeeping", ": changed with a database command, or kept by the admin page as you use it.");
     } else if (key === "link" && plan.hub) {
@@ -1108,6 +1185,7 @@ function start() {
     panelTitle.textContent = titleOf(t);
 
     const out = [];
+    if (problems && problems.table === t.name) out.push(problemsBox(problems));
     const tech = el("p", "tech");
     tech.append(document.createTextNode("In the database: "), el("code", null, t.name));
     out.push(tech);
@@ -1137,6 +1215,9 @@ function start() {
       facts.appendChild(fact);
     }
     if (facts.childNodes.length) out.push(facts);
+
+    // 4b. Updating it (Excel tables)
+    if (t.update && f === "excel") out.push(...updateBlock(t, t.update));
 
     // 5. Columns
     if ((t.columns || []).length) out.push(...columnsBlock(t));
@@ -1175,16 +1256,116 @@ function start() {
         box.append(cmd, status);
       }
     } else if (f === "excel") {
-      box.appendChild(el("p", null, "You upload it as an Excel file in the admin page. You can download the table there too, change it, and upload it again."));
-      if (typeof t.admin_url === "string" && /^\/(?!\/)/.test(t.admin_url)) {
-        const a = el("a", "btn", "Download or upload in the admin page →");
-        a.setAttribute("href", t.admin_url);
-        box.appendChild(a);
-      }
+      box.appendChild(el("p", null, "You keep it up to date: download it, change it in Excel, and upload it again (below)."));
+      const last = t.update && t.update.last;
+      box.appendChild(el("p", "muted", last ? "Last updated " + last.when + " by " + last.who + "." : "Not uploaded yet."));
     } else if (t.note) {
       box.appendChild(el("p", null, t.note));
     }
     return box;
+  }
+
+  function problemsBox(p) {
+    const box = el("div", "alert problems");
+    box.setAttribute("role", "alert");
+    box.appendChild(el("strong", "a-head", (p.file || "The file") + " can't be used yet"));
+    const n = (p.items || []).length + (p.more || 0);
+    box.appendChild(el("p", null, "Nothing has been changed. Fix " + (n === 1 ? "this" : "these") + " in the file, then upload it again:"));
+    const ul = el("ul");
+    for (const item of p.items || []) ul.appendChild(el("li", null, item));
+    box.appendChild(ul);
+    if (p.more) box.appendChild(el("p", null, "…and " + p.more + " more."));
+    return box;
+  }
+
+  function updateBlock(t, u) {
+    const out = [el("h3", null, "Update this table")];
+
+    for (const w of waitingUploads(t)) {
+      const box = el("div", "alert waiting");
+      box.appendChild(el("strong", "a-head", "An upload is waiting to be approved"));
+      box.appendChild(el("p", null, w.file + ", uploaded by " + w.who + ", " + w.when + ". Nothing changes until someone approves it."));
+      box.appendChild(link("btn", w.url, "Check the changes →"));
+      out.push(box);
+    }
+
+    const steps = el("ol", "steps");
+
+    const download = el("li");
+    download.append(
+      el("span", "step-name", "Download it"),
+      el("p", null, "Always start from a fresh download, so you don't undo changes someone else has uploaded since your last one."),
+    );
+    const dl = link("btn ghost", u.download_url, "Download as Excel");
+    dl.prepend(icon("down", 16));
+    download.appendChild(dl);
+
+    const edit = el("li");
+    const rules = el("ul");
+    const replaces = el("li");
+    replaces.append(
+      document.createTextNode("Add, change or delete rows. The upload "),
+      el("strong", null, "replaces the whole table"),
+      document.createTextNode(", so a row you delete from the file is deleted from the table."),
+    );
+    rules.append(replaces, el("li", null, "Keep the column names in row 1 as they are, and the data on the first sheet."));
+    const key = Array.isArray(u.key) ? u.key : [];
+    if (key.length) {
+      const once = el("li");
+      once.appendChild(document.createTextNode(key.length > 1 ? "Each combination of " : "Each "));
+      key.forEach((name, i) => {
+        if (i > 0) once.appendChild(document.createTextNode(i === key.length - 1 ? " and " : ", "));
+        once.appendChild(el("code", null, name));
+      });
+      once.appendChild(document.createTextNode(" can only appear once."));
+      rules.appendChild(once);
+    }
+    rules.appendChild(el("li", null, "What each column means is under Columns, below."));
+    edit.append(el("span", "step-name", "Edit it in Excel"), rules);
+
+    const upload = el("li");
+    upload.append(
+      el("span", "step-name", "Upload it"),
+      el("p", null, "You'll see what will be added, changed and deleted before anything is saved."),
+    );
+    if (isLocal(u.upload_url)) {
+      const form = el("form", "upload-form");
+      form.method = "post";
+      form.enctype = "multipart/form-data";
+      form.setAttribute("action", u.upload_url);
+      const file = el("input");
+      file.type = "file";
+      file.name = "file";
+      file.required = true;
+      file.accept = ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      file.setAttribute("aria-label", "Excel file to upload to " + titleOf(t));
+      const go = el("button", "btn", "Upload and preview");
+      go.type = "submit";
+      form.append(file, go);
+      upload.appendChild(form);
+    }
+    steps.append(download, edit, upload);
+    out.push(steps);
+
+    out.push(el("h3", null, "Recent uploads"));
+    const recent = Array.isArray(u.recent) ? u.recent : [];
+    if (!recent.length) {
+      out.push(el("p", "none", "Nothing has been uploaded to this table yet."));
+      return out;
+    }
+    const list = el("ul", "uploads");
+    for (const r of recent) {
+      const li = el("li");
+      li.append(el("span", "u-when", r.when), document.createTextNode(" · " + r.who + " · "), link(null, r.file_url, r.file));
+      const what = el("span", "u-what");
+      if (r.status === "approved") what.textContent = "Approved: " + r.added + " added, " + r.changed + " changed, " + r.removed + " deleted";
+      else if (r.status === "preview") what.appendChild(link(null, r.url, "Waiting to be checked and approved →"));
+      else what.textContent = "Cancelled";
+      li.appendChild(what);
+      list.appendChild(li);
+    }
+    out.push(list, el("p", "hint", "To go back to an earlier version, download its file here and upload it again."));
+    return out;
   }
 
   function copyText(text, code, label, status) {
@@ -1371,11 +1552,15 @@ function start() {
 
   /* Go */
   trace();
-  const first = hashName();
+  if (problems) history.replaceState(null, "", "/admin");  // the page was the answer to an upload
+  const first = problems ? problems.table : hashName();
   if (first && plan.byName.has(first)) openDetails(first, null, true);
+  const message = $("message");
+  if (message && current) panelBody.prepend(message);  // where it'll be seen
 }
 
 if (typeof document !== "undefined" && document.getElementById("model")) start();
+{% endraw %}
 </script>
 </body>
 </html>

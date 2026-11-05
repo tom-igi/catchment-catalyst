@@ -147,7 +147,6 @@
   <a class="brand" href="/admin">Catchment Catalyst <span>admin</span></a>
   {% if user %}
   <form class="who" method="post" action="/admin/logout">
-    {% if data_map %}<a href="/admin/data-map">Data map</a>{% endif %}
     <span>Logged in as <strong>{{ user }}</strong></span>
     <button class="link">Log out</button>
   </form>

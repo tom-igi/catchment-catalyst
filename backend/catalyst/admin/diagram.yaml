@@ -1,5 +1,6 @@
-# The sections of the data map page, in order: the core tables in each, and a
-# short explanation shown above them.
+# The admin page's diagram of every table (see diagram.py).
+#
+# The sections, in order: the core tables in each, and a short explanation.
 #
 # The data tables (one per dataset) always come last, in their own section. A
 # core table that isn't listed here still appears, under "Other tables", so
@@ -29,8 +30,8 @@ sections:
 
   - title: Uploads
     description: >-
-      A record of every Excel file uploaded in the admin page: who uploaded
-      it, when, and what it changed. The files themselves are kept too.
+      A record of every Excel file uploaded here: who uploaded it, when, and
+      what it changed. The files themselves are kept too.
     tables: [uploads]
 
 data_tables:
@@ -39,7 +40,7 @@ data_tables:
     One table per dataset, such as EA scores or habitat. Every row belongs to
     a catchment, linked by Catchment ID.
 
-# How each table gets its data, shown on each table in the data map.
+# How each table gets its data, shown when a table is clicked.
 # Tables marked `filled_by: api` in schema.yaml give where they're downloaded from and
 # the importer command that downloads them again. The rest say who changes them:
 #   command  someone changes it with a database command

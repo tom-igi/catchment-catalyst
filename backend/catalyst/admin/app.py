@@ -1,12 +1,15 @@
 """The admin page's web pages.
 
-    /admin                       choose a table
-    /admin/tables/<table>        download it, upload an edited copy, recent uploads
-    /admin/uploads/<id>          preview what an upload will change; approve or cancel
-    /admin/data-map              every table in plain English (if catalyst/datamap is there)
+    /admin                            every table, as a diagram (see diagram.py). Click a
+                                      table to see its columns; for an Excel table, to
+                                      download it, upload an edited copy, and see its uploads
+    /admin/tables/<table>/download    the table as an Excel file
+    /admin/tables/<table>/upload      upload an edited copy
+    /admin/uploads/<id>               preview what an upload will change; approve or cancel
 
 Every page needs a login. Only tables marked `filled_by: excel` in schema.yaml
-appear, and each works the same way (see catalyst.importers.excel).
+can be downloaded and uploaded, and each works the same way (see
+catalyst.importers.excel).
 """
 
 from __future__ import annotations
@@ -18,7 +21,7 @@ from zoneinfo import ZoneInfo
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
@@ -26,19 +29,14 @@ from starlette.middleware.sessions import SessionMiddleware
 from catalyst.db import load_schema
 from catalyst.importers import excel
 
-from . import passwords, uploads
+from . import diagram, passwords, uploads
 from .settings import Settings
-
-try:  # the data map is optional: see catalyst/datamap/README.md
-    import catalyst.datamap as datamap
-except ModuleNotFoundError as e:
-    if e.name != "catalyst.datamap":
-        raise
-    datamap = None
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 MAX_UPLOAD_MB = 20
 ROWS_SHOWN = 200  # per section of the preview
+PROBLEMS_SHOWN = 50
+RECENT_UPLOADS = 10  # per table
 LOGIN_HOURS = 12
 UK = ZoneInfo("Europe/London")
 
@@ -113,6 +111,66 @@ def log_out(request: Request):
     return RedirectResponse("/admin/login", 303)
 
 
+# --- The diagram of every table ---------------------------------------------------
+
+@router.get("")
+def home(request: Request, user: User):
+    return _render_home(request)
+
+
+@router.get("/data-map", include_in_schema=False)
+def old_data_map():  # where the diagram used to be
+    return RedirectResponse("/admin", 303)
+
+
+def _render_home(request: Request, status_code: int = 200, problems: dict | None = None):
+    """The diagram, with each Excel table's uploads. `problems` are an upload's, shown in its table's details."""
+    state = request.app.state
+    schema = state.schema
+    try:
+        with state.engine.connect() as conn:
+            counts = {t.name: _count(conn, t) for t in schema.metadata.tables.values()}
+    except sa.exc.DBAPIError:  # e.g. a table that isn't made yet: show the page without row counts
+        counts = None
+    try:
+        model = diagram.model(schema, counts)
+    except ValueError as e:  # e.g. diagram.yaml names a table that's been renamed
+        raise HTTPException(500, f"The page couldn't be made: {e}") from e
+    with state.engine.connect() as conn:
+        last = uploads.last_approved(conn, schema)
+        for t in model["tables"]:
+            if t["name"] in schema.excel_tables:
+                t["update"] = _excel_details(conn, state, schema.metadata.tables[t["name"]], last.get(t["name"]))
+    if problems:
+        model["problems"] = problems
+    return _render(request, "home.html", model=model, status_code=status_code)
+
+
+def _excel_details(conn: sa.Connection, state, table: sa.Table, last: sa.Row | None) -> dict:
+    """What a table's details need for downloading it, uploading it, and its recent uploads."""
+    return {
+        "download_url": f"/admin/tables/{table.name}/download",
+        "upload_url": f"/admin/tables/{table.name}/upload",
+        "key": excel.key_columns(table),
+        "last": {"when": _when(last.approved_at), "who": last.uploaded_by} if last else None,
+        "recent": [
+            {
+                "id": u.id,
+                "when": _when(u.uploaded_at),
+                "who": u.uploaded_by,
+                "file": u.file_name,
+                "file_url": f"/admin/uploads/{u.id}/file",
+                "url": f"/admin/uploads/{u.id}",
+                "status": u.status,
+                "added": u.rows_added,
+                "changed": u.rows_changed,
+                "removed": u.rows_removed,
+            }
+            for u in uploads.recent(conn, state.schema, table.name, RECENT_UPLOADS)
+        ],
+    }
+
+
 # --- Tables ----------------------------------------------------------------------
 
 def excel_table(request: Request, table_name: str, user: User) -> sa.Table:
@@ -125,19 +183,9 @@ def excel_table(request: Request, table_name: str, user: User) -> sa.Table:
 ExcelTable = Annotated[sa.Table, Depends(excel_table)]
 
 
-@router.get("")
-def home(request: Request, user: User):
-    schema = request.app.state.schema
-    tables = [schema.metadata.tables[name] for name in schema.excel_tables]
-    with request.app.state.engine.connect() as conn:
-        counts = {t.name: _count(conn, t) for t in tables}
-        last = uploads.last_approved(conn, schema)
-    return _render(request, "home.html", tables=tables, counts=counts, last=last)
-
-
 @router.get("/tables/{table_name}")
-def table_page(request: Request, table: ExcelTable):
-    return _render_table(request, table)
+def table_page(table: ExcelTable):  # each table's own page, before the diagram had its details
+    return RedirectResponse(_home(table), 303)
 
 
 @router.get("/tables/{table_name}/download")
@@ -156,35 +204,39 @@ def download(request: Request, table: ExcelTable):
 def upload(request: Request, user: User, table: ExcelTable, file: Annotated[UploadFile | None, File()] = None):
     state = request.app.state
     if file is None or not file.filename:
-        return _render_table(request, table, problems=["Choose a file to upload."], status_code=422)
+        return _upload_problems(request, table, None, ["Choose a file to upload."])
     data = file.file.read(MAX_UPLOAD_MB * 1024 * 1024 + 1)
     if len(data) > MAX_UPLOAD_MB * 1024 * 1024:
         problems = [f"The file is bigger than {MAX_UPLOAD_MB} MB, which is too big for one table."]
-        return _render_table(request, table, problems=problems, file_name=file.filename, status_code=422)
+        return _upload_problems(request, table, file.filename, problems)
     try:
         rows = excel.read_upload(table, data)
         with state.engine.begin() as conn:
             comparison = excel.compare(conn, table, rows)
             if not comparison.has_changes:
                 request.session["message"] = f"{file.filename} is the same as the table, so there's nothing to change."
-                return RedirectResponse(f"/admin/tables/{table.name}", 303)
+                return RedirectResponse(_home(table), 303)
             upload_id = uploads.create(
                 conn, state.schema, state.settings.raw_files_dir, table, file.filename, data, user, len(rows), comparison
             )
     except excel.UploadError as e:
-        return _render_table(request, table, problems=e.problems, file_name=file.filename, status_code=422)
+        return _upload_problems(request, table, file.filename, e.problems)
     return RedirectResponse(f"/admin/uploads/{upload_id}", 303)
 
 
-def _render_table(request: Request, table: sa.Table, status_code: int = 200, **context):
-    state = request.app.state
-    with state.engine.connect() as conn:
-        count = _count(conn, table)
-        recent = uploads.recent(conn, state.schema, table.name)
-    return _render(
-        request, "table.html", table=table, count=count, recent=recent,
-        key=excel.key_columns(table), status_code=status_code, **context,
-    )
+def _upload_problems(request: Request, table: sa.Table, file_name: str | None, problems: list[str]):
+    """The diagram again, with the table's details open and the file's problems in them."""
+    return _render_home(request, status_code=422, problems={
+        "table": table.name,
+        "file": file_name,
+        "items": problems[:PROBLEMS_SHOWN],
+        "more": max(len(problems) - PROBLEMS_SHOWN, 0),
+    })
+
+
+def _home(table: sa.Table) -> str:
+    """The diagram, with the table's details open."""
+    return f"/admin#{table.name}"
 
 
 # --- Uploads ---------------------------------------------------------------------
@@ -238,7 +290,7 @@ def approve(request: Request, user: User, upload_id: int, check: Annotated[str, 
         f"Done. {_title(table)} now matches {upload.file_name}: {len(comparison.added)} added, "
         f"{len(comparison.changed)} changed, {len(comparison.removed)} deleted."
     )
-    return RedirectResponse(f"/admin/tables/{table.name}", 303)
+    return RedirectResponse(_home(table), 303)
 
 
 @router.post("/uploads/{upload_id}/cancel")
@@ -251,7 +303,7 @@ def cancel(request: Request, user: User, upload_id: int):
             return RedirectResponse(f"/admin/uploads/{upload_id}", 303)
         uploads.cancel(conn, state.schema, upload_id)
     request.session["message"] = f"Cancelled {upload.file_name}. Nothing has been changed."
-    return RedirectResponse(f"/admin/tables/{upload.table_name}", 303)
+    return RedirectResponse(_home(state.schema.metadata.tables[upload.table_name]), 303)
 
 
 @router.get("/uploads/{upload_id}/file")
@@ -263,24 +315,6 @@ def upload_file(request: Request, user: User, upload_id: int):
     if not path.is_file():
         raise HTTPException(404, f"The file for upload {upload_id} isn't there any more ({upload.stored_as}).")
     return FileResponse(path, media_type=XLSX, filename=upload.file_name)
-
-
-# --- Data map --------------------------------------------------------------------
-
-if datamap:
-    @router.get("/data-map")
-    def data_map(request: Request, user: User):
-        state = request.app.state
-        try:
-            with state.engine.connect() as conn:
-                counts = {t.name: _count(conn, t) for t in state.schema.metadata.tables.values()}
-        except sa.exc.DBAPIError:  # e.g. a table that isn't made yet: show the page without row counts
-            counts = None
-        try:
-            page = datamap.render(state.schema, counts)
-        except ValueError as e:  # e.g. sections.yaml names a table that's been renamed
-            raise HTTPException(500, f"The data map couldn't be made: {e}") from e
-        return HTMLResponse(page)
 
 
 def _get_upload(conn: sa.Connection, state, upload_id: int, for_update: bool = False) -> sa.Row:
@@ -319,7 +353,7 @@ def _database_error_page(request: Request, exc: sa.exc.DBAPIError):
 
 def _templates() -> Jinja2Templates:
     templates = Jinja2Templates(directory=Path(__file__).with_name("templates"))
-    templates.env.globals.update(title=_title, type_label=excel.type_label, data_map=datamap is not None)
+    templates.env.globals.update(title=_title)
     templates.env.filters.update(cell=_cell, when=_when, rows=_rows)
     return templates
 

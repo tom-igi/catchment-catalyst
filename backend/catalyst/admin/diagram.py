@@ -1,14 +1,18 @@
-"""Make the data map page from the master schema file.
+"""The facts behind the admin page's diagram of every table.
 
-The admin page shows it at /admin/data-map. `model` gathers the facts: every
-table and column from schema.yaml, plus the sections, how each table is filled
-and the extra links from sections.yaml. `render` puts them, as JSON, into
-page.html, whose script draws the diagram. The page has no outside files.
+`model` gathers them: every table and column from schema.yaml (each table's
+`title`, `description` and `filled_by`, each column's `description` and
+`example`), plus the sections, where each downloaded table comes from and the
+extra links from diagram.yaml. The admin page adds the row counts and the Excel
+uploads, and templates/home.html draws the diagram from them.
+
+It's made each time the page is opened, so it always matches the schema.yaml
+the admin page is running. When you add a table filled by an importer, add it
+under `filled` in diagram.yaml, or the page can't say where it comes from.
 """
 
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,8 +24,7 @@ from sqlalchemy.dialects import postgresql
 
 from catalyst.db.schema import CATCHMENT_REFERENCE, Schema, load_schema
 
-HERE = Path(__file__).parent
-PLACEHOLDER = "__DATA__"
+DIAGRAM_FILE = Path(__file__).with_name("diagram.yaml")
 FILLS = {"api", "excel", "command", "admin"}
 
 MAP_SHAPES = {
@@ -44,24 +47,16 @@ class Section:
     data: bool = False  # the data tables section
 
 
-def render(schema: Schema | None = None, counts: dict[str, int] | None = None,
-           sections_file: Path = HERE / "sections.yaml") -> str:
-    """The page's HTML. `counts` is each table's number of rows, if known."""
-    page = (HERE / "page.html").read_text(encoding="utf-8")
-    data = json.dumps(model(schema, counts, sections_file), ensure_ascii=False)
-    return page.replace(PLACEHOLDER, data.replace("</", "<\\/"), 1)  # so no text can end the <script>
-
-
 def model(schema: Schema | None = None, counts: dict[str, int] | None = None,
-          sections_file: Path = HERE / "sections.yaml") -> dict:
-    """Every table, its columns, how it's filled and what it links to."""
+          diagram_file: Path = DIAGRAM_FILE) -> dict:
+    """Every table, its columns, how it's filled and what it links to. `counts` is each table's number of rows, if known."""
     schema = schema or load_schema()
-    config = yaml.safe_load(Path(sections_file).read_text(encoding="utf-8"))
+    config = yaml.safe_load(Path(diagram_file).read_text(encoding="utf-8"))
     filled = config.get("filled") or {}
     tables = schema.metadata.tables
     unknown = [name for name in filled if name not in tables]
     if unknown:
-        raise ValueError(f"The `filled` list in sections.yaml has {', '.join(unknown)}, which isn't in schema.yaml")
+        raise ValueError(f"The `filled` list in diagram.yaml has {', '.join(unknown)}, which isn't in schema.yaml")
 
     sections = _sections(schema, config)
     return {
@@ -78,19 +73,19 @@ def model(schema: Schema | None = None, counts: dict[str, int] | None = None,
 
 
 def _sections(schema: Schema, config: dict) -> list[Section]:
-    """The sections from sections.yaml, with every table in exactly one."""
+    """The sections from diagram.yaml, with every table in exactly one."""
     tables = schema.metadata.tables
     core = [name for name in tables if name not in schema.data_tables]
     sections, placed = [], set()
     for entry in config["sections"]:
         unknown = [name for name in entry["tables"] if name not in core]
         if unknown:
-            raise ValueError(f"catalyst/datamap/sections.yaml lists {', '.join(unknown)}, which isn't a core table in schema.yaml")
+            raise ValueError(f"catalyst/admin/diagram.yaml lists {', '.join(unknown)}, which isn't a core table in schema.yaml")
         sections.append(Section(entry["title"], entry["description"], [tables[name] for name in entry["tables"]]))
         placed.update(entry["tables"])
     others = [tables[name] for name in core if name not in placed]
     if others:
-        sections.append(Section("Other tables", "Core tables not yet given a section in catalyst/datamap/sections.yaml.", others))
+        sections.append(Section("Other tables", "Core tables not yet given a section in catalyst/admin/diagram.yaml.", others))
     data = config["data_tables"]
     sections.append(Section(data["title"], data["description"], [tables[n] for n in schema.data_tables], data=True))
     return [s for s in sections if s.tables]
@@ -112,7 +107,6 @@ def _table(table: sa.Table, schema: Schema, section: str, filled: dict, rows: in
         "source": filled.get("source"),
         "command": f"docker compose run --rm {filled['command']}" if filled.get("command") else None,
         "note": filled.get("note"),
-        "admin_url": f"/admin/tables/{table.name}" if fill == "excel" else None,
         "rows": rows,
         "one_row_per": [_label(c) for c in key] if len(key) > 1 else None,
         "columns": [_column(c, len(key)) for c in table.columns],
@@ -153,11 +147,11 @@ def _links(schema: Schema, extra: list[dict]) -> list[dict]:
     for entry in extra:
         table_name, _, column_name = entry["from"].partition(".")
         if table_name not in tables or column_name not in tables[table_name].columns:
-            raise ValueError(f"The `links` list in sections.yaml has {entry['from']}, which isn't in schema.yaml")
+            raise ValueError(f"The `links` list in diagram.yaml has {entry['from']}, which isn't in schema.yaml")
         column = tables[table_name].columns[column_name]
         for target in groups.get(entry["to"], [entry["to"]]):
             if target not in tables:
-                raise ValueError(f"The `links` list in sections.yaml links to {target}, which isn't in schema.yaml")
+                raise ValueError(f"The `links` list in diagram.yaml links to {target}, which isn't in schema.yaml")
             kind = "list" if isinstance(column.type, sa.ARRAY) else "name"
             links.append({"from": table_name, "column": column_name, "to": target, "kind": kind, "required": not column.nullable})
     return links

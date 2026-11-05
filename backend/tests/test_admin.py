@@ -1,6 +1,10 @@
-"""The admin page: logging in, and uploading an Excel file through to approval."""
+"""The admin page: logging in, and uploading an Excel file through to approval.
+
+The page itself (the diagram of every table) is tested in test_diagram.py.
+"""
 
 import io
+import json
 import re
 
 import pytest
@@ -18,6 +22,7 @@ from .test_excel import EAST, HEADINGS, WEST, add_catchments, ea_scores, xlsx
 
 PASSWORD = "a long test password"
 SCORES = xlsx(HEADINGS, (WEST, "Fish", 2025, "Poor", 0.16), (EAST, "Fish", 2025, "Good", 0.7))
+MODEL_TAG = re.compile(r'<script id="model" type="application/json">(.*?)</script>', re.S)
 
 
 @pytest.fixture
@@ -50,6 +55,16 @@ def approve(client, upload_id):
     page = client.get(f"/admin/uploads/{upload_id}").text
     check = re.search(r'name="check" value="(\w+)"', page).group(1)
     return client.post(f"/admin/uploads/{upload_id}/approve", data={"check": check})
+
+
+def page_model(page: str) -> dict:
+    """What the admin page's diagram is drawn from."""
+    return json.loads(MODEL_TAG.search(page).group(1))
+
+
+def table_details(client, table="ea_scores") -> dict:
+    """What the admin page knows about a table."""
+    return next(t for t in page_model(client.get("/admin").text)["tables"] if t["name"] == table)
 
 
 def uploads_table(app) -> list[tuple]:
@@ -107,11 +122,20 @@ def test_settings_must_be_set(monkeypatch):
 
 # --- Uploading -------------------------------------------------------------------
 
-def test_only_tables_filled_by_excel_are_shown(client):
-    page = client.get("/admin").text
-    assert "EA Scores" in page and "Habitat &amp; Land Use" in page
-    assert "Catchments" not in page
-    assert client.get("/admin/tables/catchments").status_code == 404
+def test_only_tables_filled_by_excel_can_be_updated(app, client):
+    tables = page_model(client.get("/admin").text)["tables"]
+    assert {t["name"] for t in tables if "update" in t} == set(app.state.schema.excel_tables) == {"ea_scores", "habitat_land_use"}
+    assert table_details(client)["update"]["download_url"] == "/admin/tables/ea_scores/download"
+    assert table_details(client)["update"]["key"] == ["catchment_id", "measure", "year"]
+    for path in ["/admin/tables/catchments", "/admin/tables/catchments/download"]:
+        assert client.get(path).status_code == 404
+    assert upload(client, SCORES, table="catchments").status_code == 404
+
+
+def test_old_addresses_go_to_the_admin_page(client):
+    response = client.get("/admin/tables/ea_scores", follow_redirects=False)
+    assert response.headers["location"] == "/admin#ea_scores"  # with its details open
+    assert client.get("/admin/data-map", follow_redirects=False).headers["location"] == "/admin"
 
 
 def test_download_upload_preview_and_approve(app, client, tmp_path):
@@ -123,10 +147,14 @@ def test_download_upload_preview_and_approve(app, client, tmp_path):
     preview = client.get("/admin/uploads/1").text
     assert "Check the changes" in preview and "October scores.xlsx" in preview
     assert ea_scores(app.state.engine) == []  # nothing changes before approval
+    (waiting,) = table_details(client)["update"]["recent"]
+    assert (waiting["status"], waiting["url"], waiting["file"]) == ("preview", "/admin/uploads/1", "October scores.xlsx")
 
     page = approve(client, 1)
-    assert page.url.path == "/admin/tables/ea_scores"
+    assert page.history[-1].headers["location"] == "/admin#ea_scores"  # back to the table's details
     assert "Done. EA Scores now matches October scores.xlsx: 2 added, 0 changed, 0 deleted." in page.text
+    details = next(t for t in page_model(page.text)["tables"] if t["name"] == "ea_scores")
+    assert (details["rows"], details["update"]["last"]["who"], details["update"]["recent"][0]["status"]) == (2, "tom", "approved")
     assert ea_scores(app.state.engine) == [(WEST, "Fish", 2025, "Poor", 0.16), (EAST, "Fish", 2025, "Good", 0.7)]
     assert uploads_table(app) == [(1, "ea_scores", "tom", "approved", 2, 0, 0)]
     (kept,) = (tmp_path / "ea_scores").iterdir()
@@ -135,14 +163,16 @@ def test_download_upload_preview_and_approve(app, client, tmp_path):
 
     # Uploading the same file again changes nothing, so there's nothing to approve.
     page = upload(client, SCORES)
-    assert page.headers["location"] == "/admin/tables/ea_scores"
+    assert page.headers["location"] == "/admin#ea_scores"
     assert "is the same as the table, so there&#39;s nothing to change" in client.get(page.headers["location"]).text
 
 
 def test_problems_are_shown_and_nothing_is_kept(app, client, tmp_path):
     response = upload(client, xlsx(HEADINGS, ("GB999", "Fish", "soon", None, None)))
     assert response.status_code == 422
-    assert "Row 2, year: &#39;soon&#39; isn&#39;t a whole number." in response.text
+    problems = page_model(response.text)["problems"]  # shown in the table's details, opened by the page
+    assert (problems["table"], problems["file"], problems["more"]) == ("ea_scores", "scores.xlsx", 0)
+    assert "Row 2, year: 'soon' isn't a whole number." in problems["items"]
     assert uploads_table(app) == []
     assert list(tmp_path.iterdir()) == []
 
@@ -176,6 +206,7 @@ def test_a_preview_that_is_out_of_date_is_not_approved(app, client):
 def test_cancelling(app, client):
     upload(client, SCORES)
     page = client.post("/admin/uploads/1/cancel")
+    assert page.history[-1].headers["location"] == "/admin#ea_scores"
     assert "Cancelled scores.xlsx. Nothing has been changed." in page.text
     assert "already been cancelled" in approve_anyway(client, 1).text
     assert ea_scores(app.state.engine) == []

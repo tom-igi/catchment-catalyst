@@ -45,11 +45,11 @@
 #                  deleted: cascade (delete this row too) | set null |
 #                  restrict. If left out, the delete is refused.
 #    renamed_from  The column's previous name (see RENAMING above).
-#    example       An example value, shown on the data map page
-#                  (catalyst/datamap/). Not stored in the database.
+#    example       An example value, shown on the admin page when the table
+#                  is clicked (catalyst/admin/diagram.py). Not stored in the database.
 #
 #  Table options:  title, description, filled_by, columns, indexes, renamed_from
-#    title         Friendly name, e.g. EA Scores. Shown on the data map page.
+#    title         Friendly name, e.g. EA Scores. Shown on the admin page.
 #    filled_by     How the table gets its data:
 #                    api    an importer downloads it from an outside service
 #                           (code in backend/catalyst/importers/api/)

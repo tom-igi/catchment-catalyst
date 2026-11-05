@@ -21,9 +21,9 @@ backend/                     all Python code, built into one Docker image
   catalyst/importers/api/    tables filled from outside sources (the EA's catchments, classifications, RNAGs,
                              storm overflows; River Obstacles)
   catalyst/importers/excel/  tables filled by Excel upload (one shared piece of code for all of them)
-  catalyst/admin/            the admin page: log in, download a table, upload it, preview, approve
+  catalyst/admin/            the admin page: a diagram of every table (diagram.py, diagram.yaml);
+                             download an Excel table, upload it, preview, approve
   catalyst/publish/          the publish step: writes each location's dashboard as web pages
-  catalyst/datamap/          optional data map page in the admin page: every table in plain English
   tests/
 imports/                     lists of what to import, and copies of every download and upload (see imports/README.md)
 published/                   the published dashboards (not in git; see published/README.md)
@@ -44,8 +44,11 @@ docker compose run --rm test            # run the backend tests
 The admin page is at <http://localhost:8000/admin> (name `admin`, password `admin`), and the
 published dashboards at <http://localhost:8080>.
 
-The data map (a diagram of every table: where its data comes from and how they join up) is in
-the admin page: click **Data map** at the top, or go to <http://localhost:8000/admin/data-map>.
+The admin page is a diagram of every table: where its data comes from and how they join up.
+Click a table to see its columns; for a table filled by Excel upload, that's also where you
+download it and upload an edited copy. It's made from `schema.yaml` each time it's opened, plus
+`backend/catalyst/admin/diagram.yaml` (the sections, and where each downloaded table comes
+from: add a new importer's table there).
 
 To connect a database client (DBeaver, pgAdmin, etc.): host `localhost`, port `5434`,
 database / user / password `catalyst`. To change these, copy `.env.example` to `.env`.

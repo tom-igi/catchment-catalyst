@@ -15,12 +15,12 @@ Tom to run things himself, 29 October 2026).
 ```bash
 docker compose up -d                      # start the local database, admin page and dashboard preview
 docker compose run --rm schema plan       # should say "The database already matches schema.yaml."
-docker compose run --rm test              # run the tests (127 passing at the last update)
+docker compose run --rm test              # run the tests (128 passing at the last update)
 docker compose run --rm publish           # rebuild the dashboard pages from the database
 ```
 
-- Admin page: <http://localhost:8000/admin> (name `admin`, password `admin`)
-- Data map: <http://localhost:8000/admin/data-map> (or **Data map** at the top of the admin page)
+- Admin page: <http://localhost:8000/admin> (name `admin`, password `admin`): a diagram of every
+  table; click an Excel table to download or upload it
 - Dashboard: <http://localhost:8080>
 
 The local database is on `localhost:5434` (database, user and password are all `catalyst`),
@@ -40,11 +40,10 @@ and optional extras are kept self-contained so they're easy to remove.
 | **Catchments importer** | `backend/catalyst/importers/api/`, `imports/` | Fills the catchments table from the EA's Catchment Data Explorer, for the management catchments (all their rivers) and IDs in `imports/catchments.json`. Preview first, safe to re-run, keeps the downloaded files. |
 | **EA and River Obstacles importers** | `backend/catalyst/importers/api/` | For every imported catchment: the EA's classifications and RNAGs (`importer classifications`), storm overflow spills from the EA's yearly returns (`importer storm-overflows`), and obstacles from River Obstacles (`importer river-obstacles`). Each replaces its table, with a preview first, and keeps the downloads. |
 | **Excel uploads** | `backend/catalyst/importers/excel/` | For every table marked `filled_by: excel`: download it as Excel, upload an edited copy, see what will be added, changed and deleted, then approve. No code per table. |
-| **Admin page** | `backend/catalyst/admin/` | The web page for the Excel uploads, with a login (one name and password per person). Runs with `docker compose up -d`. |
+| **Admin page** | `backend/catalyst/admin/` | One page behind a login (one name and password per person): a diagram of every table (`diagram.py`, `diagram.yaml`) showing where its data comes from (downloaded or Excel), how the tables join up by Catchment ID, and each table's columns when clicked. Excel tables are downloaded and uploaded from there; the upload's preview is its own page. Made from `schema.yaml` each time it's opened. Runs with `docker compose up -d`. |
 | **Publish step and dashboard** | `backend/catalyst/publish/`, `published/` | Writes each location's dashboard as plain web pages, laid out like the original (`Reference/ReferenceImages`): River Status, EA Data, Land Use Data and Sewerage Data (the Overview is built but switched off for now). Panels with a table are filled in (map colours, classifications, failing elements, RNAGs, catchment details, Habitat & Land Use, river obstacles, storm overflow spills); the rest are empty until their table exists. Previewed at <http://localhost:8080>. |
-| **Data map** | `backend/catalyst/datamap/` | A diagram of every table, in the admin page at `/admin/data-map` (login needed): where each table's data comes from (downloaded or Excel), how they join up by Catchment ID, and its columns when clicked. Made from `schema.yaml` (and `sections.yaml` in its folder) each time it's opened. Self-contained: deleting the folder removes it (see its `README.md`). |
 | **Dev and live setup** | `docker-compose*.yml`, `.env*.example` | The same commands on your machine and on the live server. Only the settings differ. |
-| **Tests** | `backend/tests/` | Cover the schema tool, the importers, the Excel uploads, the admin page, the publish step and the data map. |
+| **Tests** | `backend/tests/` | Cover the schema tool, the importers, the Excel uploads, the admin page (and its diagram) and the publish step. |
 
 ### Tables so far
 
@@ -90,7 +89,7 @@ show on the dashboard. They were uploaded through the admin page on 29 October 2
 - **Upstream and downstream are stored as lists of IDs on `catchments`.** Names are looked up there. Estuaries aren't imported yet, so a few won't find a name.
 
 **Filling tables: API or Excel**
-- **Each table says how it's filled** with `filled_by` in the master file: `api` (an importer, in `importers/api/`) or `excel` (the admin page, using the shared code in `importers/excel/`). The admin page only lists `excel` tables, and the data map shows which is which.
+- **Each table says how it's filled** with `filled_by` in the master file: `api` (an importer, in `importers/api/`) or `excel` (the admin page, using the shared code in `importers/excel/`). Only `excel` tables can be downloaded and uploaded in the admin page, and its diagram shows which is which.
 - **An upload is an exact copy of the table.** Same column names (any order), first sheet. No column mapping screen and no code per table, which answers the old "mapping screen or importers?" question for now.
 - **Each upload replaces the whole table**, rather than only adding rows. One process covers adding, correcting and deleting, so no editing screen is needed. The workflow is: download, edit, upload.
 - **The preview is the safety net.** It lists every row to be added, changed and deleted, and warns about deletions (strongly if it would empty the table). Nothing changes until someone approves.
@@ -105,7 +104,7 @@ show on the dashboard. They were uploaded through the admin page on 29 October 2
 - **Microsoft accounts (Entra ID) later,** only if many more people need access.
 
 **The dashboard**
-- **Plain web pages, not a JavaScript app.** The dashboard only shows data (tables and a simple map), so the publish step writes the data straight into the pages, as the data map does. There are no API calls and no build step. React and TypeScript were considered: they'd only pay off for a much more interactive dashboard.
+- **Plain web pages, not a JavaScript app.** The dashboard only shows data (tables and a simple map), so the publish step writes the data straight into the pages, as the admin page does with its diagram. There are no API calls and no build step. React and TypeScript were considered: they'd only pay off for a much more interactive dashboard.
 - **The publish step has two halves:** `collect.py` gathers a location's data and knows nothing about web pages; `site.py` and the templates turn it into pages. A different front end could reuse the first half.
 - **The pages copy the original dashboard's five tabs and colours** (29 October 2026). Each tab except the Overview has a page per catchment (`<tab>/<catchment ID>/`) and one before a catchment is chosen (`<tab>/`). Clicking the map stays on the same tab, as in the original.
 - **The Overview is switched off for now** (Tom, 29 October 2026; he'll bring it back later). It's still built and tested: `SHOW_OVERVIEW = True` in `site.py` brings it back as the front page. Until then the front page is River Status before a catchment is chosen.
@@ -139,7 +138,8 @@ show on the dashboard. They were uploaded through the admin page on 29 October 2
 - **Caddy for the web server** (when the VM is set up), rather than nginx, because it gets and renews the HTTPS certificates itself. It only does HTTPS and serving files: the login is in the Python app. Until it's added, the live admin page is only reachable through an SSH tunnel.
 - **Three Compose files:** shared, dev (loaded automatically) and live (chosen by `COMPOSE_FILE` in the server's `.env`). Passwords on the server have no defaults.
 - **The data map is a page in the admin site, behind the login** (Tom, 5 November 2026), rather than a file opened from disk or a page at an unlisted address. The admin page makes it from `schema.yaml` when it's opened, so there's no file to rebuild and it's on the live server with no extra setup.
-- **The data map is a flow diagram** (Tom, 5 November 2026), chosen from five designs: where the data comes from → tables → Catchments → dashboards, with a panel of details when a table is clicked. It replaced the original page of text and tables. More changes to it are to come.
+- **The data map is a flow diagram** (Tom, 5 November 2026), chosen from five designs: where the data comes from → tables → Catchments → dashboards, with a panel of details when a table is clicked. It replaced the original page of text and tables.
+- **The data map became the admin page** (Tom, 5 November 2026). Logging in goes straight to the diagram, headed "Your data"; the list of tables and each table's own page are gone. An Excel table's details panel has the download, the upload and its recent uploads (and any upload waiting to be approved, also shown on the table's box). The preview stays a full page, because it can list hundreds of rows; approving or cancelling goes back to the diagram with the table's panel open. An upload's problems are shown in the panel too. Its code moved from `datamap/` into `admin/` (`diagram.py`, `diagram.yaml`, `templates/home.html`), since it's no longer optional. The old addresses (`/admin/data-map`, `/admin/tables/<table>`) redirect to it.
 
 ---
 
