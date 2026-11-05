@@ -1,23 +1,1381 @@
-{% extends "base.html" %}
-{% block title %}Choose a table{% endblock %}
-{% block content %}
-<h1>Choose a table</h1>
-<p class="lead">
-  To update a table, download it as an Excel file, edit it, and upload it again.
-  You'll see exactly what will change before anything is saved.
-</p>
-<div class="tiles">
-  {% for table in tables %}
-  <a class="card tile" href="/admin/tables/{{ table.name }}">
-    <h2>{{ title(table) }}</h2>
-    <p>{{ table.comment or "" }}</p>
-    <p class="muted">
-      {{ counts[table.name] | rows }} ·
-      {% if last[table.name] %}last updated {{ last[table.name].approved_at | when }} by {{ last[table.name].uploaded_by }}{% else %}not uploaded yet{% endif %}
-    </p>
-  </a>
-  {% else %}
-  <p>No tables are filled by Excel upload yet. Mark one with <code>filled_by: excel</code> in schema.yaml.</p>
-  {% endfor %}
-</div>
-{% endblock %}
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Behind the admin login; ask search engines not to list it anyway. -->
+<meta name="robots" content="noindex, nofollow">
+<title>Catchment Catalyst data map</title>
+<style>
+  /* "Where the data comes from": a left-to-right flow diagram, drawn from the model below. */
+  :root {
+    color-scheme: light dark;
+    --bg: #f3f6f7;
+    --card: #ffffff;
+    --text: #1c282d;
+    --muted: #5a6a71;
+    --border: #d9e2e5;
+    --api: #0d6b77;
+    --api-soft: #e3f1f3;
+    --excel: #1d6b36;
+    --excel-soft: #e6f4ea;
+    --quiet: #5a6a71;
+    --quiet-soft: #eef2f3;
+    --catchment: #b0245a;
+    --catchment-soft: #fbe9f0;
+    --on-solid: #ffffff;
+    --focus: #2563eb;
+    --shadow: 0 1px 2px rgba(20, 40, 50, .06), 0 3px 10px rgba(20, 40, 50, .05);
+    --panel-shadow: -16px 0 48px rgba(20, 40, 50, .18);
+    --mono: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #10171a;
+      --card: #172126;
+      --text: #e3ebee;
+      --muted: #9aabb2;
+      --border: #2a383e;
+      --api: #5cc3ce;
+      --api-soft: #163339;
+      --excel: #7fd497;
+      --excel-soft: #16301f;
+      --quiet: #9aabb2;
+      --quiet-soft: #1f2a2f;
+      --catchment: #ff8db4;
+      --catchment-soft: #3a1b27;
+      --on-solid: #10171a;
+      --focus: #93b4ff;
+      --shadow: none;
+      --panel-shadow: -16px 0 48px rgba(0, 0, 0, .5);
+    }
+  }
+
+  /* Each fill sets --f (strong) and --f-soft (tint) for whatever it's on. */
+  .f-api { --f: var(--api); --f-soft: var(--api-soft); }
+  .f-excel { --f: var(--excel); --f-soft: var(--excel-soft); }
+  .f-command, .f-admin { --f: var(--quiet); --f-soft: var(--quiet-soft); }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  body.panel-open-narrow { overflow: hidden; }
+  a { color: var(--api); }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .visually-hidden {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  main { max-width: 1360px; margin: 0 auto; padding: 24px 32px 104px; }
+
+  /* Header */
+  .back { display: inline-block; font-size: .95rem; text-decoration: none; font-weight: 600; }
+  .back:hover { text-decoration: underline; }
+  h1 { margin: 10px 0 2px; font-size: 2.1rem; line-height: 1.15; letter-spacing: -.01em; }
+  .lead { margin: 0 0 18px; color: var(--muted); font-size: 1.08rem; max-width: 46em; }
+
+  /* Key */
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; padding: 0; list-style: none; }
+  .legend > li { display: flex; }
+  .key {
+    display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 14px 8px 8px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
+    text-align: left; cursor: pointer; transition: border-color .15s, box-shadow .15s;
+  }
+  .key:hover { border-color: var(--f, var(--catchment)); }
+  .key[aria-pressed="true"] { border-color: var(--f, var(--catchment)); box-shadow: 0 0 0 2px var(--f, var(--catchment)); }
+  .key-icon {
+    flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px;
+    background: var(--f); color: var(--on-solid);
+  }
+  .key.quiet .key-icon { background: var(--quiet-soft); color: var(--quiet); }
+  .key-text { display: block; line-height: 1.3; }
+  .key-text strong { display: block; font-size: .95rem; }
+  .key-sub { display: block; font-size: .8rem; color: var(--muted); }
+  .key-count {
+    flex: none; margin-left: 4px; min-width: 26px; padding: 2px 8px; border-radius: 999px; text-align: center;
+    font-size: .8rem; font-weight: 700; background: var(--f-soft, var(--catchment-soft)); color: var(--f, var(--catchment));
+  }
+  .pill {
+    display: inline-block; padding: 3px 10px; border-radius: 999px; white-space: nowrap;
+    background: var(--catchment); color: var(--on-solid); font-weight: 700; font-size: .8rem; line-height: 1.4;
+  }
+  .caption {
+    height: 3em; margin: 14px 0 10px; color: var(--muted); font-size: .92rem; line-height: 1.5;
+    overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  }
+  .caption strong { color: var(--text); }
+
+  /* ------- The diagram (narrow first: a stacked flow) ------- */
+  .flow { position: relative; }
+  .wires { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; z-index: 0; }
+
+  .group { margin: 0 0 18px; }
+  .src {
+    position: relative; z-index: 1; display: flex; align-items: center; gap: 11px; width: 100%;
+    padding: 11px 14px 11px 11px; border: 1px solid transparent; border-radius: 12px;
+    background: var(--f-soft); text-align: left; cursor: pointer;
+    transition: opacity .15s, border-color .15s, box-shadow .15s;
+  }
+  .src:hover { border-color: var(--f); }
+  .src[aria-pressed="true"] { border-color: var(--f); box-shadow: 0 0 0 2px var(--f); }
+  .src-icon {
+    flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%;
+    background: var(--f); color: var(--on-solid);
+  }
+  .src-text { display: block; min-width: 0; line-height: 1.3; }
+  .src-eyebrow { display: block; font-size: .78rem; font-weight: 650; color: var(--f); }
+  .src-name { display: block; font-weight: 650; font-size: .95rem; overflow-wrap: anywhere; }
+  .group.quiet .src { padding: 8px 12px 8px 9px; }
+  .group.quiet .src-icon { width: 30px; height: 30px; background: var(--card); color: var(--quiet); border: 1px solid var(--border); }
+  .group.quiet .src-eyebrow { color: var(--muted); font-weight: 600; }
+  .group.quiet .src-name { font-size: .9rem; font-weight: 600; }
+
+  .tables {
+    list-style: none; display: grid; gap: 8px;
+    margin: 0 0 0 30px; padding: 8px 0 0 18px; border-left: 2px solid var(--f);
+  }
+  .group.quiet .tables { margin-left: 24px; }
+  .tables > li { position: relative; }
+  .tables > li::before {
+    content: ""; position: absolute; left: -18px; top: 50%; width: 15px; border-top: 2px solid var(--f);
+  }
+  .tables > li:last-child::after {
+    content: ""; position: absolute; left: -21px; top: calc(50% + 2px); bottom: -2px; width: 6px; background: var(--bg);
+  }
+  .tables:empty { display: none; }
+  .also {
+    display: flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 4px;
+    color: var(--muted); font-size: .88rem;
+  }
+  .also strong { color: var(--text); }
+
+  /* A table */
+  .node {
+    position: relative; z-index: 1; display: flex; align-items: center; gap: 11px; width: 100%; min-height: 58px;
+    padding: 9px 14px 9px 10px; text-align: left; cursor: pointer;
+    background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--f); border-radius: 10px;
+    box-shadow: var(--shadow);
+    transition: opacity .15s, border-color .15s, box-shadow .15s, transform .15s;
+  }
+  .node:hover { border-color: var(--f); transform: translateX(2px); }
+  .node.is-selected { border-color: var(--f); box-shadow: 0 0 0 3px var(--f-soft), 0 0 0 5px var(--f); }
+  .node-icon {
+    flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px;
+    background: var(--f-soft); color: var(--f);
+  }
+  .node-text { display: block; min-width: 0; }
+  .node-title { display: block; font-weight: 650; font-size: .98rem; line-height: 1.25; overflow-wrap: anywhere; }
+  .node-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; margin-top: 2px; font-size: .8rem; color: var(--muted); }
+  .node-meta .fw { color: var(--f); font-weight: 650; }
+  .node-meta .fw svg { vertical-align: -3px; margin-right: 3px; }
+  .group.quiet .node { min-height: 50px; box-shadow: none; }
+
+  /* The hub and the dashboard tables */
+  .hub, .dash { flex-direction: column; align-items: stretch; gap: 6px; padding: 14px 16px; }
+  .hub { border: 2px solid var(--catchment); }
+  .hub:hover { border-color: var(--catchment); }
+  .hub.is-selected { box-shadow: 0 0 0 3px var(--catchment-soft), 0 0 0 5px var(--catchment); }
+  .node-top { display: flex; align-items: center; gap: 10px; }
+  .hub .node-title { font-size: 1.25rem; }
+  .hub-icon {
+    flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%;
+    background: var(--catchment); color: var(--on-solid);
+  }
+  .port {
+    align-self: flex-start; margin-left: -16px; padding: 3px 12px 3px 14px; border-radius: 0 999px 999px 0;
+    background: var(--catchment); color: var(--on-solid); font-size: .78rem; font-weight: 700; white-space: nowrap;
+  }
+  .dash .port { background: var(--catchment-soft); color: var(--catchment); }
+  .node-sum {
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    font-size: .84rem; line-height: 1.4; color: var(--muted);
+  }
+  .hub-from { display: block; font-size: .82rem; color: var(--f); font-weight: 600; }
+
+  .junction {
+    display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 4px 0 12px;
+    color: var(--catchment); font-size: .9rem; text-align: center;
+  }
+  .junction .j-text { color: var(--muted); }
+  .dash-nodes { display: grid; gap: 10px; }
+  .dash-end { display: flex; flex-direction: column; align-items: center; }
+  .dash-end > svg { color: var(--muted); margin: 4px 0; }
+  .dashboard {
+    display: flex; align-items: center; gap: 11px; width: 100%; padding: 12px 14px;
+    border: 1.5px dashed var(--border); border-radius: 12px; color: var(--text);
+  }
+  .dashboard-icon {
+    flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 9px;
+    background: var(--card); color: var(--muted); border: 1px solid var(--border);
+  }
+  .dashboard strong { display: block; line-height: 1.3; }
+  .dashboard span.sub { display: block; font-size: .84rem; color: var(--muted); line-height: 1.4; }
+
+  .house-head { margin: 30px 0 12px; padding-top: 14px; border-top: 1px dashed var(--border); color: var(--muted); font-size: .9rem; }
+  .house-head strong { color: var(--text); }
+
+  /* Tracing: fade what isn't connected to the thing under the pointer */
+  .flow.tracing [data-node]:not(.on) { opacity: .28; }
+
+  .wire { transition: opacity .15s; }
+  .wire path { fill: none; stroke-width: 2; stroke-linecap: round; transition: stroke-width .15s; }
+  .wire.t-src path, .wire.t-bridge path { stroke: var(--f); }
+  .wire.t-src circle, .wire.t-bridge circle { fill: var(--f); }
+  .wire.t-hub path, .wire.t-dash path { stroke: var(--catchment); }
+  .wire.t-hub circle, .wire.t-dash circle { fill: var(--catchment); }
+  .wire.t-soft path { stroke: var(--muted); stroke-dasharray: 4 5; stroke-width: 1.6; }
+  .wire.t-soft circle { fill: var(--muted); }
+  .wire { opacity: .62; }
+  .wire.t-hub { opacity: .5; }
+  .wire.t-soft { opacity: 0; }
+  .flow.tracing .wire { opacity: .07; }
+  .flow.tracing .wire.t-soft { opacity: 0; }
+  .flow.tracing .wire.on { opacity: 1; }
+  .flow.tracing .wire.on path { stroke-width: 3; }
+  .flow.tracing .wire.t-soft.on { opacity: .9; }
+  .flow.tracing .wire.t-soft.on path { stroke-width: 1.8; }
+
+  .col-head { display: flex; align-items: center; gap: 8px; font-size: .86rem; font-weight: 650; color: var(--muted); line-height: 1.25; }
+  .col-head .num {
+    flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--text); color: var(--bg); font-size: .75rem; font-weight: 700;
+  }
+
+  @media (max-width: 859.98px) {
+    main { padding: 18px 16px 104px; }
+    h1 { font-size: 1.8rem; }
+    .wide-only { display: none !important; }
+    .legend > li { flex: 1 1 100%; }
+    .key { width: 100%; }
+    .hub-col, .dash-col { margin-bottom: 4px; }
+    .dash-end { margin-top: 0; }
+    .dash-end .dashboard { max-width: 100%; }
+  }
+
+  /* ------- Wide: four columns with drawn connectors ------- */
+  @media (min-width: 860px) {
+    main { padding: 24px 24px 104px; }
+    .narrow-only { display: none !important; }
+    .flow {
+      display: grid;
+      grid-template-columns:
+        minmax(140px, 1fr) minmax(36px, .45fr) minmax(176px, 1.3fr) minmax(72px, .8fr)
+        minmax(164px, 1.1fr) minmax(40px, .5fr) minmax(140px, 1fr);
+      row-gap: 22px;
+      align-items: start;
+      padding-bottom: 8px;
+    }
+    .col-head { grid-row: 1; align-self: end; }
+    .col-head[data-col="1"] { grid-column: 1; }
+    .col-head[data-col="2"] { grid-column: 3; }
+    .col-head[data-col="3"] { grid-column: 5; }
+    .col-head[data-col="4"] { grid-column: 7; }
+    .band { grid-row: 2; grid-column: 1 / -1; height: 8px; }
+    .group { display: contents; }
+    .src { grid-column: 1; grid-row: var(--row); align-self: center; }
+    .tables {
+      grid-column: 3; grid-row: var(--row); align-self: center;
+      margin: 0; padding: 0; border-left: 0; gap: 10px;
+    }
+    .tables > li::before, .tables > li:last-child::after { display: none; }
+    .group.quiet .tables { margin-left: 0; }
+    .hub-col, .dash-col {
+      grid-row: var(--span); align-self: stretch;
+      display: grid; grid-template-rows: 1fr auto 1fr;
+    }
+    .hub-col { grid-column: 5; }
+    .dash-col { grid-column: 7; }
+    .hub-col > .hub, .dash-col > .dash-nodes { grid-row: 2; }
+    .dash-col > .dash-end { grid-row: 3; align-self: start; }
+    .dash-end > svg { margin: 6px 0; }
+    .house-head { grid-column: 1 / 4; grid-row: var(--row); margin: 18px 0 0; }
+    .group.quiet .src { align-self: center; }
+  }
+  @media (min-width: 1200px) {
+    main { padding: 28px 32px 104px; }
+    .flow { row-gap: 26px; }
+  }
+
+  /* ------- Details panel ------- */
+  .panel {
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: 40;
+    width: min(620px, 100%); overflow-y: auto; overscroll-behavior: contain;
+    background: var(--card); border-left: 1px solid var(--border); box-shadow: var(--panel-shadow);
+    transform: translateX(104%); visibility: hidden;
+    transition: transform .18s ease-out, visibility 0s linear .18s;
+  }
+  .panel.open { transform: none; visibility: visible; transition: transform .18s ease-out; }
+  .panel.instant { transition: none !important; }
+  .panel-bar {
+    position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 14px 24px 12px; background: var(--card); border-bottom: 1px solid var(--border);
+  }
+  .p-badge {
+    display: inline-flex; align-items: center; gap: 8px; min-width: 0; padding: 5px 12px 5px 6px; border-radius: 999px;
+    background: var(--f); color: var(--on-solid); font-weight: 700; font-size: .92rem; line-height: 1.3;
+  }
+  .p-badge .b-icon { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: rgba(255, 255, 255, .18); flex: none; }
+  .p-badge .tag { padding: 0 6px; border: 1.5px solid currentColor; border-radius: 5px; font-size: .72rem; }
+  .p-badge.quiet { background: var(--quiet-soft); color: var(--quiet); }
+  .p-badge.quiet .b-icon { background: var(--card); }
+  .close {
+    flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 8px;
+    background: transparent; border: 1px solid var(--border); cursor: pointer; font-weight: 600; font-size: .9rem;
+  }
+  .close:hover { background: var(--bg); }
+  .panel-inner { padding: 18px 24px 104px; }
+  .panel h2 { margin: 0; font-size: 1.7rem; line-height: 1.2; }
+  .panel h2:focus { outline: none; }
+  .panel h2:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; border-radius: 4px; }
+  .tech { margin: 4px 0 0; color: var(--muted); font-size: .85rem; }
+  .tech code, .panel code { font-family: var(--mono); font-size: .88em; }
+  .desc { margin: 12px 0 18px; }
+  .panel h3 { margin: 26px 0 8px; font-size: 1.05rem; display: flex; align-items: baseline; gap: 8px; }
+  .panel h3 .n { font-size: .85rem; color: var(--muted); font-weight: 600; }
+
+  .from { padding: 14px 16px; border-radius: 12px; background: var(--f-soft); border-left: 4px solid var(--f); }
+  .from-head { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--f); }
+  .from p { margin: 6px 0 0; }
+  .from .muted { color: var(--muted); font-size: .9rem; }
+  .cmd { display: flex; gap: 8px; align-items: stretch; margin-top: 8px; }
+  .cmd code {
+    flex: 1; min-width: 0; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--card); color: var(--text); font-size: .82rem; overflow-wrap: anywhere; line-height: 1.45;
+  }
+  .copy {
+    flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--card); cursor: pointer; font-weight: 600; font-size: .85rem;
+  }
+  .copy:hover { border-color: var(--f); }
+  .status { min-height: 1.2em; font-size: .82rem; color: var(--muted); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; padding: 9px 14px; border-radius: 8px;
+    background: var(--f); color: var(--on-solid); font-weight: 700; text-decoration: none;
+  }
+  .btn:hover { filter: brightness(1.08); }
+
+  .facts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+  .fact { padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: .9rem; line-height: 1.6; }
+  .fact .big { font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .chip {
+    display: inline-block; padding: 0 7px; border-radius: 6px; background: var(--quiet-soft); color: var(--text);
+    font-size: .84rem; font-weight: 600; line-height: 1.6; white-space: nowrap;
+  }
+  .chip.cid { background: var(--catchment); color: var(--on-solid); }
+
+  .hint { margin: 0 0 8px; font-size: .85rem; color: var(--muted); }
+  .sheet-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
+  .sheet { border-collapse: separate; border-spacing: 0; font-size: .85rem; }
+  .sheet th, .sheet td { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .sheet tr > :last-child { border-right: 0; }
+  .sheet tbody tr:last-child > * { border-bottom: 0; }
+  .sheet .letters th { padding: 1px 8px; background: var(--quiet-soft); color: var(--muted); font-weight: 500; font-size: .72rem; text-align: center; }
+  .sheet .rownum {
+    position: sticky; left: 0; z-index: 1; min-width: 30px; padding: 0 6px; text-align: center;
+    background: var(--quiet-soft); color: var(--muted); font-weight: 500; font-size: .72rem;
+  }
+  .sheet .labels th { padding: 0; vertical-align: top; text-align: left; }
+  .col-btn {
+    display: block; width: 100%; min-width: 96px; padding: 7px 12px 6px; border: 0; border-radius: 0; background: var(--card);
+    text-align: left; cursor: pointer; line-height: 1.3; box-shadow: inset 0 -3px 0 transparent;
+  }
+  .col-btn:hover { background: var(--bg); }
+  .col-btn[aria-pressed="true"] { background: var(--f-soft); box-shadow: inset 0 -3px 0 var(--f); }
+  .col-btn .c-label { display: flex; align-items: center; gap: 5px; font-weight: 700; }
+  .col-btn .c-type { display: block; font-size: .74rem; color: var(--muted); font-weight: 400; }
+  .col-btn.cid { background: var(--catchment); color: var(--on-solid); }
+  .col-btn.cid .c-type { color: inherit; opacity: .85; }
+  .col-btn.cid[aria-pressed="true"] { box-shadow: inset 0 -4px 0 var(--text); }
+  .sheet td { padding: 7px 12px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-family: var(--mono); font-size: .8rem; }
+  .sheet td.cid { color: var(--catchment); font-weight: 600; }
+  .sheet td.on { background: var(--f-soft); color: var(--text); }
+
+  .col-card { margin-top: 10px; padding: 12px 14px; border-radius: 10px; background: var(--bg); border: 1px solid var(--border); }
+  .cc-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+  .cc-head strong { font-size: 1.02rem; }
+  .cc-head code { color: var(--muted); }
+  .col-card p { margin: 6px 0 0; }
+  .col-card .ex { font-size: .88rem; color: var(--muted); }
+  .col-card .ex code { color: var(--text); overflow-wrap: anywhere; }
+  .flags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .flag { padding: 1px 8px; border-radius: 6px; font-size: .78rem; font-weight: 600; background: var(--card); border: 1px solid var(--border); color: var(--muted); }
+  .flag.cid { background: var(--catchment-soft); border-color: transparent; color: var(--catchment); }
+
+  .jump {
+    display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px 5px 6px; border-radius: 8px; cursor: pointer;
+    background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--f); font-weight: 650; font-size: .88rem;
+    text-align: left; line-height: 1.3;
+  }
+  .jump:hover { border-color: var(--f); }
+  .jump .j-icon { display: grid; place-items: center; color: var(--f); }
+  .jumps { display: flex; flex-wrap: wrap; gap: 6px; }
+  .link-rows { display: grid; gap: 10px; }
+  .link-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+  .link-row .via { font-size: .85rem; color: var(--muted); }
+  .link-dir { margin: 14px 0 6px; font-size: .82rem; font-weight: 700; color: var(--muted); }
+  .link-dir:first-child { margin-top: 0; }
+  .none { color: var(--muted); font-size: .9rem; margin: 0; }
+
+  footer { margin-top: 40px; color: var(--muted); font-size: .85rem; }
+
+  @media (max-width: 640px) {
+    .panel-bar { padding: 12px 16px 10px; }
+    .panel-inner { padding: 16px 16px 104px; }
+    .panel h2 { font-size: 1.45rem; }
+    .p-badge { font-size: .85rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0s !important; transition-delay: 0s !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <a class="back" href="/admin">← Admin</a>
+    <h1>Data map</h1>
+    <p class="lead">Where each table's data comes from, and how the tables join up. Click a table to see its columns.</p>
+  </header>
+
+  <ul class="legend" id="legend" aria-label="Key"></ul>
+  <p class="caption" id="caption" aria-hidden="true"></p>
+
+  <section class="flow" id="flow" aria-labelledby="flow-title">
+    <h2 class="visually-hidden" id="flow-title">The tables, from where their data comes from to the dashboards</h2>
+  </section>
+
+  <footer>Made from the database's own master file, so it always matches the database.</footer>
+</main>
+
+<aside class="panel" id="panel" role="dialog" aria-modal="false" aria-labelledby="panel-title">
+  <div class="panel-bar">
+    <span id="panel-badge"></span>
+    <button type="button" class="close" id="panel-close">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      Close
+    </button>
+  </div>
+  <div class="panel-inner">
+    <h2 id="panel-title" tabindex="-1"></h2>
+    <div id="panel-body"></div>
+  </div>
+</aside>
+
+<script id="model" type="application/json">__DATA__</script>
+<script>
+"use strict";
+
+/* ---------- What each way of filling a table is called ---------- */
+
+const FILLS = {
+  api: { word: "Downloaded", long: "Downloaded from the internet", icon: "cloud", tag: "API" },
+  excel: { word: "Excel upload", long: "Uploaded in Excel", icon: "sheet", tag: "Excel" },
+  command: { word: "Database command", long: "Changed with a database command", icon: "terminal" },
+  admin: { word: "Admin page", long: "Kept by the admin page", icon: "window" },
+};
+const QUIET = { command: true, admin: true };
+const fillOf = t => (FILLS[t.fill] ? t.fill : "command");
+
+const ICONS = {
+  cloud: "M12 13v8M8 17l4 4 4-4M4.39 15.27A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.44 8.28",
+  sheet: "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM3 9h18M3 15h18M9 9v12M15 9v12",
+  terminal: "M4 17l6-6-6-6M12 19h8",
+  window: "M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM3 9h18M6.5 6.5h.01M9.5 6.5h.01",
+  drop: "M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z",
+  dashboard: "M4 3h6a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM14 3h6a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM14 12h6a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1zM4 16h6a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1z",
+  copy: "M10 8h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2zM16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3",
+  check: "M20 6 9 17l-5-5",
+  right: "M5 12h14M13 6l6 6-6 6",
+  down: "M12 4v15M6 13l6 6 6-6",
+  key: "M10.5 13.5a4 4 0 1 1-5.66 5.66 4 4 0 0 1 5.66-5.66zM10.5 13.5 19 5M15.5 8.5l2.5 2.5M18 6l2 2",
+  link: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71",
+};
+
+/* ---------- Small helpers (all model text goes in with textContent) ---------- */
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = String(text);
+  return e;
+}
+const SVGNS = "http://www.w3.org/2000/svg";
+function svgEl(tag, attrs) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs || {}) e.setAttribute(k, String(attrs[k]));
+  return e;
+}
+function icon(name, size) {
+  const s = svgEl("svg", {
+    viewBox: "0 0 24 24", width: size || 18, height: size || 18, fill: "none", stroke: "currentColor",
+    "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": "true", focusable: "false",
+  });
+  s.appendChild(svgEl("path", { d: ICONS[name] || "" }));
+  return s;
+}
+function rowsText(n) {
+  if (n == null) return "";
+  if (n === 0) return "No rows yet";
+  return n === 1 ? "1 row" : Number(n).toLocaleString("en-GB") + " rows";
+}
+function joinWords(words) {
+  if (words.length < 2) return words.join("");
+  return words.slice(0, -1).join(", ") + " and " + words[words.length - 1];
+}
+function titleOf(t) { return t.title || t.name; }
+function columnOf(t, name) { return (t.columns || []).find(c => c.name === name) || null; }
+function columnLabel(t, name) { const c = columnOf(t, name); return c ? (c.label || c.name) : name; }
+function columnLetters(i) {
+  let s = "";
+  for (let n = i + 1; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + ((n - 1) % 26)) + s;
+  return s;
+}
+
+/* ---------- The plan: who goes in which column, and every line between them ---------- */
+
+function makePlan(model) {
+  const tables = ((model && model.tables) || []).filter(t => t && typeof t.name === "string");
+  const byName = new Map(tables.map(t => [t.name, t]));
+  const links = ((model && model.links) || []).filter(l => l && byName.has(l.from) && byName.has(l.to));
+  const isIdLink = l => l.kind === "id" || l.kind === "list";
+
+  // The hub is the table most ID links point to (not counting a table's links to itself).
+  const score = new Map();
+  for (const l of links) if (l.from !== l.to && isIdLink(l)) score.set(l.to, (score.get(l.to) || 0) + 1);
+  let hub = null, best = 0;
+  for (const t of tables) { const s = score.get(t.name) || 0; if (s > best) { hub = t; best = s; } }
+
+  // Dashboard tables: core tables that hold a list of the hub's IDs (each row is a dashboard).
+  const dash = hub ? tables.filter(t => t !== hub && t.kind !== "data" &&
+    links.some(l => l.from === t.name && l.to === hub.name && l.kind === "list")) : [];
+  const onDash = new Set(dash.map(t => t.name));
+
+  // Everything else is grouped by where its data comes from.
+  const groups = [];
+  const groupFor = t => {
+    const fill = fillOf(t);
+    const key = fill === "api" ? "api|" + (t.source || "") : fill;
+    let g = groups.find(x => x.key === key);
+    if (!g) {
+      g = { key, id: "src:g" + groups.length, order: groups.length, fill, source: fill === "api" ? (t.source || null) : null,
+            quiet: !!QUIET[fill], tables: [], feedsHub: false };
+      groups.push(g);
+    }
+    return g;
+  };
+  for (const t of tables) if (t !== hub && !onDash.has(t.name)) groupFor(t).tables.push(t);
+  let hubGroup = null;
+  if (hub && !QUIET[fillOf(hub)]) { hubGroup = groupFor(hub); hubGroup.feedsHub = true; }
+  const rank = g => (g === hubGroup ? 0 : g.fill === "api" ? 1 : g.fill === "excel" ? 2 : g.fill === "command" ? 3 : 4);
+  groups.sort((a, b) => rank(a) - rank(b) || a.order - b.order);
+  const main = groups.filter(g => !g.quiet);
+  const house = groups.filter(g => g.quiet);
+  main.forEach((g, i) => { g.row = 3 + i; });
+  const houseRow = 3 + main.length;
+  house.forEach((g, i) => { g.row = houseRow + 1 + i; });
+
+  // Lines: source -> table, source -> hub, table -> hub (by ID), dashboard table -> hub, and faint others.
+  const wires = [];
+  const addWire = (type, a, b, extra) => { wires.push(Object.assign({ id: "w" + wires.length, type, a, b }, extra || {})); };
+  for (const g of groups) for (const t of g.tables) addWire("src", g.id, "tbl:" + t.name, { fill: g.fill });
+  if (hubGroup) addWire("bridge", hubGroup.id, "tbl:" + hub.name, { fill: hubGroup.fill });
+  const seen = new Set();
+  const hubLabels = new Map();
+  const dashLabels = new Map();
+  for (const l of links) {
+    if (l.from === l.to) continue; // e.g. upstream / downstream: shown in the details only
+    const toHub = hub && l.to === hub.name && isIdLink(l);
+    const type = toHub ? (onDash.has(l.from) ? "dash" : "hub") : "soft";
+    const k = type + "|" + l.from + "|" + l.to;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const label = columnLabel(byName.get(l.from), l.column);
+    addWire(type, "tbl:" + l.from, "tbl:" + l.to, { label, kind: l.kind });
+    if (type === "hub") hubLabels.set(label, (hubLabels.get(label) || 0) + 1);
+    if (type === "dash" && !dashLabels.has(l.from)) dashLabels.set(l.from, label);
+  }
+
+  let hubLabel = null, most = 0;
+  for (const [label, n] of hubLabels) if (n > most) { hubLabel = label; most = n; }
+  const hubIdColumn = hub ? ((hub.columns || []).find(c => c.catchment_id) || (hub.columns || []).find(c => c.unique_id) || null) : null;
+  if (hub && !hubLabel) hubLabel = hubIdColumn ? (hubIdColumn.label || hubIdColumn.name) : "ID";
+  const example = hubIdColumn && hubIdColumn.example ? hubIdColumn.example : null;
+
+  const counts = { api: 0, excel: 0, quiet: 0 };
+  for (const t of tables) { const f = fillOf(t); counts[QUIET[f] ? "quiet" : f] += 1; }
+
+  return {
+    tables, byName, links, hub, dash, groups, main, house, houseRow, wires, hubGroup,
+    hubLabel, dashLabels, example, counts,
+    span: "3 / span " + Math.max(1, main.length),
+  };
+}
+
+// Which nodes and lines light up for a key ("tbl:name", "src:g0", "fill:api", "link").
+function relations(plan, key) {
+  const nodes = new Set([key]);
+  const wires = new Set();
+  const touching = n => plan.wires.filter(w => w.a === n || w.b === n);
+  if (key.startsWith("tbl:")) {
+    for (const w of touching(key)) { wires.add(w.id); nodes.add(w.a); nodes.add(w.b); }
+  } else if (key.startsWith("src:")) {
+    for (const w of touching(key)) { wires.add(w.id); nodes.add(w.b); }
+    for (const n of Array.from(nodes)) {
+      if (n === key) continue;
+      for (const w of touching(n)) if (w.type === "hub" && w.a === n) { wires.add(w.id); nodes.add(w.b); }
+    }
+  } else if (key.startsWith("fill:")) {
+    const f = key.slice(5);
+    const match = x => (f === "quiet" ? !!QUIET[x] : x === f);
+    for (const t of plan.tables) if (match(fillOf(t))) nodes.add("tbl:" + t.name);
+    for (const g of plan.groups) if (match(g.fill)) nodes.add(g.id);
+    for (const w of plan.wires) {
+      if ((w.type === "src" || w.type === "bridge") && nodes.has(w.a) && nodes.has(w.b)) wires.add(w.id);
+    }
+  } else if (key === "link" && plan.hub) {
+    nodes.add("tbl:" + plan.hub.name);
+    for (const w of plan.wires) if (w.type === "hub" || w.type === "dash") { wires.add(w.id); nodes.add(w.a); nodes.add(w.b); }
+  }
+  return { nodes, wires };
+}
+
+/* ---------- Geometry: SVG paths from measured boxes ({l, t, r, b} inside the diagram) ---------- */
+
+const num = n => String(Math.round(n * 10) / 10);
+const midY = r => (r.t + r.b) / 2;
+const midX = r => (r.l + r.r) / 2;
+function sCurve(x1, y1, x2, y2) {
+  const c = Math.max(18, Math.abs(x2 - x1) * 0.5);
+  return "M" + num(x1) + " " + num(y1) + "C" + num(x1 + c) + " " + num(y1) + " " + num(x2 - c) + " " + num(y2) + " " + num(x2) + " " + num(y2);
+}
+
+function geometry(plan, rectOf, bandY) {
+  return plan.wires.map(w => {
+    const A = rectOf(w.a), B = rectOf(w.b);
+    if (!A || !B) return { id: w.id, d: "", dots: [] };
+    if (w.type === "src") {
+      return { id: w.id, d: sCurve(A.r, midY(A), B.l, midY(B)), dots: [[B.l, midY(B)]] };
+    }
+    if (w.type === "bridge") {
+      // Up from the source, along the band above the tables, and down into the hub.
+      const sx = midX(A), sy = A.t, hx = midX(B), hy = B.t;
+      if (bandY == null || sy - bandY < 6 || hy - bandY < 6 || hx - sx < 30) {
+        return { id: w.id, d: sCurve(A.r, midY(A), B.l, midY(B)), dots: [[B.l, midY(B)]] };
+      }
+      const r = Math.min(14, sy - bandY, hy - bandY, (hx - sx) / 2);
+      const d = "M" + num(sx) + " " + num(sy) + "V" + num(bandY + r) +
+        "Q" + num(sx) + " " + num(bandY) + " " + num(sx + r) + " " + num(bandY) +
+        "H" + num(hx - r) + "Q" + num(hx) + " " + num(bandY) + " " + num(hx) + " " + num(bandY + r) + "V" + num(hy);
+      return { id: w.id, d, dots: [[hx, hy]] };
+    }
+    if (w.type === "hub") {
+      // Every data table plugs into the hub's ID "port".
+      const P = rectOf("port:" + w.b);
+      const y2 = P ? midY(P) : midY(B);
+      return { id: w.id, d: sCurve(A.r, midY(A), B.l, y2), dots: [[A.r, midY(A)], [B.l, y2]] };
+    }
+    if (w.type === "dash") {
+      // From the hub's right side into the dashboard table's list "port" (a = dashboard table, b = hub).
+      const P = rectOf("port:" + w.a);
+      const y2 = P ? midY(P) : midY(A);
+      const y1 = Math.min(Math.max(y2, B.t + 14), B.b - 14);
+      return { id: w.id, d: sCurve(B.r, y1, A.l, y2), dots: [[B.r, y1], [A.l, y2]] };
+    }
+    // Faint links (e.g. a table's name): a loop on the right if both are in the same column.
+    if (Math.abs(A.l - B.l) < 8) {
+      const x = Math.max(A.r, B.r), y1 = midY(A), y2 = midY(B);
+      const k = 22 + Math.min(70, Math.abs(y2 - y1) * 0.16);
+      const d = "M" + num(A.r) + " " + num(y1) + "C" + num(x + k) + " " + num(y1) + " " + num(x + k) + " " + num(y2) + " " + num(B.r) + " " + num(y2);
+      return { id: w.id, d, dots: [[A.r, y1], [B.r, y2]] };
+    }
+    const L = A.l <= B.l ? A : B, R = A.l <= B.l ? B : A;
+    return { id: w.id, d: sCurve(L.r, midY(L), R.l, midY(R)), dots: [[L.r, midY(L)], [R.l, midY(R)]] };
+  });
+}
+
+/* ---------- The page ---------- */
+
+function start() {
+  let model;
+  try { model = JSON.parse(document.getElementById("model").textContent); } catch (e) { model = { tables: [], links: [], sections: [] }; }
+  const plan = makePlan(model);
+  const $ = id => document.getElementById(id);
+  const flow = $("flow"), legend = $("legend"), caption = $("caption");
+  const panel = $("panel"), panelBadge = $("panel-badge"), panelTitle = $("panel-title"), panelBody = $("panel-body");
+  const closeBtn = $("panel-close");
+  const wideQuery = window.matchMedia ? window.matchMedia("(min-width: 860px)") : { matches: true };
+
+  const nodeEls = new Map();   // key -> element that lights up
+  const anchors = new Map();   // key -> element the lines are measured from
+  const wireEls = new Map();   // wire id -> { g, path }
+  const keyEls = new Map();    // key -> legend button
+  let hoverKey = null, focusKey = null, pinnedKey = null, current = null, opener = null;
+
+  /* Key */
+  const keyItems = [
+    { key: "fill:api", cls: "f-api", icon: "cloud", strong: FILLS.api.long, sub: "API · downloaded again when someone runs a command", n: plan.counts.api },
+    { key: "fill:excel", cls: "f-excel", icon: "sheet", strong: FILLS.excel.long, sub: "By you, in the admin page", n: plan.counts.excel },
+    { key: "fill:quiet", cls: "f-command quiet", icon: "terminal", strong: "Housekeeping", sub: "A database command or the admin page", n: plan.counts.quiet },
+  ];
+  for (const item of keyItems) {
+    if (!item.n) continue;
+    const li = el("li");
+    const b = el("button", "key " + item.cls);
+    b.type = "button";
+    b.setAttribute("aria-pressed", "false");
+    const ic = el("span", "key-icon");
+    ic.appendChild(icon(item.icon, 18));
+    const tx = el("span", "key-text");
+    tx.appendChild(el("strong", null, item.strong));
+    tx.appendChild(el("span", "key-sub", item.sub));
+    const n = el("span", "key-count", item.n);
+    n.setAttribute("aria-label", item.n === 1 ? "1 table" : item.n + " tables");
+    b.append(ic, tx, n, el("span", "visually-hidden", ": highlight these tables"));
+    wireKey(b, item.key);
+    li.appendChild(b);
+    legend.appendChild(li);
+  }
+  if (plan.hub) {
+    const li = el("li");
+    const b = el("button", "key");
+    b.type = "button";
+    b.setAttribute("aria-pressed", "false");
+    const tx = el("span", "key-text");
+    tx.appendChild(el("strong", null, "Links each row to its catchment"));
+    tx.appendChild(el("span", "key-sub", plan.example ? "For example " + plan.example : "Every data table has one"));
+    b.append(el("span", "pill", plan.hubLabel), tx, el("span", "visually-hidden", ": highlight these links"));
+    wireKey(b, "link");
+    li.appendChild(b);
+    legend.appendChild(li);
+  }
+  function wireKey(b, key) {
+    keyEls.set(key, b);
+    b.addEventListener("click", () => { pinnedKey = pinnedKey === key ? null : key; trace(); });
+    hoverable(b, key);
+  }
+
+  /* Diagram */
+  const svg = svgEl("svg", { class: "wires wide-only", "aria-hidden": "true", focusable: "false" });
+  flow.appendChild(svg);
+
+  const heads = [["1", "Where the data comes from"], ["2", "Tables"]];
+  if (plan.hub) heads.push(["3", "Joined up by " + plan.hubLabel]);
+  if (plan.dash.length) heads.push(["4", "Shown on dashboards"]);
+  for (const [n, text] of heads) {
+    const h = el("div", "col-head wide-only");
+    h.dataset.col = n;
+    h.setAttribute("aria-hidden", "true");
+    h.append(el("span", "num", n), el("span", null, text));
+    flow.appendChild(h);
+  }
+  const band = el("div", "band wide-only");
+  band.setAttribute("aria-hidden", "true");
+  flow.appendChild(band);
+  anchors.set("band", band);
+
+  for (const g of plan.main) flow.appendChild(groupEl(g));
+
+  if (plan.hub) {
+    const col = el("div", "hub-col");
+    col.style.setProperty("--span", plan.span);
+    col.appendChild(junction("All linked by", plan.hubLabel, true));
+    col.appendChild(hubNode(plan.hub));
+    flow.appendChild(col);
+  }
+  if (plan.dash.length) {
+    const col = el("div", "dash-col");
+    col.style.setProperty("--span", plan.span);
+    const firstLabel = plan.dashLabels.get(plan.dash[0].name) || plan.hubLabel;
+    col.appendChild(junction("Picked by a list of", firstLabel, false));
+    const box = el("div", "dash-nodes");
+    for (const t of plan.dash) box.appendChild(dashNode(t));
+    col.appendChild(box);
+    const end = el("div", "dash-end");
+    end.appendChild(icon("down", 22));
+    const card = el("div", "dashboard");
+    const di = el("span", "dashboard-icon");
+    di.appendChild(icon("dashboard", 20));
+    const dt = el("span");
+    dt.appendChild(el("strong", null, "Dashboards"));
+    dt.appendChild(el("span", "sub", "One for each row of " + joinWords(plan.dash.map(titleOf)) + ", showing only its catchments."));
+    card.append(di, dt);
+    end.appendChild(card);
+    col.appendChild(end);
+    flow.appendChild(col);
+  }
+
+  if (plan.house.length) {
+    const head = el("div", "house-head");
+    head.style.setProperty("--row", String(plan.houseRow));
+    head.append(el("strong", null, "Housekeeping"), document.createTextNode(" · tables that keep things running behind the scenes"));
+    flow.appendChild(head);
+    for (const g of plan.house) flow.appendChild(groupEl(g));
+  }
+
+  const order = { soft: 0, src: 1, bridge: 2, hub: 3, dash: 4 };
+  for (const w of plan.wires.slice().sort((a, b) => order[a.type] - order[b.type])) {
+    const g = svgEl("g", { class: "wire t-" + w.type + (w.fill ? " f-" + w.fill : "") });
+    const path = svgEl("path", { d: "" });
+    g.appendChild(path);
+    svg.appendChild(g);
+    wireEls.set(w.id, { g, path });
+  }
+
+  function groupEl(g) {
+    const wrap = el("div", "group f-" + g.fill + (g.quiet ? " quiet" : ""));
+    wrap.style.setProperty("--row", String(g.row));
+    const b = el("button", "src f-" + g.fill);
+    b.type = "button";
+    b.setAttribute("aria-pressed", "false");
+    b.dataset.node = g.id;
+    const ic = el("span", "src-icon");
+    ic.appendChild(icon(FILLS[g.fill].icon, g.quiet ? 16 : 20));
+    const tx = el("span", "src-text");
+    const words = groupWords(g);
+    tx.append(el("span", "src-eyebrow", words.eyebrow), el("span", "src-name", words.name));
+    b.append(ic, tx, el("span", "visually-hidden", ": highlight its tables"));
+    b.addEventListener("click", () => { pinnedKey = pinnedKey === g.id ? null : g.id; trace(); });
+    hoverable(b, g.id);
+    nodeEls.set(g.id, b);
+    anchors.set(g.id, b);
+    wrap.appendChild(b);
+
+    const ul = el("ul", "tables");
+    ul.setAttribute("role", "list");
+    for (const t of g.tables) {
+      const li = el("li");
+      li.appendChild(tableNode(t));
+      ul.appendChild(li);
+    }
+    if (g.feedsHub && plan.hub) {
+      const li = el("li", "narrow-only");
+      const also = el("span", "also");
+      also.append(document.createTextNode("Also fills "), el("strong", null, titleOf(plan.hub)), document.createTextNode(", further down"));
+      li.appendChild(also);
+      ul.appendChild(li);
+    }
+    wrap.appendChild(ul);
+    return wrap;
+  }
+
+  function groupWords(g) {
+    if (g.fill === "api") return { eyebrow: FILLS.api.long, name: g.source || "A website" };
+    if (g.fill === "excel") return { eyebrow: "Uploaded in the admin page", name: "You, in Excel" };
+    if (g.fill === "admin") return { eyebrow: "Housekeeping", name: "The admin page" };
+    return { eyebrow: "Housekeeping", name: "A database command" };
+  }
+
+  function metaEl(t) {
+    const f = fillOf(t);
+    const m = el("span", "node-meta");
+    const fw = el("span", "fw");
+    fw.append(icon(FILLS[f].icon, 14), document.createTextNode(FILLS[f].word));
+    m.appendChild(fw);
+    if (t.rows != null) { m.appendChild(el("span", null, "·")); m.appendChild(el("span", null, rowsText(t.rows))); }
+    return m;
+  }
+
+  function nodeButton(t, extraClass) {
+    const b = el("button", "node f-" + fillOf(t) + (extraClass ? " " + extraClass : ""));
+    b.type = "button";
+    b.dataset.node = "tbl:" + t.name;
+    b.setAttribute("aria-haspopup", "dialog");
+    b.addEventListener("click", () => openDetails(t.name, b));
+    hoverable(b, "tbl:" + t.name);
+    nodeEls.set("tbl:" + t.name, b);
+    anchors.set("tbl:" + t.name, b);
+    return b;
+  }
+
+  function tableNode(t) {
+    const b = nodeButton(t);
+    const ic = el("span", "node-icon");
+    ic.appendChild(icon(FILLS[fillOf(t)].icon, 18));
+    const tx = el("span", "node-text");
+    tx.append(el("span", "node-title", titleOf(t)), metaEl(t));
+    b.append(ic, tx);
+    return b;
+  }
+
+  function hubNode(t) {
+    const b = nodeButton(t, "hub");
+    const top = el("span", "node-top");
+    const ic = el("span", "hub-icon");
+    ic.appendChild(icon("drop", 20));
+    top.append(ic, el("span", "node-title", titleOf(t)));
+    const port = el("span", "port", plan.hubLabel);
+    anchors.set("port:tbl:" + t.name, port);
+    b.append(top, port, metaEl(t));
+    if (t.summary) b.appendChild(el("span", "node-sum", t.summary));
+    if (fillOf(t) === "api" && t.source) b.appendChild(el("span", "hub-from narrow-only", "From " + t.source));
+    return b;
+  }
+
+  function dashNode(t) {
+    const b = nodeButton(t, "dash");
+    const top = el("span", "node-top");
+    const ic = el("span", "node-icon");
+    ic.appendChild(icon(FILLS[fillOf(t)].icon, 18));
+    top.append(ic, el("span", "node-title", titleOf(t)));
+    const port = el("span", "port", plan.dashLabels.get(t.name) || plan.hubLabel);
+    anchors.set("port:tbl:" + t.name, port);
+    b.append(top, port, metaEl(t));
+    if (t.summary) b.appendChild(el("span", "node-sum", t.summary));
+    return b;
+  }
+
+  function junction(text, label, first) {
+    const j = el("div", "junction narrow-only");
+    j.setAttribute("aria-hidden", "true");
+    j.appendChild(icon("down", 24));
+    const line = el("span", "j-text");
+    line.append(document.createTextNode(text + " "), el("span", "pill", label));
+    j.appendChild(line);
+    if (first) j.style.marginTop = "6px";
+    return j;
+  }
+
+  /* Hover, focus and pinning */
+  function hoverable(elm, key) {
+    elm.addEventListener("pointerenter", e => {
+      if (e.pointerType === "touch") return;
+      hoverKey = key; trace();
+    });
+    elm.addEventListener("pointerleave", () => { if (hoverKey === key) { hoverKey = null; trace(); } });
+    elm.addEventListener("focus", () => {
+      let visible = true;
+      try { visible = elm.matches(":focus-visible"); } catch (e) { /* older browsers */ }
+      if (visible) { focusKey = key; trace(); }
+    });
+    elm.addEventListener("blur", () => { if (focusKey === key) { focusKey = null; trace(); } });
+  }
+
+  function trace() {
+    const key = hoverKey || focusKey || pinnedKey || (current ? "tbl:" + current : null);
+    const rel = key ? relations(plan, key) : null;
+    flow.classList.toggle("tracing", !!rel);
+    for (const [k, e] of nodeEls) {
+      e.classList.toggle("on", !!rel && rel.nodes.has(k));
+      e.classList.toggle("is-selected", current != null && k === "tbl:" + current);
+      if (k.startsWith("src:")) e.setAttribute("aria-pressed", String(pinnedKey === k));
+    }
+    for (const [id, w] of wireEls) w.g.classList.toggle("on", !!rel && rel.wires.has(id));
+    for (const [k, b] of keyEls) b.setAttribute("aria-pressed", String(pinnedKey === k));
+    showCaption(key);
+  }
+
+  function showCaption(key) {
+    caption.replaceChildren();
+    const put = (strong, rest) => { caption.append(el("strong", null, strong), document.createTextNode(rest)); };
+    if (!key) { caption.textContent = "Point at (or tap) a source to trace its tables. Click a table to see its columns."; return; }
+    if (key.startsWith("tbl:")) {
+      const t = plan.byName.get(key.slice(4));
+      if (t) put(titleOf(t), t.summary ? "  " + t.summary : "");
+    } else if (key.startsWith("src:")) {
+      const g = plan.groups.find(x => x.id === key);
+      if (!g) return;
+      const names = g.tables.map(titleOf);
+      if (g.feedsHub && plan.hub) names.push(titleOf(plan.hub));
+      put(groupWords(g).name, ": " + joinWords(names) + ".");
+    } else if (key === "fill:api") {
+      put(FILLS.api.long, ": downloaded again only when someone runs the command shown in each table's details.");
+    } else if (key === "fill:excel") {
+      put(FILLS.excel.long, ": you download and upload these as Excel files in the admin page.");
+    } else if (key === "fill:quiet") {
+      put("Housekeeping", ": changed with a database command, or kept by the admin page as you use it.");
+    } else if (key === "link" && plan.hub) {
+      put(plan.hubLabel, ": every table with a line to " + titleOf(plan.hub) + " has this column, so each of its rows belongs to one catchment.");
+    }
+  }
+
+  /* Drawing the lines (wide screens only) */
+  let drawQueued = false;
+  function queueDraw() {
+    if (drawQueued) return;
+    drawQueued = true;
+    requestAnimationFrame(() => { drawQueued = false; draw(); });
+  }
+  function draw() {
+    if (!wideQuery.matches) return;
+    const fr = flow.getBoundingClientRect();
+    const w = Math.ceil(flow.clientWidth || fr.width), h = Math.ceil(flow.clientHeight || fr.height);
+    svg.setAttribute("width", w);
+    svg.setAttribute("height", h);
+    svg.setAttribute("viewBox", "0 0 " + w + " " + h);
+    const rectOf = key => {
+      const e = anchors.get(key);
+      if (!e) return null;
+      const r = e.getBoundingClientRect();
+      if (!r.width && !r.height) return null;
+      return { l: r.left - fr.left, t: r.top - fr.top, r: r.right - fr.left, b: r.bottom - fr.top };
+    };
+    const bandRect = rectOf("band");
+    const geo = geometry(plan, rectOf, bandRect ? midY(bandRect) : null);
+    for (const g of geo) {
+      const we = wireEls.get(g.id);
+      if (!we) continue;
+      we.path.setAttribute("d", g.d);
+      while (we.g.childNodes.length > 1) we.g.removeChild(we.g.lastChild);
+      for (const [x, y] of g.dots) we.g.appendChild(svgEl("circle", { cx: num(x), cy: num(y), r: 3.5 }));
+    }
+  }
+  if (window.ResizeObserver) new window.ResizeObserver(queueDraw).observe(flow);
+  window.addEventListener("resize", queueDraw);
+  if (wideQuery.addEventListener) wideQuery.addEventListener("change", queueDraw);
+  queueDraw();
+
+  /* Details panel */
+  function openDetails(name, from, instant) {
+    const t = plan.byName.get(name);
+    if (!t) return;
+    if (!current) opener = from || document.activeElement;
+    current = name;
+    pinnedKey = null;
+    renderDetails(t);
+    if (instant) {
+      panel.classList.add("instant");
+      requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.remove("instant")));
+    }
+    panel.classList.add("open");
+    document.body.classList.toggle("panel-open-narrow", !wideQuery.matches);
+    panel.scrollTop = 0;
+    const hash = "#" + encodeURIComponent(name);
+    if (location.hash !== hash) history.replaceState(null, "", hash);
+    trace();
+    panelTitle.focus({ preventScroll: true });
+  }
+
+  function closeDetails() {
+    if (!current) return;
+    const name = current;
+    current = null;
+    panel.classList.remove("open");
+    document.body.classList.remove("panel-open-narrow");
+    history.replaceState(null, "", location.pathname + location.search);
+    const node = nodeEls.get("tbl:" + name);
+    const back = node || (opener && document.body.contains(opener) ? opener : null);
+    opener = null;
+    trace();
+    if (back) back.focus({ preventScroll: false });
+  }
+
+  closeBtn.addEventListener("click", closeDetails);
+  document.addEventListener("keydown", e => {
+    if (e.key !== "Escape") return;
+    if (current) { e.preventDefault(); closeDetails(); }
+    else if (pinnedKey) { pinnedKey = null; trace(); }
+  });
+  window.addEventListener("hashchange", () => {
+    const name = hashName();
+    if (name && plan.byName.has(name)) openDetails(name);
+    else if (!name) closeDetails();
+  });
+  function hashName() {
+    const raw = location.hash.replace(/^#/, "");
+    try { return decodeURIComponent(raw); } catch (e) { return raw; }
+  }
+
+  function jumpButton(t) {
+    const b = el("button", "jump f-" + fillOf(t));
+    b.type = "button";
+    const ic = el("span", "j-icon");
+    ic.appendChild(icon(FILLS[fillOf(t)].icon, 16));
+    b.append(ic, el("span", null, titleOf(t)));
+    b.addEventListener("click", () => openDetails(t.name));
+    return b;
+  }
+
+  function renderDetails(t) {
+    const f = fillOf(t);
+    const quiet = !!QUIET[f];
+
+    // 1. Title and how it's filled
+    const badge = el("span", "p-badge f-" + f + (quiet ? " quiet" : ""));
+    const bi = el("span", "b-icon");
+    bi.appendChild(icon(FILLS[f].icon, 16));
+    badge.append(bi, el("span", null, FILLS[f].long));
+    if (FILLS[f].tag && f === "api") badge.appendChild(el("span", "tag", FILLS[f].tag));
+    panelBadge.replaceChildren(badge);
+    panelBody.className = "f-" + f;
+    panelTitle.textContent = titleOf(t);
+
+    const out = [];
+    const tech = el("p", "tech");
+    tech.append(document.createTextNode("In the database: "), el("code", null, t.name));
+    out.push(tech);
+
+    // 2. What it is
+    if (t.description || t.summary) out.push(el("p", "desc", t.description || t.summary));
+
+    // 3. Where its data comes from
+    out.push(fromBox(t, f));
+
+    // 4. Rows
+    const facts = el("div", "facts");
+    if (t.rows != null) {
+      const fact = el("div", "fact");
+      if (t.rows === 0) fact.textContent = rowsText(0);
+      else fact.append(el("span", "big", Number(t.rows).toLocaleString("en-GB")), document.createTextNode(t.rows === 1 ? " row" : " rows"));
+      facts.appendChild(fact);
+    }
+    if (Array.isArray(t.one_row_per) && t.one_row_per.length) {
+      const fact = el("div", "fact");
+      fact.appendChild(document.createTextNode("One row for each "));
+      t.one_row_per.forEach((label, i) => {
+        if (i > 0) fact.appendChild(document.createTextNode(i === t.one_row_per.length - 1 ? " and " : ", "));
+        const col = (t.columns || []).find(c => (c.label || c.name) === label);
+        fact.appendChild(el("span", "chip" + (col && col.catchment_id ? " cid" : ""), label));
+      });
+      facts.appendChild(fact);
+    }
+    if (facts.childNodes.length) out.push(facts);
+
+    // 5. Columns
+    if ((t.columns || []).length) out.push(...columnsBlock(t));
+
+    // 6. Links
+    out.push(...linksBlock(t));
+
+    panelBody.replaceChildren(...out);
+  }
+
+  function fromBox(t, f) {
+    const box = el("section", "from f-" + f);
+    box.setAttribute("aria-label", "Where its data comes from");
+    const head = el("div", "from-head");
+    head.append(icon(FILLS[f].icon, 18), el("span", null, FILLS[f].long));
+    box.appendChild(head);
+    if (f === "api") {
+      if (t.source) {
+        const p = el("p");
+        p.append(document.createTextNode("From "), el("strong", null, t.source), document.createTextNode("."));
+        box.appendChild(p);
+      }
+      if (t.command) {
+        box.appendChild(el("p", "muted", "It only changes when someone downloads it again, by running this command:"));
+        const cmd = el("div", "cmd");
+        const code = el("code", null, t.command);
+        const copy = el("button", "copy");
+        copy.type = "button";
+        const label = el("span", null, "Copy");
+        copy.append(icon("copy", 15), label);
+        copy.setAttribute("aria-label", "Copy the command");
+        const status = el("p", "status");
+        status.setAttribute("role", "status");
+        copy.addEventListener("click", () => copyText(t.command, code, label, status));
+        cmd.append(code, copy);
+        box.append(cmd, status);
+      }
+    } else if (f === "excel") {
+      box.appendChild(el("p", null, "You upload it as an Excel file in the admin page. You can download the table there too, change it, and upload it again."));
+      if (typeof t.admin_url === "string" && /^\/(?!\/)/.test(t.admin_url)) {
+        const a = el("a", "btn", "Download or upload in the admin page →");
+        a.setAttribute("href", t.admin_url);
+        box.appendChild(a);
+      }
+    } else if (t.note) {
+      box.appendChild(el("p", null, t.note));
+    }
+    return box;
+  }
+
+  function copyText(text, code, label, status) {
+    const done = ok => {
+      label.textContent = ok ? "Copied" : "Copy";
+      status.textContent = ok ? "Copied to the clipboard." : "Selected: press Ctrl+C (or ⌘C) to copy.";
+      setTimeout(() => { label.textContent = "Copy"; }, 1600);
+    };
+    const fallback = () => {
+      try {
+        const range = document.createRange();
+        range.selectNodeContents(code);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        done(document.execCommand && document.execCommand("copy"));
+      } catch (e) { done(false); }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => done(true), fallback);
+    else fallback();
+  }
+
+  function columnsBlock(t) {
+    const cols = t.columns || [];
+    const h = el("h3");
+    h.append(document.createTextNode("Columns"), el("span", "n", cols.length));
+    const hint = el("p", "hint", "Row 2 is a made-up example, not real data. Choose a column to see what it means.");
+
+    const wrap = el("div", "sheet-wrap");
+    wrap.setAttribute("role", "region");
+    wrap.setAttribute("aria-label", "Columns of " + titleOf(t) + ", with an example row");
+    wrap.tabIndex = 0;
+    const table = el("table", "sheet");
+    const thead = el("thead");
+    const letters = el("tr", "letters");
+    letters.setAttribute("aria-hidden", "true");
+    letters.appendChild(el("th", "rownum"));
+    const labels = el("tr", "labels");
+    const r1 = el("th", "rownum", "1");
+    r1.setAttribute("aria-hidden", "true");
+    labels.appendChild(r1);
+    const tbody = el("tbody");
+    const exRow = el("tr", "example");
+    const r2 = el("th", "rownum", "2");
+    r2.setAttribute("aria-hidden", "true");
+    exRow.appendChild(r2);
+
+    const card = el("div", "col-card");
+    card.setAttribute("aria-live", "polite");
+    const buttons = [], cells = [];
+    let chosen = -1;
+    const choose = i => {
+      if (i === chosen) return;
+      chosen = i;
+      buttons.forEach((b, j) => b.setAttribute("aria-pressed", String(j === i)));
+      cells.forEach((c, j) => c.classList.toggle("on", j === i));
+      card.replaceChildren(...columnCard(t, cols[i]));
+    };
+
+    cols.forEach((c, i) => {
+      letters.appendChild(el("th", null, columnLetters(i)));
+      const th = el("th");
+      th.setAttribute("scope", "col");
+      const b = el("button", "col-btn" + (c.catchment_id ? " cid" : ""));
+      b.type = "button";
+      const lab = el("span", "c-label");
+      lab.appendChild(el("span", null, c.label || c.name));
+      if (c.key) lab.appendChild(icon("key", 13));
+      if (outgoing(t, c).length) lab.appendChild(icon("link", 13));
+      b.append(lab, el("span", "c-type", c.type || ""));
+      b.addEventListener("click", () => choose(i));
+      b.addEventListener("focus", () => choose(i));
+      b.addEventListener("pointerenter", e => { if (e.pointerType === "mouse") choose(i); });
+      buttons.push(b);
+      th.appendChild(b);
+      labels.appendChild(th);
+      const td = el("td", c.catchment_id ? "cid" : null, c.example ? c.example : "–");
+      cells.push(td);
+      exRow.appendChild(td);
+    });
+    thead.append(letters, labels);
+    tbody.appendChild(exRow);
+    table.append(thead, tbody);
+    wrap.appendChild(table);
+    choose(0);
+    return [h, hint, wrap, card];
+  }
+
+  function outgoing(t, c) { return plan.links.filter(l => l.from === t.name && l.column === c.name); }
+
+  function columnCard(t, c) {
+    const out = [];
+    const head = el("div", "cc-head");
+    head.append(el("strong", null, c.label || c.name), el("code", null, c.name));
+    if (c.type) head.appendChild(el("span", "chip", c.type));
+    out.push(head);
+    if (c.meaning) out.push(el("p", null, c.meaning));
+    if (c.example) {
+      const ex = el("p", "ex");
+      ex.append(document.createTextNode("Example: "), el("code", null, c.example));
+      out.push(ex);
+    }
+    const flags = [];
+    if (c.catchment_id) flags.push(["Catchment ID", "cid"]);
+    if (c.unique_id) flags.push(["Unique ID"]);
+    else if (c.key) flags.push(["Part of each row's ID"]);
+    if (c.required) flags.push(["Required"]);
+    else if (!c.automatic) flags.push(["Can be empty"]);
+    if (c.automatic) flags.push(["Numbered by the database"]);
+    if (c.no_duplicates) flags.push(["No duplicates"]);
+    if (c.default) flags.push(["If left empty: " + c.default]);
+    if (flags.length) {
+      const fl = el("div", "flags");
+      for (const [text, cls] of flags) fl.appendChild(el("span", "flag" + (cls ? " " + cls : ""), text));
+      out.push(fl);
+    }
+    const targets = outgoing(t, c).map(l => l.to);
+    if (c.links_to && !targets.includes(c.links_to) && plan.byName.has(c.links_to)) targets.push(c.links_to);
+    if (targets.length) {
+      const row = el("div", "link-row");
+      row.style.marginTop = "10px";
+      row.appendChild(el("span", "via", targets.length > 1 ? "Names one of:" : "Links to"));
+      const jumps = el("div", "jumps");
+      for (const name of targets) {
+        if (name === t.name) jumps.appendChild(el("span", "chip", "Other rows of this table"));
+        else jumps.appendChild(jumpButton(plan.byName.get(name)));
+      }
+      row.appendChild(jumps);
+      out.push(row);
+    }
+    return out;
+  }
+
+  function linksBlock(t) {
+    const out = [el("h3", null, "Links")];
+    const box = el("div");
+    const isCid = (tbl, col) => { const c = columnOf(tbl, col); return !!(c && c.catchment_id); };
+
+    // What this table links to, one row per column
+    const outLinks = plan.links.filter(l => l.from === t.name);
+    const byColumn = new Map();
+    for (const l of outLinks) {
+      if (!byColumn.has(l.column)) byColumn.set(l.column, []);
+      if (!byColumn.get(l.column).includes(l.to)) byColumn.get(l.column).push(l.to);
+    }
+    if (byColumn.size) {
+      box.appendChild(el("p", "link-dir", "Links to"));
+      const rows = el("div", "link-rows");
+      for (const [col, targets] of byColumn) {
+        const row = el("div", "link-row");
+        row.append(el("span", "chip" + (isCid(t, col) ? " cid" : ""), columnLabel(t, col)), icon("right", 16));
+        const jumps = el("div", "jumps");
+        for (const name of targets) {
+          if (name === t.name) jumps.appendChild(el("span", "chip", "Other rows of this table"));
+          else jumps.appendChild(jumpButton(plan.byName.get(name)));
+        }
+        row.appendChild(jumps);
+        rows.appendChild(row);
+      }
+      box.appendChild(rows);
+    }
+
+    // What links to this table
+    const inLinks = plan.links.filter(l => l.to === t.name && l.from !== t.name);
+    if (inLinks.length) {
+      box.appendChild(el("p", "link-dir", "Linked from"));
+      const rows = el("div", "link-rows");
+      const seenIn = new Set();
+      for (const l of inLinks) {
+        const k = l.from + "|" + l.column;
+        if (seenIn.has(k)) continue;
+        seenIn.add(k);
+        const from = plan.byName.get(l.from);
+        const row = el("div", "link-row");
+        row.append(jumpButton(from), el("span", "via", "by its"), el("span", "chip" + (isCid(from, l.column) ? " cid" : ""), columnLabel(from, l.column)));
+        rows.appendChild(row);
+      }
+      box.appendChild(rows);
+    }
+    if (!byColumn.size && !inLinks.length) box.appendChild(el("p", "none", "No links to other tables."));
+    out.push(box);
+    return out;
+  }
+
+  /* Go */
+  trace();
+  const first = hashName();
+  if (first && plan.byName.has(first)) openDetails(first, null, true);
+}
+
+if (typeof document !== "undefined" && document.getElementById("model")) start();
+</script>
+</body>
+</html>
