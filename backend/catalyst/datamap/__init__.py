@@ -4,6 +4,6 @@ Shown in the admin page at /admin/data-map. Optional and self-contained: see
 README.md (including how to remove it).
 """
 
-from .build import render
+from .build import model, render
 
-__all__ = ["render"]
+__all__ = ["model", "render"]

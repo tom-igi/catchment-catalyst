@@ -270,8 +270,14 @@ def upload_file(request: Request, user: User, upload_id: int):
 if datamap:
     @router.get("/data-map")
     def data_map(request: Request, user: User):
+        state = request.app.state
         try:
-            page = datamap.render(request.app.state.schema)
+            with state.engine.connect() as conn:
+                counts = {t.name: _count(conn, t) for t in state.schema.metadata.tables.values()}
+        except sa.exc.DBAPIError:  # e.g. a table that isn't made yet: show the page without row counts
+            counts = None
+        try:
+            page = datamap.render(state.schema, counts)
         except ValueError as e:  # e.g. sections.yaml names a table that's been renamed
             raise HTTPException(500, f"The data map couldn't be made: {e}") from e
         return HTMLResponse(page)

@@ -61,8 +61,9 @@ It shows the data as it was when it was last published (see step 5).
 
 ## 5. Update the tables in the database
 
-Most tables are updated in one of the two ways below; the data map (step 4) says which, under
-"How it's filled". Locations are the exception, and are changed with the commands after that.
+Most tables are updated in one of the two ways below; the data map (step 4) marks each table
+**Downloaded** or **Excel upload**. Locations are the exception, and are changed with the
+commands after that.
 
 ### Tables updated by Excel upload (e.g. EA Scores, Habitat & Land Use)
 

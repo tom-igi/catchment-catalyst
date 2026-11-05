@@ -1,9 +1,10 @@
-"""The data map page lists everything in the master schema file, behind the admin login.
+"""The data map page shows everything in the master schema file, behind the admin login.
 
 Skipped if the optional catalyst/datamap folder has been removed.
 """
 
-import html
+import json
+import re
 
 import pytest
 from fastapi.testclient import TestClient
@@ -15,49 +16,82 @@ datamap = pytest.importorskip("catalyst.datamap")
 
 from .test_admin import app, client  # noqa: E402, F401  (the logged-in admin page)
 
+MODEL_TAG = re.compile(r'<script id="model" type="application/json">(.*?)</script>', re.S)
 ONLY_DATA_TABLES_SECTION = """
 sections: []
 data_tables: {title: Data tables, description: One per dataset.}
 """
 
 
-def test_page_shows_every_table_and_column():
+def page_model(page: str) -> dict:
+    return json.loads(MODEL_TAG.search(page).group(1))
+
+
+def test_page_has_every_table_and_column():
     schema = load_schema()
     page = datamap.render(schema)
-    for table in schema.metadata.tables.values():
-        assert f'id="{table.name}"' in page
-        assert html.escape(table.info["title"]) in page
-        for column in table.columns:
-            assert f"<code>{column.name}</code>" in page
+    assert "__DATA__" not in page
     assert '<meta name="robots" content="noindex, nofollow">' in page
-    assert "<strong>How it's filled:</strong> uploaded as an Excel file in the admin page." in page
+    tables = {t["name"]: t for t in page_model(page)["tables"]}
+    assert set(tables) == set(schema.metadata.tables)
+    for table in schema.metadata.tables.values():
+        assert tables[table.name]["title"] == table.info["title"]
+        assert [c["name"] for c in tables[table.name]["columns"]] == [c.name for c in table.columns]
 
 
 def test_sections_come_in_the_order_of_sections_yaml():
-    page = datamap.render(load_schema())
-    positions = [page.index(f"<h2>{title}</h2>") for title in ["Locations", "Catchments", "Datasets", "Uploads", "Data tables"]]
-    assert positions == sorted(positions)
-    assert "Other tables" not in page  # every core table has a section
+    sections = [s["title"] for s in datamap.model(load_schema())["sections"]]
+    assert sections == ["Locations", "Catchments", "Datasets", "Uploads", "Data tables"]  # every core table has a section
 
 
-def test_a_table_missing_from_the_schema_is_reported(tmp_path):
-    sections = tmp_path / "sections.yaml"
-    sections.write_text(ONLY_DATA_TABLES_SECTION.replace("sections: []", "sections: [{title: X, description: Y, tables: [nope]}]"))
+def test_the_model_says_how_each_table_is_filled():
+    tables = {t["name"]: t for t in datamap.model(load_schema())["tables"]}
+    assert tables["catchments"]["fill"] == "api"
+    assert tables["catchments"]["source"] == "Environment Agency, Catchment Data Explorer"
+    assert tables["catchments"]["command"] == "docker compose run --rm importer catchments imports/catchments.json"
+    assert (tables["ea_scores"]["fill"], tables["ea_scores"]["admin_url"]) == ("excel", "/admin/tables/ea_scores")
+    assert (tables["uploads"]["fill"], tables["locations"]["fill"]) == ("admin", "command")
+    assert all(t["fill"] in {"api", "excel"} for t in tables.values() if t["kind"] == "data")
+    assert tables["locations"]["summary"].startswith("One row per dashboard location (e.g. North Devon): ")
+    assert tables["ea_scores"]["one_row_per"] == ["Catchment ID", "Measure", "Year"]
+
+
+def test_the_model_has_every_link():
+    model = datamap.model(load_schema())
+    links = {(l["from"], l["column"], l["to"], l["kind"]) for l in model["links"]}
+    data_tables = [t["name"] for t in model["tables"] if t["kind"] == "data"]
+    assert {(name, "catchment_id", "catchments", "id") for name in data_tables} <= links
+    assert ("locations", "catchment_ids", "catchments", "list") in links
+    assert {("datasets", "table_name", name, "name") for name in data_tables} <= links
+    assert ("uploads", "table_name", "ea_scores", "name") in links
+
+
+def test_a_mistake_in_sections_yaml_is_reported(tmp_path):
+    settings = tmp_path / "sections.yaml"
+    settings.write_text(ONLY_DATA_TABLES_SECTION.replace("sections: []", "sections: [{title: X, description: Y, tables: [nope]}]"))
     with pytest.raises(ValueError, match="lists nope, which isn't a core table"):
-        datamap.render(load_schema(), sections)
+        datamap.render(load_schema(), sections_file=settings)
+    settings.write_text(ONLY_DATA_TABLES_SECTION + "filled: {nope: {how: admin}}\n")
+    with pytest.raises(ValueError, match="has nope, which isn't in schema.yaml"):
+        datamap.model(load_schema(), sections_file=settings)
+    settings.write_text(ONLY_DATA_TABLES_SECTION + "links: [{from: locations.nope, to: catchments}]\n")
+    with pytest.raises(ValueError, match="has locations.nope, which isn't in schema.yaml"):
+        datamap.model(load_schema(), sections_file=settings)
 
 
-def test_text_from_the_schema_is_escaped(tmp_path):
+def test_text_from_the_schema_cant_break_the_page(tmp_path):
     sections = tmp_path / "sections.yaml"
     sections.write_text(ONLY_DATA_TABLES_SECTION)
+    title = "Fish & </script><b>chips</b>"
     schema = build_schema({"tables": {"things": {
-        "title": "Fish & <chips>",
+        "title": title,
         "columns": {"id": {"type": "integer", "primary_key": True, "example": "<b>1</b>"}},
     }}})
-    page = datamap.render(schema, sections)
-    assert "Fish &amp; &lt;chips&gt;" in page
-    assert "<b>1</b>" not in page
-    assert "<h2>Other tables</h2>" in page  # a table without a section still appears
+    page = datamap.render(schema, sections_file=sections)
+    assert "</script><b>" not in page
+    model = page_model(page)
+    assert model["tables"][0]["title"] == title  # the page shows it as text
+    assert model["sections"][0]["title"] == "Other tables"  # a table without a section still appears
 
 
 # --- In the admin page -----------------------------------------------------------
@@ -71,5 +105,6 @@ def test_the_admin_page_shows_the_data_map_after_logging_in(app, client):
     assert page.status_code == 200
     assert page.headers["content-type"].startswith("text/html")
     assert '<a class="back" href="/admin">← Admin</a>' in page.text
-    for table in app.state.schema.metadata.tables.values():
-        assert f'id="{table.name}"' in page.text
+    rows = {t["name"]: t["rows"] for t in page_model(page.text)["tables"]}
+    assert set(rows) == set(app.state.schema.metadata.tables)
+    assert rows["catchments"] == 2

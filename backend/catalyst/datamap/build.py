@@ -1,15 +1,17 @@
 """Make the data map page from the master schema file.
 
-The admin page shows it at /admin/data-map. It's plain HTML and CSS, with no
-scripts or outside files.
+The admin page shows it at /admin/data-map. `model` gathers the facts: every
+table and column from schema.yaml, plus the sections, how each table is filled
+and the extra links from sections.yaml. `render` puts them, as JSON, into
+page.html, whose script draws the diagram. The page has no outside files.
 """
 
 from __future__ import annotations
 
-import html
+import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
-from string import Template
 
 import sqlalchemy as sa
 import yaml
@@ -19,20 +21,19 @@ from sqlalchemy.dialects import postgresql
 from catalyst.db.schema import CATCHMENT_REFERENCE, Schema, load_schema
 
 HERE = Path(__file__).parent
+PLACEHOLDER = "__DATA__"
+FILLS = {"api", "excel", "command", "admin"}
 
 MAP_SHAPES = {
     "POINT": "Map point", "MULTIPOINT": "Map points",
     "LINESTRING": "Map line", "MULTILINESTRING": "Map line",
     "POLYGON": "Map area", "MULTIPOLYGON": "Map area",
 }
-DEFAULTS = {"now()": "Set automatically to the current time", "true": "Default: Yes", "false": "Default: No"}
+DEFAULTS = {"now()": "the current time", "true": "Yes", "false": "No"}
 WORDS = {"id": "ID", "ea": "EA", "url": "URL", "ha": "(ha)", "km": "(km)", "ids": "IDs"}
-FILLED_BY = {
-    "api": "downloaded from an outside service by an importer.",
-    "excel": "uploaded as an Excel file in the admin page.",
-}
 PLURALS = {"Text": "text", "Whole number": "whole numbers", "Number": "numbers", "Date": "dates",
            "Date and time": "dates and times", "Yes / No": "yes / no values", "ID code": "ID codes"}
+SENTENCE_END = re.compile(r"(?<!e\.g)(?<!i\.e)\.\s")  # not the dot in "e.g. " or "i.e. "
 
 
 @dataclass
@@ -43,19 +44,41 @@ class Section:
     data: bool = False  # the data tables section
 
 
-def render(schema: Schema | None = None, sections_file: Path = HERE / "sections.yaml") -> str:
-    """The page's HTML."""
+def render(schema: Schema | None = None, counts: dict[str, int] | None = None,
+           sections_file: Path = HERE / "sections.yaml") -> str:
+    """The page's HTML. `counts` is each table's number of rows, if known."""
+    page = (HERE / "page.html").read_text(encoding="utf-8")
+    data = json.dumps(model(schema, counts, sections_file), ensure_ascii=False)
+    return page.replace(PLACEHOLDER, data.replace("</", "<\\/"), 1)  # so no text can end the <script>
+
+
+def model(schema: Schema | None = None, counts: dict[str, int] | None = None,
+          sections_file: Path = HERE / "sections.yaml") -> dict:
+    """Every table, its columns, how it's filled and what it links to."""
     schema = schema or load_schema()
-    sections = _sections(schema, sections_file)
-    return Template((HERE / "page.html").read_text(encoding="utf-8")).substitute(
-        sections="\n".join(_section(s) for s in sections),
-        tables="\n".join(_card(t, s) for s in sections for t in s.tables),
-    )
-
-
-def _sections(schema: Schema, sections_file: Path) -> list[Section]:
-    """The page's sections, from sections.yaml, with every table in exactly one."""
     config = yaml.safe_load(Path(sections_file).read_text(encoding="utf-8"))
+    filled = config.get("filled") or {}
+    tables = schema.metadata.tables
+    unknown = [name for name in filled if name not in tables]
+    if unknown:
+        raise ValueError(f"The `filled` list in sections.yaml has {', '.join(unknown)}, which isn't in schema.yaml")
+
+    sections = _sections(schema, config)
+    return {
+        "sections": [
+            {"title": s.title, "description": s.description, "data": s.data, "tables": [t.name for t in s.tables]}
+            for s in sections
+        ],
+        "tables": [
+            _table(t, schema, s.title, filled.get(t.name) or {}, (counts or {}).get(t.name))
+            for s in sections for t in s.tables
+        ],
+        "links": _links(schema, config.get("links") or []),
+    }
+
+
+def _sections(schema: Schema, config: dict) -> list[Section]:
+    """The sections from sections.yaml, with every table in exactly one."""
     tables = schema.metadata.tables
     core = [name for name in tables if name not in schema.data_tables]
     sections, placed = [], set()
@@ -73,104 +96,77 @@ def _sections(schema: Schema, sections_file: Path) -> list[Section]:
     return [s for s in sections if s.tables]
 
 
-def _section(section: Section) -> str:
-    tiles = "".join(
-        f'<a class="tile" href="#{t.name}">'
-        f'<span class="tile-title">{_e(_title(t))}</span>'
-        f'<span class="tile-desc">{_e(_first_sentence(t.comment))}</span>'
-        f'<span class="tile-meta">{len(t.columns)} columns</span></a>'
-        for t in section.tables
-    )
-    return (
-        f'<section class="group"><h2>{_e(section.title)}</h2>'
-        f'<p class="group-note">{_e(section.description)}</p><div class="tiles">{tiles}</div></section>'
-    )
+def _table(table: sa.Table, schema: Schema, section: str, filled: dict, rows: int | None) -> dict:
+    fill = table.info.get("filled_by") or filled.get("how") or "command"
+    if fill not in FILLS:
+        raise ValueError(f"{table.name}: how it's filled must be one of {', '.join(sorted(FILLS))}, not {fill}")
+    key = list(table.primary_key.columns)
+    return {
+        "name": table.name,
+        "title": _title(table),
+        "description": _plain(table.comment),
+        "summary": _first_sentence(_plain(table.comment)),
+        "kind": "data" if table.name in schema.data_tables else "core",
+        "section": section,
+        "fill": fill,  # api, excel, command or admin
+        "source": filled.get("source"),
+        "command": f"docker compose run --rm {filled['command']}" if filled.get("command") else None,
+        "note": filled.get("note"),
+        "admin_url": f"/admin/tables/{table.name}" if fill == "excel" else None,
+        "rows": rows,
+        "one_row_per": [_label(c) for c in key] if len(key) > 1 else None,
+        "columns": [_column(c, len(key)) for c in table.columns],
+    }
 
 
-def _card(table: sa.Table, section: Section) -> str:
-    columns = list(table.columns)
-    headings = "".join(f'<th scope="col"{_catchment_class(c)}>{_e(_label(c))}</th>' for c in columns)
-    types = "".join(f"<td>{_type(c)}</td>" for c in columns)
-    example = "".join(f"<td>{_e(_example(c.info.get('example')))}</td>" for c in columns)
-
-    key = [c for c in table.primary_key.columns]
-    one_row_per = ""
-    if len(key) > 1:
-        one_row_per = f" There is one row for each combination of {_e(_join([_label(c) for c in key]))}."
-
-    rows = "".join(
-        f'<tr><th scope="row">{_e(_label(c))}<code>{_e(c.name)}</code></th>'
-        f"<td>{_type(c)}{_flags(c, len(key))}</td><td>{_e(_meaning(c))}</td></tr>"
-        for c in columns
-    )
-    return f"""
-<section class="card" id="{table.name}">
-  <div class="card-head">
-    <h3>{_e(_title(table))}</h3>
-    <span class="tag{' data' if section.data else ''}">{_e('Data table' if section.data else section.title)}</span>
-    <code class="tech">{_e(table.name)}</code>
-  </div>
-  <p class="card-desc">{_e(table.comment or '')}</p>{_filled_by(table)}
-  <div class="scroll" role="region" aria-label="{_e(_title(table))}: columns and an example row" tabindex="0">
-    <table class="sheet">
-      <thead><tr>{headings}</tr><tr class="types">{types}</tr></thead>
-      <tbody><tr class="example">{example}</tr></tbody>
-    </table>
-  </div>
-  <p class="note">The shaded row is an example of what each column holds, not real data.{one_row_per}</p>
-  <table class="columns">
-    <thead><tr><th scope="col">Column</th><th scope="col">Holds</th><th scope="col">What it means</th></tr></thead>
-    <tbody>{rows}</tbody>
-  </table>
-  <a class="top" href="#top">Back to the list of tables</a>
-</section>"""
-
-
-def _filled_by(table: sa.Table) -> str:
-    how = FILLED_BY.get(table.info.get("filled_by"))
-    return f'\n  <p class="note"><strong>How it\'s filled:</strong> {_e(how)}</p>' if how else ""
-
-
-def _flags(column: sa.Column, key_size: int) -> str:
-    flags = []
-    if column.primary_key and key_size == 1:
-        flags.append(("Unique ID", ""))
-    elif not column.nullable and column.identity is None:
-        flags.append(("Required", ""))
-    if column.identity is not None:
-        flags.append(("Numbered automatically", ""))
-    if column.unique:
-        flags.append(("No duplicates", ""))
+def _column(column: sa.Column, key_size: int) -> dict:
+    links_to = [fk.column.table.name for fk in column.foreign_keys]
+    default = None
     if column.server_default is not None and column.identity is None:
         text = getattr(column.server_default.arg, "text", str(column.server_default.arg))
-        flags.append((DEFAULTS.get(text, f"Default: {text}"), ""))
-    for fk in column.foreign_keys:
-        target = fk.column.table
-        style = " catchment" if fk.target_fullname == CATCHMENT_REFERENCE else ""
-        flags.append((f'Links to <a href="#{target.name}">{_e(_title(target))}</a>', style))
-    return "".join(f'<span class="flag{style}">{text}</span>' for text, style in flags)
+        default = DEFAULTS.get(text, text)
+    return {
+        "name": column.name,
+        "label": _label(column),
+        "type": _type_label(column.type),
+        "meaning": _plain(column.comment) or ("The catchment this row belongs to" if _is_catchment_id(column) and links_to else ""),
+        "example": _example(column.info.get("example")),
+        "key": bool(column.primary_key),
+        "unique_id": bool(column.primary_key and key_size == 1),
+        "required": not column.nullable and column.identity is None,
+        "automatic": column.identity is not None,
+        "no_duplicates": bool(column.unique),
+        "default": default,
+        "links_to": links_to[0] if links_to else None,
+        "catchment_id": _is_catchment_id(column),
+    }
 
 
-def _meaning(column: sa.Column) -> str:
-    if column.comment:
-        return column.comment
-    if _is_catchment_id(column) and column.foreign_keys:
-        return "The catchment this row belongs to"
-    return ""
-
-
-def _catchment_class(column: sa.Column) -> str:
-    return ' class="catchment"' if _is_catchment_id(column) else ""
+def _links(schema: Schema, extra: list[dict]) -> list[dict]:
+    """Every link between tables: `id` (checked by the database), `list` (a list of IDs) or `name` (a table's name)."""
+    tables = schema.metadata.tables
+    links = [
+        {"from": t.name, "column": c.name, "to": fk.column.table.name, "kind": "id", "required": not c.nullable}
+        for t in tables.values() for c in t.columns for fk in c.foreign_keys
+    ]
+    groups = {"data tables": list(schema.data_tables), "excel tables": list(schema.excel_tables)}
+    for entry in extra:
+        table_name, _, column_name = entry["from"].partition(".")
+        if table_name not in tables or column_name not in tables[table_name].columns:
+            raise ValueError(f"The `links` list in sections.yaml has {entry['from']}, which isn't in schema.yaml")
+        column = tables[table_name].columns[column_name]
+        for target in groups.get(entry["to"], [entry["to"]]):
+            if target not in tables:
+                raise ValueError(f"The `links` list in sections.yaml links to {target}, which isn't in schema.yaml")
+            kind = "list" if isinstance(column.type, sa.ARRAY) else "name"
+            links.append({"from": table_name, "column": column_name, "to": target, "kind": kind, "required": not column.nullable})
+    return links
 
 
 def _is_catchment_id(column: sa.Column) -> bool:
     return f"{column.table.name}.{column.name}" == CATCHMENT_REFERENCE or any(
         fk.target_fullname == CATCHMENT_REFERENCE for fk in column.foreign_keys
     )
-
-
-def _type(column: sa.Column) -> str:
-    return _type_label(column.type)
 
 
 def _type_label(t) -> str:
@@ -214,16 +210,11 @@ def _example(value) -> str:
     return str(value)
 
 
-def _first_sentence(text: str | None) -> str:
-    if not text:
-        return ""
-    first, dot, _ = text.partition(". ")
-    return first + "." if dot else text
+def _plain(text: str | None) -> str:
+    """Text from schema.yaml without its `code` marks, which the page shows as plain text."""
+    return (text or "").replace("`", "")
 
 
-def _join(items: list[str]) -> str:
-    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
-
-
-def _e(text: str) -> str:
-    return html.escape(text, quote=True)
+def _first_sentence(text: str) -> str:
+    parts = SENTENCE_END.split(text, maxsplit=1)
+    return parts[0] + "." if len(parts) > 1 else text

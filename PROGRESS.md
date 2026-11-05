@@ -15,7 +15,7 @@ Tom to run things himself, 29 October 2026).
 ```bash
 docker compose up -d                      # start the local database, admin page and dashboard preview
 docker compose run --rm schema plan       # should say "The database already matches schema.yaml."
-docker compose run --rm test              # run the tests (125 passing at the last update)
+docker compose run --rm test              # run the tests (127 passing at the last update)
 docker compose run --rm publish           # rebuild the dashboard pages from the database
 ```
 
@@ -42,7 +42,7 @@ and optional extras are kept self-contained so they're easy to remove.
 | **Excel uploads** | `backend/catalyst/importers/excel/` | For every table marked `filled_by: excel`: download it as Excel, upload an edited copy, see what will be added, changed and deleted, then approve. No code per table. |
 | **Admin page** | `backend/catalyst/admin/` | The web page for the Excel uploads, with a login (one name and password per person). Runs with `docker compose up -d`. |
 | **Publish step and dashboard** | `backend/catalyst/publish/`, `published/` | Writes each location's dashboard as plain web pages, laid out like the original (`Reference/ReferenceImages`): River Status, EA Data, Land Use Data and Sewerage Data (the Overview is built but switched off for now). Panels with a table are filled in (map colours, classifications, failing elements, RNAGs, catchment details, Habitat & Land Use, river obstacles, storm overflow spills); the rest are empty until their table exists. Previewed at <http://localhost:8080>. |
-| **Data map** | `backend/catalyst/datamap/` | A plain-English web page of every table, in the admin page at `/admin/data-map` (login needed). Made from `schema.yaml` each time it's opened. Self-contained: deleting the folder removes it (see its `README.md`). |
+| **Data map** | `backend/catalyst/datamap/` | A diagram of every table, in the admin page at `/admin/data-map` (login needed): where each table's data comes from (downloaded or Excel), how they join up by Catchment ID, and its columns when clicked. Made from `schema.yaml` (and `sections.yaml` in its folder) each time it's opened. Self-contained: deleting the folder removes it (see its `README.md`). |
 | **Dev and live setup** | `docker-compose*.yml`, `.env*.example` | The same commands on your machine and on the live server. Only the settings differ. |
 | **Tests** | `backend/tests/` | Cover the schema tool, the importers, the Excel uploads, the admin page, the publish step and the data map. |
 
@@ -139,6 +139,7 @@ show on the dashboard. They were uploaded through the admin page on 29 October 2
 - **Caddy for the web server** (when the VM is set up), rather than nginx, because it gets and renews the HTTPS certificates itself. It only does HTTPS and serving files: the login is in the Python app. Until it's added, the live admin page is only reachable through an SSH tunnel.
 - **Three Compose files:** shared, dev (loaded automatically) and live (chosen by `COMPOSE_FILE` in the server's `.env`). Passwords on the server have no defaults.
 - **The data map is a page in the admin site, behind the login** (Tom, 5 November 2026), rather than a file opened from disk or a page at an unlisted address. The admin page makes it from `schema.yaml` when it's opened, so there's no file to rebuild and it's on the live server with no extra setup.
+- **The data map is a flow diagram** (Tom, 5 November 2026), chosen from five designs: where the data comes from → tables → Catchments → dashboards, with a panel of details when a table is clicked. It replaced the original page of text and tables. More changes to it are to come.
 
 ---
 

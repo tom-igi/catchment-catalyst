@@ -44,8 +44,8 @@ docker compose run --rm test            # run the backend tests
 The admin page is at <http://localhost:8000/admin> (name `admin`, password `admin`), and the
 published dashboards at <http://localhost:8080>.
 
-The data map (every table and column in plain English) is in the admin page: click **Data map**
-at the top, or go to <http://localhost:8000/admin/data-map>.
+The data map (a diagram of every table: where its data comes from and how they join up) is in
+the admin page: click **Data map** at the top, or go to <http://localhost:8000/admin/data-map>.
 
 To connect a database client (DBeaver, pgAdmin, etc.): host `localhost`, port `5434`,
 database / user / password `catalyst`. To change these, copy `.env.example` to `.env`.

@@ -38,3 +38,44 @@ data_tables:
   description: >-
     One table per dataset, such as EA scores or habitat. Every row belongs to
     a catchment, linked by Catchment ID.
+
+# How each table gets its data, shown on each table in the data map.
+# Tables marked `filled_by: api` in schema.yaml give where they're downloaded from and
+# the importer command that downloads them again. The rest say who changes them:
+#   command  someone changes it with a database command
+#   admin    the admin page writes it by itself
+filled:
+  catchments:
+    source: Environment Agency, Catchment Data Explorer
+    command: importer catchments imports/catchments.json
+  ea_classifications:
+    source: Environment Agency, Catchment Data Explorer
+    command: importer classifications
+  ea_rnags:
+    source: Environment Agency, Catchment Data Explorer
+    command: importer classifications
+  storm_overflows:
+    source: Environment Agency, storm overflow annual returns
+    command: importer storm-overflows
+  river_obstacles:
+    source: River Obstacles (Environment Agency and The Rivers Trust)
+    command: importer river-obstacles
+  locations:
+    how: command
+    note: Changed with a database command for now (see OPERATING.md).
+  datasets:
+    how: command
+    note: Nothing fills it yet. It will hold each dataset's source and caveats.
+  uploads:
+    how: admin
+    note: The admin page adds a row each time someone uploads an Excel file.
+
+# Links the database can't check, so they aren't in schema.yaml as `references`:
+# a list of IDs, or a table's name. `to: data tables` means every data table, and
+# `to: excel tables` every table filled by Excel upload.
+links:
+  - {from: locations.catchment_ids, to: catchments}
+  - {from: catchments.upstream_ids, to: catchments}
+  - {from: catchments.downstream_ids, to: catchments}
+  - {from: datasets.table_name, to: data tables}
+  - {from: uploads.table_name, to: excel tables}
