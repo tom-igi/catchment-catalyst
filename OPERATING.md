@@ -80,7 +80,8 @@ Each upload replaces the whole table, so always start from a fresh download.
 ### Tables filled from an outside source (e.g. Catchments, from the Environment Agency)
 
 Each has its own import command, which downloads the data, shows what will change, and asks
-before saving. `imports/catchments.json` says which catchments to import (now all of North
+before saving. On the admin page, each command's box on the left (**How to update**) shows
+the command, with a Copy button, and the website the data comes from. `imports/catchments.json` says which catchments to import (now all of North
 Devon's rivers). Import the catchments first, then the rest:
 
 ```bash

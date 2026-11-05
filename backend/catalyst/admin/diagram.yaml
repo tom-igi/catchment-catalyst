@@ -18,7 +18,7 @@ sections:
   - title: Catchments
     description: >-
       Every catchment's details, outline and river. This table is filled
-      entirely from the Environment Agency's Catchment Data Explorer by the
+      entirely from the EA's Catchment Data Explorer by the
       catchments importer, and every other table links to it by Catchment ID.
     tables: [catchments]
 
@@ -40,26 +40,33 @@ data_tables:
     One table per dataset, such as EA scores or habitat. Every row belongs to
     a catchment, linked by Catchment ID.
 
-# How each table gets its data, shown when a table is clicked.
-# Tables marked `filled_by: api` in schema.yaml give where they're downloaded from and
-# the importer command that downloads them again. The rest say who changes them:
+# How each table gets its data, shown in its box on the left of the diagram ("where the
+# data comes from"). Tables marked `filled_by: api` in schema.yaml give where they're
+# downloaded from (`source`, and its web page, `url`) and the importer command that
+# downloads them again. Tables filled by the same command share one box. The rest say
+# who changes them:
 #   command  someone changes it with a database command
 #   admin    the admin page writes it by itself
 filled:
   catchments:
-    source: Environment Agency, Catchment Data Explorer
+    source: EA Catchment Data Explorer
+    url: https://environment.data.gov.uk/catchment-planning/
     command: importer catchments imports/catchments.json
   ea_classifications:
-    source: Environment Agency, Catchment Data Explorer
+    source: EA Catchment Data Explorer
+    url: https://environment.data.gov.uk/catchment-planning/
     command: importer classifications
   ea_rnags:
-    source: Environment Agency, Catchment Data Explorer
+    source: EA Catchment Data Explorer
+    url: https://environment.data.gov.uk/catchment-planning/
     command: importer classifications
   storm_overflows:
-    source: Environment Agency, storm overflow annual returns
+    source: EA storm overflow annual returns
+    url: https://www.data.gov.uk/dataset/event-duration-monitoring-storm-overflows-annual-returns
     command: importer storm-overflows
   river_obstacles:
-    source: River Obstacles (Environment Agency and The Rivers Trust)
+    source: River Obstacles (EA and The Rivers Trust)
+    url: https://river-obstacles-theriverstrust.hub.arcgis.com/
     command: importer river-obstacles
   locations:
     how: command

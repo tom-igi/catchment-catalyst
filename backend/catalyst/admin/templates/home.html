@@ -110,23 +110,25 @@
   .group { margin: 0 0 18px; }
   .src {
     position: relative; z-index: 1; display: flex; align-items: center; gap: 11px; width: 100%;
-    padding: 11px 14px 11px 11px; border: 1px solid transparent; border-radius: 12px;
+    padding: 9px 12px 10px 11px; border: 1px solid transparent; border-radius: 12px;
     background: var(--f-soft); text-align: left; cursor: pointer;
     transition: opacity .15s, border-color .15s, box-shadow .15s;
   }
   .src:hover { border-color: var(--f); }
-  .src[aria-pressed="true"], .src.is-selected { border-color: var(--f); box-shadow: 0 0 0 2px var(--f); }
+  .src.is-selected { border-color: var(--f); box-shadow: 0 0 0 2px var(--f); }
   .src-action {
-    display: inline-flex; align-items: center; gap: 6px; margin-top: 7px; padding: 4px 11px 4px 9px; border-radius: 7px;
-    background: var(--f); color: var(--on-solid); font-weight: 700; font-size: .84rem; line-height: 1.4;
+    flex: none; display: inline-flex; align-items: center; gap: 5px; margin-left: auto; padding: 2px 9px 2px 7px; border-radius: 6px;
+    background: var(--f); color: var(--on-solid); font-weight: 700; font-size: .8rem; line-height: 1.4;
   }
+  .src-action.ghost { background: var(--card); color: var(--f); box-shadow: inset 0 0 0 1.5px var(--f); font-weight: 650; }
   .src:hover .src-action { filter: brightness(1.08); }
   .src-waiting { display: block; margin-top: 5px; font-size: .8rem; font-weight: 650; color: var(--warn); }
   .src-icon {
     flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%;
     background: var(--f); color: var(--on-solid);
   }
-  .src-text { display: block; min-width: 0; line-height: 1.3; }
+  .src-text { display: block; flex: 1; min-width: 0; line-height: 1.3; }
+  .src-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; }
   .src-eyebrow { display: block; font-size: .78rem; font-weight: 650; color: var(--f); }
   .src-name { display: block; font-weight: 650; font-size: .95rem; overflow-wrap: anywhere; }
   .group.quiet .src { padding: 8px 12px 8px 9px; }
@@ -194,7 +196,6 @@
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
     font-size: .84rem; line-height: 1.4; color: var(--muted);
   }
-  .hub-from { display: block; font-size: .82rem; color: var(--f); font-weight: 600; }
 
   .junction {
     display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 4px 0 12px;
@@ -263,8 +264,8 @@
     .flow {
       display: grid;
       grid-template-columns:
-        minmax(140px, 1fr) minmax(36px, .45fr) minmax(176px, 1.3fr) minmax(72px, .8fr)
-        minmax(164px, 1.1fr) minmax(40px, .5fr) minmax(140px, 1fr);
+        minmax(200px, 2fr) minmax(32px, .35fr) minmax(176px, 1.3fr) minmax(56px, .6fr)
+        minmax(164px, 1.1fr) minmax(36px, .4fr) minmax(140px, 1fr);
       row-gap: 22px;
       align-items: start;
       padding-bottom: 8px;
@@ -274,7 +275,6 @@
     .col-head[data-col="2"] { grid-column: 3; }
     .col-head[data-col="3"] { grid-column: 5; }
     .col-head[data-col="4"] { grid-column: 7; }
-    .band { grid-row: 2; grid-column: 1 / -1; height: 8px; }
     .group { display: contents; }
     .src { grid-column: 1; grid-row: var(--row); align-self: center; }
     .tables {
@@ -319,7 +319,6 @@
     background: var(--f); color: var(--on-solid); font-weight: 700; font-size: .92rem; line-height: 1.3;
   }
   .p-badge .b-icon { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: rgba(255, 255, 255, .18); flex: none; }
-  .p-badge .tag { padding: 0 6px; border: 1.5px solid currentColor; border-radius: 5px; font-size: .72rem; }
   .p-badge.quiet { background: var(--quiet-soft); color: var(--quiet); }
   .p-badge.quiet .b-icon { background: var(--card); }
   .close {
@@ -338,8 +337,9 @@
   .panel h3 .n { font-size: .85rem; color: var(--muted); font-weight: 600; }
 
   .from { padding: 14px 16px; border-radius: 12px; background: var(--f-soft); border-left: 4px solid var(--f); }
-  .from-head { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--f); }
   .from p { margin: 6px 0 0; }
+  .from p:first-child { margin-top: 0; }
+  .fills { margin-top: 16px; }
   .from .muted { color: var(--muted); font-size: .9rem; }
   .cmd { display: flex; gap: 8px; align-items: stretch; margin-top: 8px; }
   .cmd code {
@@ -389,7 +389,7 @@
   .get .btn { margin-top: 0; }
   .get p { flex: 1 1 220px; margin: 0; font-size: .88rem; color: var(--muted); }
   .a-head { display: block; font-weight: 700; }
-  #panel-body > .alert:first-child, #panel-body > .message:first-child { margin-top: 14px; }  /* clear of the title's focus ring */
+  #panel-body > .alert:first-child, #panel-body > .message:first-child, #panel-body > .from:first-child { margin-top: 14px; }  /* clear of the title's focus ring */
   .uploads { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 10px; }
   .uploads > li { padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: .9rem; overflow-wrap: anywhere; }
   .uploads > li:last-child { border-bottom: 0; }
@@ -397,14 +397,10 @@
   .u-what { display: block; color: var(--muted); }
   .u-what a { font-weight: 650; }
 
-  .facts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
-  .fact { padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: .9rem; line-height: 1.6; }
-  .fact .big { font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
   .chip {
     display: inline-block; padding: 0 7px; border-radius: 6px; background: var(--quiet-soft); color: var(--text);
     font-size: .84rem; font-weight: 600; line-height: 1.6; white-space: nowrap;
   }
-  .chip.cid { background: var(--catchment); color: var(--on-solid); }
 
   .hint { margin: 0 0 8px; font-size: .85rem; color: var(--muted); }
   .sheet-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
@@ -452,11 +448,8 @@
   .jump:hover { border-color: var(--f); }
   .jump .j-icon { display: grid; place-items: center; color: var(--f); }
   .jumps { display: flex; flex-wrap: wrap; gap: 6px; }
-  .link-rows { display: grid; gap: 10px; }
   .link-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
   .link-row .via { font-size: .85rem; color: var(--muted); }
-  .link-dir { margin: 14px 0 6px; font-size: .82rem; font-weight: 700; color: var(--muted); }
-  .link-dir:first-child { margin-top: 0; }
   .none { color: var(--muted); font-size: .9rem; margin: 0; }
 
   footer { margin-top: 40px; color: var(--muted); font-size: .85rem; }
@@ -513,14 +506,16 @@
 /* ---------- What each way of filling a table is called ---------- */
 
 const FILLS = {
-  api: { word: "Downloaded", long: "Downloaded from the internet", icon: "cloud", tag: "API" },
+  api: { word: "Downloaded", long: "API", icon: "cloud" },
   excel: { word: "Excel upload", long: "Uploaded in Excel", icon: "sheet", tag: "Excel" },
   command: { word: "Database command", long: "Changed with a database command", icon: "terminal" },
   admin: { word: "Admin page", long: "Kept by the admin page", icon: "window" },
 };
 const QUIET = { command: true, admin: true };
-// "#ea_scores" opens a table's details, and "#upload-ea_scores" its upload. Table names can't have a "-".
-const UPLOAD_HASH = "upload-";
+// "#catchments" opens a table's details, and "#from-catchments" where its data comes from (for an
+// Excel table, "#upload-ea_scores", its upload). Table names can't have a "-".
+const FROM_HASH = "from-", UPLOAD_HASH = "upload-";
+const canUpload = t => fillOf(t) === "excel" && !!t.update;
 const fillOf = t => (FILLS[t.fill] ? t.fill : "command");
 
 const ICONS = {
@@ -573,6 +568,7 @@ function joinWords(words) {
 }
 function titleOf(t) { return t.title || t.name; }
 function isLocal(url) { return typeof url === "string" && /^\/(?!\/)/.test(url); }  // a link within this site
+function isWebPage(url) { return typeof url === "string" && /^https:\/\/[^\s"<>]+$/.test(url); }  // a source's own site
 function link(cls, url, text) {
   const a = el("a", cls, text);
   if (isLocal(url)) a.setAttribute("href", url);
@@ -609,31 +605,33 @@ function makePlan(model) {
     links.some(l => l.from === t.name && l.to === hub.name && l.kind === "list")) : [];
   const onDash = new Set(dash.map(t => t.name));
 
-  // Everything else is grouped by where its data comes from. Each Excel table is a group of its own,
-  // because its source on the left is where it's uploaded.
+  // Every other table is in a row starting from where its data comes from (its "source"), which
+  // opens how it's updated. Tables downloaded by the same command share a source; every other table
+  // has its own. The hub's source is on the left too, joined to the hub by a line.
   const groups = [];
-  const uploadGroups = new Map();  // Excel table name -> its group
-  const groupFor = t => {
+  const sources = new Map();  // table name -> its group
+  for (const t of tables) {
+    if (onDash.has(t.name)) continue;
     const fill = fillOf(t);
-    const key = fill === "api" ? "api|" + (t.source || "") : fill === "excel" ? "excel|" + t.name : fill;
+    const key = fill === "api" && t.command ? "command|" + t.command : "table|" + t.name;
     let g = groups.find(x => x.key === key);
     if (!g) {
-      g = { key, id: "src:g" + groups.length, order: groups.length, fill, source: fill === "api" ? (t.source || null) : null,
-            quiet: !!QUIET[fill], tables: [], feedsHub: false, upload: fill === "excel" && t.update ? t : null };
+      g = { key, id: "src:g" + groups.length, order: groups.length, fill, quiet: !!QUIET[fill],
+            source: fill === "api" ? (t.source || null) : null, members: [], tables: [], feedsHub: false };
       groups.push(g);
-      if (g.upload) uploadGroups.set(t.name, g);
     }
-    return g;
-  };
-  for (const t of tables) if (t !== hub && !onDash.has(t.name)) groupFor(t).tables.push(t);
-  let hubGroup = null;
-  if (hub && !QUIET[fillOf(hub)]) { hubGroup = groupFor(hub); hubGroup.feedsHub = true; }
+    g.members.push(t);  // every table it fills
+    if (t === hub) g.feedsHub = true;
+    else g.tables.push(t);  // the ones in the column next to it
+    sources.set(t.name, g);
+  }
+  const hubGroup = hub ? sources.get(hub.name) : null;
   const rank = g => (g === hubGroup ? 0 : g.fill === "api" ? 1 : g.fill === "excel" ? 2 : g.fill === "command" ? 3 : 4);
   groups.sort((a, b) => rank(a) - rank(b) || a.order - b.order);
   const main = groups.filter(g => !g.quiet);
   const house = groups.filter(g => g.quiet);
-  main.forEach((g, i) => { g.row = 3 + i; });
-  const houseRow = 3 + main.length;
+  main.forEach((g, i) => { g.row = 2 + i; });
+  const houseRow = 2 + main.length;
   house.forEach((g, i) => { g.row = houseRow + 1 + i; });
 
   // Lines: source -> table, source -> hub, table -> hub (by ID), dashboard table -> hub, and faint others.
@@ -663,9 +661,9 @@ function makePlan(model) {
   if (hub && !hubLabel) hubLabel = hubIdColumn ? (hubIdColumn.label || hubIdColumn.name) : "ID";
 
   return {
-    tables, byName, links, hub, dash, groups, main, house, houseRow, wires, hubGroup, uploadGroups,
+    tables, byName, links, hub, dash, groups, main, house, houseRow, wires, hubGroup, sources,
     hubLabel, dashLabels,
-    span: "3 / span " + Math.max(1, main.length),
+    span: "2 / span " + Math.max(1, main.length),
   };
 }
 
@@ -696,7 +694,7 @@ function sCurve(x1, y1, x2, y2) {
   return "M" + num(x1) + " " + num(y1) + "C" + num(x1 + c) + " " + num(y1) + " " + num(x2 - c) + " " + num(y2) + " " + num(x2) + " " + num(y2);
 }
 
-function geometry(plan, rectOf, bandY) {
+function geometry(plan, rectOf) {
   return plan.wires.map(w => {
     const A = rectOf(w.a), B = rectOf(w.b);
     if (!A || !B) return { id: w.id, d: "", dots: [] };
@@ -704,15 +702,14 @@ function geometry(plan, rectOf, bandY) {
       return { id: w.id, d: sCurve(A.r, midY(A), B.l, midY(B)), dots: [[B.l, midY(B)]] };
     }
     if (w.type === "bridge") {
-      // Up from the source, along the band above the tables, and down into the hub.
-      const sx = midX(A), sy = A.t, hx = midX(B), hy = B.t;
-      if (bandY == null || sy - bandY < 6 || hy - bandY < 6 || hx - sx < 30) {
+      // The hub's own source, in the first row: right, above the tables, and down into the top of the hub.
+      const sx = A.r, sy = midY(A), hx = midX(B), hy = B.t;
+      if (hy - sy < 24 || hx - sx < 40) {
         return { id: w.id, d: sCurve(A.r, midY(A), B.l, midY(B)), dots: [[B.l, midY(B)]] };
       }
-      const r = Math.min(14, sy - bandY, hy - bandY, (hx - sx) / 2);
-      const d = "M" + num(sx) + " " + num(sy) + "V" + num(bandY + r) +
-        "Q" + num(sx) + " " + num(bandY) + " " + num(sx + r) + " " + num(bandY) +
-        "H" + num(hx - r) + "Q" + num(hx) + " " + num(bandY) + " " + num(hx) + " " + num(bandY + r) + "V" + num(hy);
+      const r = Math.min(16, (hy - sy) / 2, (hx - sx) / 2);
+      const d = "M" + num(sx) + " " + num(sy) + "H" + num(hx - r) +
+        "Q" + num(hx) + " " + num(sy) + " " + num(hx) + " " + num(sy + r) + "V" + num(hy);
       return { id: w.id, d, dots: [[hx, hy]] };
     }
     if (w.type === "hub") {
@@ -756,8 +753,9 @@ function start() {
   const nodeEls = new Map();   // key -> element that lights up
   const anchors = new Map();   // key -> element the lines are measured from
   const wireEls = new Map();   // wire id -> { g, path }
-  // `current` is the open panel: { name, upload }, where upload is true for an Excel table's upload.
-  let hoverKey = null, focusKey = null, pinnedKey = null, current = null, opener = null;
+  // `current` is the open panel: { name, source }, where source is true for where the table's data
+  // comes from (its source on the left), and false for the table's details.
+  let hoverKey = null, focusKey = null, current = null, opener = null;
 
   /* Diagram */
   const svg = svgEl("svg", { class: "wires wide-only", "aria-hidden": "true", focusable: "false" });
@@ -779,11 +777,6 @@ function start() {
     h.append(el("span", "num", n), tx);
     flow.appendChild(h);
   }
-  const band = el("div", "band wide-only");
-  band.setAttribute("aria-hidden", "true");
-  flow.appendChild(band);
-  anchors.set("band", band);
-
   for (const g of plan.main) flow.appendChild(groupEl(g));
 
   if (plan.hub) {
@@ -842,22 +835,27 @@ function start() {
     ic.appendChild(icon(FILLS[g.fill].icon, g.quiet ? 16 : 20));
     const tx = el("span", "src-text");
     const words = groupWords(g);
-    tx.append(el("span", "src-eyebrow", words.eyebrow), el("span", "src-name", words.name));
+    const head = el("span", "src-head");  // the button goes on this line, beside the eyebrow
+    head.appendChild(el("span", "src-eyebrow", words.eyebrow));
+    tx.append(head, el("span", "src-name", words.name));
     b.append(ic, tx);
-    if (g.upload) {
-      // An Excel table's source is where it's uploaded: it opens the upload.
+    // Each source opens how its tables are updated: for an Excel table, that's where it's uploaded.
+    const first = g.members[0];
+    const names = joinWords(g.members.map(titleOf));
+    if (canUpload(first)) {
       const action = el("span", "src-action");
-      action.append(icon("upload", 15), el("span", null, "Upload data"), el("span", "visually-hidden", " to " + titleOf(g.upload)));
-      tx.appendChild(action);
-      const waiting = waitingUploads(g.upload).length;
+      action.append(icon("upload", 15), el("span", null, "Upload data"));
+      head.appendChild(action);
+      const waiting = waitingUploads(first).length;
       if (waiting) tx.appendChild(el("span", "src-waiting", waiting + (waiting === 1 ? " upload" : " uploads") + " to approve"));
-      b.setAttribute("aria-haspopup", "dialog");
-      b.addEventListener("click", () => openPanel(g.upload.name, true, b));
-    } else {
-      b.setAttribute("aria-pressed", "false");
-      b.appendChild(el("span", "visually-hidden", ": highlight its tables"));
-      b.addEventListener("click", () => { pinnedKey = pinnedKey === g.id ? null : g.id; trace(); });
+    } else if (g.fill === "api") {
+      const action = el("span", "src-action ghost");
+      action.append(icon("terminal", 15), el("span", null, "How to update"));
+      head.appendChild(action);
     }
+    b.appendChild(el("span", "visually-hidden", " (" + names + ")"));
+    b.setAttribute("aria-haspopup", "dialog");
+    b.addEventListener("click", () => openPanel(first.name, true, b));
     hoverable(b, g.id);
     nodeEls.set(g.id, b);
     anchors.set(g.id, b);
@@ -873,7 +871,7 @@ function start() {
     if (g.feedsHub && plan.hub) {
       const li = el("li", "narrow-only");
       const also = el("span", "also");
-      also.append(document.createTextNode("Also fills "), el("strong", null, titleOf(plan.hub)), document.createTextNode(", further down"));
+      also.append(document.createTextNode("Fills "), el("strong", null, titleOf(plan.hub)), document.createTextNode(", further down"));
       li.appendChild(also);
       ul.appendChild(li);
     }
@@ -930,7 +928,6 @@ function start() {
     anchors.set("port:tbl:" + t.name, port);
     b.append(top, port, metaEl(t));
     if (t.summary) b.appendChild(el("span", "node-sum", t.summary));
-    if (fillOf(t) === "api" && t.source) b.appendChild(el("span", "hub-from narrow-only", "From " + t.source));
     return b;
   }
 
@@ -973,22 +970,21 @@ function start() {
     elm.addEventListener("blur", () => { if (focusKey === key) { focusKey = null; trace(); } });
   }
 
-  // The diagram's key for the open panel: the table, or for an upload, the Excel table's source.
+  // The diagram's key for the open panel: the table, or its source.
   function currentKey() {
     if (!current) return null;
-    const g = current.upload ? plan.uploadGroups.get(current.name) : null;
+    const g = current.source ? plan.sources.get(current.name) : null;
     return g ? g.id : "tbl:" + current.name;
   }
 
   function trace() {
     const selected = currentKey();
-    const key = hoverKey || focusKey || pinnedKey || selected;
+    const key = hoverKey || focusKey || selected;
     const rel = key ? relations(plan, key) : null;
     flow.classList.toggle("tracing", !!rel);
     for (const [k, e] of nodeEls) {
       e.classList.toggle("on", !!rel && rel.nodes.has(k));
       e.classList.toggle("is-selected", k === selected);
-      if (e.hasAttribute("aria-pressed")) e.setAttribute("aria-pressed", String(pinnedKey === k));
     }
     for (const [id, w] of wireEls) w.g.classList.toggle("on", !!rel && rel.wires.has(id));
   }
@@ -1014,8 +1010,7 @@ function start() {
       if (!r.width && !r.height) return null;
       return { l: r.left - fr.left, t: r.top - fr.top, r: r.right - fr.left, b: r.bottom - fr.top };
     };
-    const bandRect = rectOf("band");
-    const geo = geometry(plan, rectOf, bandRect ? midY(bandRect) : null);
+    const geo = geometry(plan, rectOf);
     for (const g of geo) {
       const we = wireEls.get(g.id);
       if (!we) continue;
@@ -1029,16 +1024,16 @@ function start() {
   if (wideQuery.addEventListener) wideQuery.addEventListener("change", queueDraw);
   queueDraw();
 
-  /* Details panel: a table's details, or an Excel table's upload */
-  function openPanel(name, upload, from, instant) {
+  /* Details panel: a table's details, or where its data comes from (for an Excel table, its upload) */
+  function openPanel(name, source, from, instant) {
     const t = plan.byName.get(name);
     if (!t) return;
-    upload = !!(upload && plan.uploadGroups.has(name));
+    source = !!(source && plan.sources.has(name));
     if (!current) opener = from || document.activeElement;
-    current = { name, upload };
-    pinnedKey = null;
-    if (upload) renderUpload(t, t.update);
-    else renderDetails(t);
+    current = { name, source };
+    if (!source) renderDetails(t);
+    else if (canUpload(t)) renderUpload(t, t.update);
+    else renderSource(plan.sources.get(name));
     if (instant) {
       panel.classList.add("instant");
       requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.remove("instant")));
@@ -1046,7 +1041,7 @@ function start() {
     panel.classList.add("open");
     document.body.classList.toggle("panel-open-narrow", !wideQuery.matches);
     panel.scrollTop = 0;
-    const hash = "#" + (upload ? UPLOAD_HASH : "") + encodeURIComponent(name);
+    const hash = "#" + (source ? (canUpload(t) ? UPLOAD_HASH : FROM_HASH) : "") + encodeURIComponent(name);
     if (location.hash !== hash) history.replaceState(null, "", hash);
     trace();
     panelTitle.focus({ preventScroll: true });
@@ -1070,18 +1065,20 @@ function start() {
   document.addEventListener("keydown", e => {
     if (e.key !== "Escape") return;
     if (current) { e.preventDefault(); closePanel(); }
-    else if (pinnedKey) { pinnedKey = null; trace(); }
   });
   window.addEventListener("hashchange", () => {
     const want = fromHash();
-    if (want && plan.byName.has(want.name)) openPanel(want.name, want.upload);
+    if (want && plan.byName.has(want.name)) openPanel(want.name, want.source);
     else if (!want) closePanel();
   });
   function fromHash() {
     let raw = location.hash.replace(/^#/, "");
     try { raw = decodeURIComponent(raw); } catch (e) { /* use it as it is */ }
     if (!raw) return null;
-    return raw.startsWith(UPLOAD_HASH) ? { name: raw.slice(UPLOAD_HASH.length), upload: true } : { name: raw, upload: false };
+    for (const prefix of [FROM_HASH, UPLOAD_HASH]) {
+      if (raw.startsWith(prefix)) return { name: raw.slice(prefix.length), source: true };
+    }
+    return { name: raw, source: false };
   }
 
   function jumpButton(t) {
@@ -1100,75 +1097,58 @@ function start() {
     const bi = el("span", "b-icon");
     bi.appendChild(icon(FILLS[f].icon, 16));
     badge.append(bi, el("span", null, FILLS[f].long));
-    if (FILLS[f].tag && f === "api") badge.appendChild(el("span", "tag", FILLS[f].tag));
     return badge;
   }
 
+  // A table: what it is, its download and its columns. Where its data comes from is on its source.
   function renderDetails(t) {
-    const f = fillOf(t);
-
-    // 1. Title and how it's filled
-    panelBadge.replaceChildren(badgeFor(f));
-    panelBody.className = "f-" + f;
+    panelBadge.replaceChildren();
+    panelBody.className = "f-" + fillOf(t);
     panelTitle.textContent = titleOf(t);
 
     const out = [];
     const tech = el("p", "tech");
     tech.append(document.createTextNode("In the database: "), el("code", null, t.name));
     out.push(tech);
-
-    // 2. What it is
     if (t.description || t.summary) out.push(el("p", "desc", t.description || t.summary));
-
-    // 3. Where its data comes from
-    out.push(fromBox(t, f));
-
-    // 4. Rows
-    const facts = el("div", "facts");
-    if (t.rows != null) {
-      const fact = el("div", "fact");
-      if (t.rows === 0) fact.textContent = rowsText(0);
-      else fact.append(el("span", "big", Number(t.rows).toLocaleString("en-GB")), document.createTextNode(t.rows === 1 ? " row" : " rows"));
-      facts.appendChild(fact);
-    }
-    if (Array.isArray(t.one_row_per) && t.one_row_per.length) {
-      const fact = el("div", "fact");
-      fact.appendChild(document.createTextNode("One row for each "));
-      t.one_row_per.forEach((label, i) => {
-        if (i > 0) fact.appendChild(document.createTextNode(i === t.one_row_per.length - 1 ? " and " : ", "));
-        const col = (t.columns || []).find(c => (c.label || c.name) === label);
-        fact.appendChild(el("span", "chip" + (col && col.catchment_id ? " cid" : ""), label));
-      });
-      facts.appendChild(fact);
-    }
-    if (facts.childNodes.length) out.push(facts);
-
-    // 4b. Downloading it (every table)
-    if (t.download && isLocal(t.download.url)) out.push(downloadBlock(t, f));
-
-    // 5. Columns
+    if (t.download && isLocal(t.download.url)) out.push(downloadBlock(t));
     if ((t.columns || []).length) out.push(...columnsBlock(t));
-
-    // 6. Links
-    out.push(...linksBlock(t));
-
     panelBody.replaceChildren(...out);
   }
 
-  function fromBox(t, f) {
+  // Where a source's tables get their data (not an Excel table's: that's its upload).
+  function renderSource(g) {
+    const t = g.members[0], f = g.fill;
+    panelBadge.replaceChildren(badgeFor(f));
+    panelBody.className = "f-" + f;
+    const many = g.members.length > 1;
+    panelTitle.textContent = f === "api" && g.source ? g.source : "Where " + titleOf(t) + " comes from";
+    const fills = el("div", "link-row fills");
+    const jumps = el("div", "jumps");
+    for (const m of g.members) jumps.appendChild(jumpButton(m));
+    fills.append(el("span", "via", many ? "Fills the tables" : "Fills the table"), jumps);
+    panelBody.replaceChildren(fromBox(t, f, many), fills);
+  }
+
+  function fromBox(t, f, many) {
     const box = el("section", "from f-" + f);
-    box.setAttribute("aria-label", "Where its data comes from");
-    const head = el("div", "from-head");
-    head.append(icon(FILLS[f].icon, 18), el("span", null, FILLS[f].long));
-    box.appendChild(head);
+    box.setAttribute("aria-label", "Where the data comes from");
     if (f === "api") {
-      if (t.source) {
+      if (isWebPage(t.url)) {
+        const p = el("p");
+        const a = el("a", null, t.url.replace(/^https:\/\//, "").replace(/\/$/, ""));
+        a.setAttribute("href", t.url);
+        a.setAttribute("target", "_blank");
+        a.setAttribute("rel", "noopener noreferrer");
+        p.append(document.createTextNode("Website: "), a);
+        box.appendChild(p);
+      } else if (t.source) {
         const p = el("p");
         p.append(document.createTextNode("From "), el("strong", null, t.source), document.createTextNode("."));
         box.appendChild(p);
       }
       if (t.command) {
-        box.appendChild(el("p", "muted", "It only changes when someone downloads it again, by running this command:"));
+        box.appendChild(el("p", "muted", (many ? "They only change when someone downloads them" : "It only changes when someone downloads it") + " again, by running this command:"));
         const cmd = el("div", "cmd");
         const code = el("code", null, t.command);
         const copy = el("button", "copy");
@@ -1182,11 +1162,8 @@ function start() {
         cmd.append(code, copy);
         box.append(cmd, status);
       }
-    } else if (f === "excel") {
-      box.appendChild(el("p", null, "You keep it up to date in Excel, with its Upload data on the left of the diagram."));
-      box.appendChild(el("p", "muted", lastUpdated(t)));
-    } else if (t.note) {
-      box.appendChild(el("p", null, t.note));
+    } else {
+      box.appendChild(el("p", null, t.note || FILLS[f].long + "."));
     }
     return box;
   }
@@ -1196,16 +1173,13 @@ function start() {
     return last ? "Last updated " + last.when + " by " + last.who + "." : "Not uploaded yet.";
   }
 
-  function downloadBlock(t, f) {
+  function downloadBlock(t) {
     const box = el("div", "get");
     const dl = link("btn ghost", t.download.url, "Download as Excel");
     dl.prepend(icon("download", 16));
-    const notes = [];
-    if (f === "excel") notes.push("A copy of the whole table. To change it, use its Upload data on the left.");
-    else notes.push("A copy to look at or share. It can't be uploaded here.");
+    box.appendChild(dl);
     const left = (t.download.left_out || []).map(name => columnLabel(t, name));
-    if (left.length) notes.push("Leaves out " + joinWords(left) + ": map shapes, thousands of coordinates long.");
-    box.append(dl, el("p", null, notes.join(" ")));
+    if (left.length) box.appendChild(el("p", null, "Leaves out " + joinWords(left) + ": map shapes, thousands of coordinates long."));
     return box;
   }
 
@@ -1458,62 +1432,11 @@ function start() {
     return out;
   }
 
-  function linksBlock(t) {
-    const out = [el("h3", null, "Links")];
-    const box = el("div");
-    const isCid = (tbl, col) => { const c = columnOf(tbl, col); return !!(c && c.catchment_id); };
-
-    // What this table links to, one row per column
-    const outLinks = plan.links.filter(l => l.from === t.name);
-    const byColumn = new Map();
-    for (const l of outLinks) {
-      if (!byColumn.has(l.column)) byColumn.set(l.column, []);
-      if (!byColumn.get(l.column).includes(l.to)) byColumn.get(l.column).push(l.to);
-    }
-    if (byColumn.size) {
-      box.appendChild(el("p", "link-dir", "Links to"));
-      const rows = el("div", "link-rows");
-      for (const [col, targets] of byColumn) {
-        const row = el("div", "link-row");
-        row.append(el("span", "chip" + (isCid(t, col) ? " cid" : ""), columnLabel(t, col)), icon("right", 16));
-        const jumps = el("div", "jumps");
-        for (const name of targets) {
-          if (name === t.name) jumps.appendChild(el("span", "chip", "Other rows of this table"));
-          else jumps.appendChild(jumpButton(plan.byName.get(name)));
-        }
-        row.appendChild(jumps);
-        rows.appendChild(row);
-      }
-      box.appendChild(rows);
-    }
-
-    // What links to this table
-    const inLinks = plan.links.filter(l => l.to === t.name && l.from !== t.name);
-    if (inLinks.length) {
-      box.appendChild(el("p", "link-dir", "Linked from"));
-      const rows = el("div", "link-rows");
-      const seenIn = new Set();
-      for (const l of inLinks) {
-        const k = l.from + "|" + l.column;
-        if (seenIn.has(k)) continue;
-        seenIn.add(k);
-        const from = plan.byName.get(l.from);
-        const row = el("div", "link-row");
-        row.append(jumpButton(from), el("span", "via", "by its"), el("span", "chip" + (isCid(from, l.column) ? " cid" : ""), columnLabel(from, l.column)));
-        rows.appendChild(row);
-      }
-      box.appendChild(rows);
-    }
-    if (!byColumn.size && !inLinks.length) box.appendChild(el("p", "none", "No links to other tables."));
-    out.push(box);
-    return out;
-  }
-
   /* Go */
   trace();
   if (problems) history.replaceState(null, "", "/admin");  // the page was the answer to an upload
-  const first = problems ? { name: problems.table, upload: true } : fromHash();
-  if (first && plan.byName.has(first.name)) openPanel(first.name, first.upload, null, true);
+  const first = problems ? { name: problems.table, source: true } : fromHash();
+  if (first && plan.byName.has(first.name)) openPanel(first.name, first.source, null, true);
   const message = $("message");
   if (message && current) panelBody.prepend(message);  // where it'll be seen
 }

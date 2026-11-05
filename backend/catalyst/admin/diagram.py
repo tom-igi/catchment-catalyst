@@ -2,8 +2,8 @@
 
 `model` gathers them: every table and column from schema.yaml (each table's
 `title`, `description` and `filled_by`, each column's `description` and
-`example`), plus the sections, where each downloaded table comes from and the
-extra links from diagram.yaml. The admin page adds the row counts and the Excel
+`example`), plus the sections, where each downloaded table comes from (with its
+web page and command) and the extra links from diagram.yaml. The admin page adds the row counts and the Excel
 uploads, and templates/home.html draws the diagram from them.
 
 It's made each time the page is opened, so it always matches the schema.yaml
@@ -95,6 +95,9 @@ def _table(table: sa.Table, schema: Schema, section: str, filled: dict, rows: in
     fill = table.info.get("filled_by") or filled.get("how") or "command"
     if fill not in FILLS:
         raise ValueError(f"{table.name}: how it's filled must be one of {', '.join(sorted(FILLS))}, not {fill}")
+    url = filled.get("url")
+    if url is not None and not str(url).startswith("https://"):
+        raise ValueError(f"The `filled` list in diagram.yaml gives {table.name} the web page {url}, which should start with https://")
     key = list(table.primary_key.columns)
     return {
         "name": table.name,
@@ -105,6 +108,7 @@ def _table(table: sa.Table, schema: Schema, section: str, filled: dict, rows: in
         "section": section,
         "fill": fill,  # api, excel, command or admin
         "source": filled.get("source"),
+        "url": url,  # the source's web page
         "command": f"docker compose run --rm {filled['command']}" if filled.get("command") else None,
         "note": filled.get("note"),
         "rows": rows,

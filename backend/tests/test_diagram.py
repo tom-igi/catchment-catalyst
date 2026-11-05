@@ -38,7 +38,11 @@ def test_sections_come_in_the_order_of_diagram_yaml():
 def test_the_model_says_how_each_table_is_filled():
     tables = {t["name"]: t for t in diagram.model(load_schema())["tables"]}
     assert tables["catchments"]["fill"] == "api"
-    assert tables["catchments"]["source"] == "Environment Agency, Catchment Data Explorer"
+    assert tables["catchments"]["source"] == "EA Catchment Data Explorer"
+    assert tables["catchments"]["url"] == "https://environment.data.gov.uk/catchment-planning/"
+    assert all(t["url"].startswith("https://") for t in tables.values() if t["fill"] == "api")  # each has a web page
+    # Tables downloaded by the same command share one box on the page.
+    assert tables["ea_classifications"]["command"] == tables["ea_rnags"]["command"] != tables["catchments"]["command"]
     assert tables["catchments"]["command"] == "docker compose run --rm importer catchments imports/catchments.json"
     assert tables["ea_scores"]["fill"] == "excel"
     assert (tables["uploads"]["fill"], tables["locations"]["fill"]) == ("admin", "command")
@@ -64,6 +68,9 @@ def test_a_mistake_in_diagram_yaml_is_reported(tmp_path):
         diagram.model(load_schema(), diagram_file=settings)
     settings.write_text(ONLY_DATA_TABLES_SECTION + "filled: {nope: {how: admin}}\n")
     with pytest.raises(ValueError, match="has nope, which isn't in schema.yaml"):
+        diagram.model(load_schema(), diagram_file=settings)
+    settings.write_text(ONLY_DATA_TABLES_SECTION + "filled: {catchments: {source: EA, url: 'javascript:alert(1)'}}\n")
+    with pytest.raises(ValueError, match="should start with https://"):
         diagram.model(load_schema(), diagram_file=settings)
     settings.write_text(ONLY_DATA_TABLES_SECTION + "links: [{from: locations.nope, to: catchments}]\n")
     with pytest.raises(ValueError, match="has locations.nope, which isn't in schema.yaml"):

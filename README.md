@@ -46,10 +46,11 @@ published dashboards at <http://localhost:8080>.
 
 The admin page is a diagram of every table: where its data comes from and how they join up.
 Click a table to see its columns and download it as Excel (any table; map shapes are left
-out). Each table filled by Excel upload also has its own **Upload data** box on the left,
-where its data comes from, to upload an edited copy. It's made from `schema.yaml` each time it's opened, plus
+out). On the left, where the data comes from, each import command has a box (with the
+source's website and the command that downloads its tables again), and so does each table
+filled by Excel upload (**Upload data**, to upload an edited copy). It's made from `schema.yaml` each time it's opened, plus
 `backend/catalyst/admin/diagram.yaml` (the sections, and where each downloaded table comes
-from: add a new importer's table there).
+from, its website and its command: add a new importer's table there).
 
 To connect a database client (DBeaver, pgAdmin, etc.): host `localhost`, port `5434`,
 database / user / password `catalyst`. To change these, copy `.env.example` to `.env`.
