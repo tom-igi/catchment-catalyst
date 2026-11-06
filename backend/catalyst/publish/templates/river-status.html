@@ -6,12 +6,12 @@
 <div class="grid river-status">
   <section class="panel yellow why">
     {{ heading("Why is the river failing?") }}
-    <div class="text">{{ words.get("why_failing") | paragraphs }}</div>
+    <div class="text">{{ words.get("why_failing") | formatted }}</div>
   </section>
 
   <section class="panel yellow now">
     {{ heading("What is happening now?") }}
-    <div class="text">{{ words.get("happening_now") | paragraphs }}</div>
+    <div class="text">{{ words.get("happening_now") | formatted }}</div>
   </section>
 
   <section class="panel navy risks-panel">
@@ -22,7 +22,7 @@
   <section class="panel yellow hypothesis">
     {% set confidence = words.get("hypothesis_confidence") %}
     {{ heading("Intervention hypothesis" ~ (" (confidence: %s)" % confidence if confidence else "")) }}
-    <div class="text">{{ words.get("intervention_hypothesis") | paragraphs }}</div>
+    <div class="text">{{ words.get("intervention_hypothesis") | formatted }}</div>
   </section>
 
   <section class="panel white interventions">

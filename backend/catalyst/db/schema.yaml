@@ -215,61 +215,24 @@ tables:
   datasets:
     title: Datasets
     description: >-
-      The list of datasets: one row for each data table (the tiles on the
-      admin "Choose a table" screen). Holds the text for the dashboard's "i"
-      info buttons. The data itself is in each dataset's own table.
+      The text in the dashboard's "i" info buttons: one row for each data table
+      that has one. A panel's "i" button is greyed out until its table has a
+      row here. In Excel, Alt+Enter starts a new line in a cell.
+      The text can have paragraphs, bullets, bold, links, headings and sections, written as described under Location Text.
+    filled_by: excel
     columns:
-      id:
-        type: integer
-        example: 1
-        primary_key: true
-        identity: true
       table_name:
         type: text
-        example: ea_scores
-        required: true
-        unique: true
-        description: The data table this row describes, e.g. ea_scores
-      name:
+        example: risk_levels
+        primary_key: true
+        description: >-
+          The data table, by its name in the database (shown under its title
+          when you click it on the admin page), e.g. risk_levels
+      info_text:
         type: text
-        example: EA Scores
+        example: "Risk levels assessed by the catchment partnership in 2026. Source: …"
         required: true
-        description: Name on the admin tile and info button, e.g. EA Scores
-      description:
-        type: text
-        example: Water Framework Directive classification results
-      source_organisation:
-        type: text
-        example: Environment Agency
-        description: e.g. Environment Agency, South West Water
-      source_url:
-        type: text
-        example: https://environment.data.gov.uk/catchment-planning
-        description: Where the data comes from
-      data_date:
-        type: date
-        example: "2025-10-01"
-        description: Date of the data currently loaded
-      caveats:
-        type: text
-        example: 2025 results are provisional
-        description: Caveats shown on the info button
-      is_national:
-        type: boolean
-        example: true
-        required: true
-        default: false
-        description: true = one national set for all locations; false = loaded per location
-      created_at:
-        type: timestamptz
-        example: 2026-10-28 09:00
-        required: true
-        default: now()
-      updated_at:
-        type: timestamptz
-        example: 2026-10-28 09:00
-        required: true
-        default: now()
+        description: What the "i" button shows, e.g. where the data comes from, how up to date it is, and any caveats
 
   uploads:
     title: Uploads
@@ -650,9 +613,8 @@ data_tables:
     title: River Status Text
     description: >-
       The hand-written text on the Waterbody Dashboard's River Status page:
-      one row per catchment. In Excel, Alt+Enter starts a new line in a cell;
-      a blank line starts a new paragraph, and lines starting with a dash or •
-      become a list.
+      one row per catchment. In Excel, Alt+Enter starts a new line in a cell.
+      The text can have paragraphs, bullets, bold, links, headings and sections, written as described under Location Text.
     filled_by: excel
     columns:
       catchment_id:
@@ -950,8 +912,13 @@ data_tables:
     title: Location Text
     description: >-
       The hand-written text about a whole location: one row per location. In
-      Excel, Alt+Enter starts a new line in a cell; a blank line starts a new
-      paragraph, and lines starting with a dash or • become a list.
+      Excel, Alt+Enter starts a new line in a cell. A blank line starts a new
+      paragraph. A line starting with - or • is a bullet, and two spaces
+      before it put it inside the bullet above. **Words** like that are bold,
+      and [words](https://…) is a link; web and email addresses become links
+      by themselves. A line starting with ## is a heading, ### a section that
+      opens and closes (up to the next ## or ###; the first starts open), ####
+      a smaller heading, and > a paragraph in a grey box.
     filled_by: excel
     columns:
       location_id:
@@ -983,12 +950,10 @@ data_tables:
       about_waterbody_dashboard:
         type: text
         example: What needs to happen to bring each waterbody up to "Good" ecological status? …
-        description: Shown under the Waterbody Dashboard
+        description: >-
+          Shown under every Waterbody Dashboard tab: an introduction, then
+          "## Understanding the dashboard" and a ### section for each part
       about_catchment_dashboard:
         type: text
         example: The Catchment Dashboard brings together …
-        description: Shown under the Catchment Dashboard
-      contact_email:
-        type: text
-        example: biosphere-mailbox@devon.gov.uk
-        description: Shown under the dashboards, for questions about the data
+        description: Shown under the Catchment Dashboard, written in the same way

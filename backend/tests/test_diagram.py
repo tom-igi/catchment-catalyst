@@ -51,6 +51,35 @@ def test_the_model_says_how_each_table_is_filled():
     assert tables["ea_scores"]["one_row_per"] == ["Catchment ID", "Measure", "Year"]
 
 
+def test_the_model_says_what_happens_to_the_data_on_the_way_in():
+    tables = {t["name"]: t for t in diagram.model(load_schema())["tables"]}
+    # Each importer says what it does to its downloads, in a few steps...
+    for t in tables.values():
+        if t["fill"] == "api":
+            assert t["transformation"] and all(isinstance(step, str) and step.endswith(".") for step in t["transformation"]), t["name"]
+    assert "#N/A" in " ".join(tables["storm_overflows"]["transformation"])  # not cut off as a YAML comment
+    # ...and Excel uploads are copied 1 to 1, for now.
+    assert all(t["transformation"] == [] for t in tables.values() if t["fill"] == "excel")
+
+
+def test_the_model_says_where_each_data_table_is_on_the_dashboards():
+    tables = {t["name"]: t for t in diagram.model(load_schema())["tables"]}
+    for t in tables.values():
+        if t["kind"] == "data":  # every one is somewhere, so a new table needs adding to diagram.yaml
+            assert t["dashboard"] and all(place["panels"] for place in t["dashboard"]), t["name"]
+    assert tables["datasets"]["dashboard"] == [{"page": "Every dashboard page", "panels": ['"i" info buttons']}]
+    assert tables["catchments"]["dashboard"] == []
+    # A panel's name can be on more than one page, from different tables: the page tells them apart.
+    assert {"page": "River Status", "panels": ["Why is the river failing?", "What is happening now?", "Intervention hypothesis"]} \
+        in tables["river_status_text"]["dashboard"]
+    assert "Intervention hypothesis" in {panel for place in tables["location_text"]["dashboard"] if place["page"] == "Catchment Dashboard"
+                                         for panel in place["panels"]}
+    # A panel with data from several tables is listed for each, in the dashboards' order.
+    for name in ["ea_classifications", "ea_scores", "ea_thresholds"]:
+        assert {"page": "EA Data", "panels": ["Environment Agency Scoring"]} in tables[name]["dashboard"]
+    assert [place["page"] for place in tables["risk_levels"]["dashboard"]] == ["River Status", "Land Use Data", "Sewerage Data"]
+
+
 def test_the_model_has_every_link():
     model = diagram.model(load_schema())
     links = {(l["from"], l["column"], l["to"], l["kind"]) for l in model["links"]}
@@ -74,6 +103,15 @@ def test_a_mistake_in_diagram_yaml_is_reported(tmp_path):
         diagram.model(load_schema(), diagram_file=settings)
     settings.write_text(ONLY_DATA_TABLES_SECTION + "filled: {catchments: {source: EA, url: 'javascript:alert(1)'}}\n")
     with pytest.raises(ValueError, match="should start with https://"):
+        diagram.model(load_schema(), diagram_file=settings)
+    settings.write_text(ONLY_DATA_TABLES_SECTION + "filled: {catchments: {transformation: {Downloads: it}}}\n")
+    with pytest.raises(ValueError, match="a transformation that isn't a list of steps"):
+        diagram.model(load_schema(), diagram_file=settings)
+    settings.write_text(ONLY_DATA_TABLES_SECTION + "dashboard: {River Status: {Risk Levels: [risk_levels, nope]}}\n")
+    with pytest.raises(ValueError, match="gives River Status's Risk Levels panel the table nope, which isn't in schema.yaml"):
+        diagram.model(load_schema(), diagram_file=settings)
+    settings.write_text(ONLY_DATA_TABLES_SECTION + "dashboard: {River Status: [Risk Levels]}\n")
+    with pytest.raises(ValueError, match="should list each page, then each panel on it"):
         diagram.model(load_schema(), diagram_file=settings)
     settings.write_text(ONLY_DATA_TABLES_SECTION + "links: [{from: locations.nope, to: catchments}]\n")
     with pytest.raises(ValueError, match="has locations.nope, which isn't in schema.yaml"):

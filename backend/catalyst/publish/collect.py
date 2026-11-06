@@ -47,7 +47,7 @@ class Dataset:
     description: str | None
     columns: list[Column]  # every column except catchment_id (or location_id)
     rows: dict[Any, list[dict[str, Any]]]  # catchment ID (or location ID) -> its rows
-    info: dict[str, Any] | None  # its row in the datasets table (source, caveats), for the "i" buttons
+    info: dict[str, Any] | None  # its row in the Datasets table (info_text), for the "i" buttons
     key: str = "catchment_id"  # what the rows belong to: catchment_id, or location_id for data about a whole location
 
     def rows_for(self, key: Any) -> list[dict[str, Any]]:
@@ -129,7 +129,7 @@ def _names(conn: sa.Connection, schema: Schema, ids: set[str]) -> dict[str, str]
 
 
 def _info(conn: sa.Connection, schema: Schema) -> dict[str, dict[str, Any]]:
-    """Each data table's row in the datasets table, by table name."""
+    """Each data table's row in the Datasets table (the text for its "i" button), by table name."""
     table = schema.metadata.tables["datasets"]
     return {row["table_name"]: dict(row) for row in conn.execute(sa.select(table)).mappings()}
 

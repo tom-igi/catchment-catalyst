@@ -11,6 +11,7 @@ from catalyst.importers.api import catchments, classifications
 from catalyst.publish import collect, figures, site
 from catalyst.publish.__main__ import main
 from catalyst.publish.collect import PublishProblem
+from catalyst.publish.text import formatted
 
 from .test_import_catchments import EAST_OKEMONT, WEST_OKEMENT, FakeEA
 
@@ -116,14 +117,13 @@ def test_land_use_shows_the_river_information_and_habitat(database, tmp_path):
 def test_info_buttons_show_the_datasets_table(database, tmp_path):
     with database.begin() as conn:
         conn.execute(sa.text(
-            "INSERT INTO datasets (table_name, name, source_organisation, source_url, caveats) "
-            "VALUES ('ea_classifications', 'EA Classifications', 'Environment Agency', 'https://example.org/ea', "
-            "'2025 is provisional')"
+            "INSERT INTO datasets (table_name, info_text) "
+            "VALUES ('ea_classifications', 'From the Environment Agency.\n\n2025 is <provisional>.')"
         ))
     page = (publish(database, tmp_path) / "ea-data" / WEST_OKEMENT / "index.html").read_text()
     assert 'popovertarget="info-ea_classifications"' in page
-    assert '<a href="https://example.org/ea">Environment Agency</a>' in page
-    assert "2025 is provisional" in page
+    assert "<h3>EA Classifications</h3>" in page  # the table's title
+    assert "<p>From the Environment Agency.</p>\n<p>2025 is &lt;provisional&gt;.</p>" in page  # in paragraphs, as text
     page = (publish(database, tmp_path) / "land-use" / WEST_OKEMENT / "index.html").read_text()
     assert 'popovertarget="info-habitat_land_use"' not in page  # no datasets row yet: greyed out
     assert '<span class="info" aria-hidden="true">i</span>' in page
@@ -310,7 +310,7 @@ def test_river_status_shows_the_text_risks_interventions_and_ranking(database, t
         {"catchment_id": WEST_OKEMENT, "number": 3, "priority": "Primary", "desired_change": "Less metal", "lead_partner": "EA"},
     ])
     page = (publish(database, tmp_path) / "river-status" / WEST_OKEMENT / "index.html").read_text()
-    assert "<p>Fish are poor.</p>\n<p>The reasons:</p>\n<ul><li>Metals</li><li>Mining</li></ul>" in page
+    assert "<p>Fish are poor.</p>\n<p>The reasons:</p>\n<ul>\n<li>Metals</li>\n<li>Mining</li>\n</ul>" in page
     assert "&lt;b&gt;Surveys&lt;/b&gt;" in page  # text is shown as typed, never as HTML
     assert "Intervention hypothesis (confidence: Med-High)" in page
     assert '<li class="risk-very-high"><span class="risk-name">Untreated Sewage</span><span class="risk-level">Very High</span></li>' in page
@@ -379,7 +379,7 @@ def test_sewerage_shows_the_properties_plans_and_location_text(database, tmp_pat
     insert(database, "sewerage_properties", [{"catchment_id": WEST_OKEMENT, "public_sewerage_properties": 310, "private_sewerage_properties": 467}])
     insert(database, "sewerage_improvements", [{"catchment_id": WEST_OKEMENT, "site_name": "HIGH BICKINGTON STW", "completion_year": 2035}])
     insert(database, "location_text", [{"location_id": location_id(database), "intermittent_discharges": "When it rains.",
-                                        "contact_email": "someone@example.org"}])
+                                        "about_waterbody_dashboard": "Email someone@example.org"}])
     location = gather(database)
     area = next(c["area_ha"] for c in location.catchments if c["id"] == WEST_OKEMENT)
     page = (publish(database, tmp_path) / "sewerage" / WEST_OKEMENT / "index.html").read_text()
@@ -387,7 +387,7 @@ def test_sewerage_shows_the_properties_plans_and_location_text(database, tmp_pat
     assert f"<dd>{467 / area:.2f}</dd>" in page
     assert "<td>HIGH BICKINGTON STW</td>" in page
     assert "<p>When it rains.</p>" in page
-    assert '<a href="mailto:someone@example.org">' in page
+    assert 'Email <a href="mailto:someone@example.org">someone@example.org</a>' in page  # the text under the dashboard
 
 
 def test_the_catchment_dashboard_adds_up_the_location(database, tmp_path):
@@ -402,7 +402,6 @@ def test_the_catchment_dashboard_adds_up_the_location(database, tmp_path):
     assert [(a.kind, a.slug) for a in areas] == [("management", ""), ("operational", "torridge")]  # North Devon is the whole location
     ids = [WEST_OKEMENT, EAST_OKEMONT]
     assert numbers.class_counts(ids) == [("High", None), ("Good", None), ("Moderate", None), ("Poor", 1), ("Bad", None)]
-    assert numbers.failing(ids) == 1
     assert numbers.total("farms", "number_of_farms", ids) == figures.Total(68, 1, 2)
     habitat, covered = numbers.habitat_totals(ids)
     assert habitat[0]["area_ha"] == 600 and covered.known == 2
@@ -423,7 +422,7 @@ def test_the_placeholder_views_show_their_focus_areas(database, tmp_path):
     folder = publish(database, tmp_path)
     page = (folder / "intervention-management" / "index.html").read_text()
     assert page.count('role="tab"') == len(site.INTERVENTION_AREAS)
-    assert "Starting Position (2022)" in page and "<li>1 Failing</li>" in page
+    assert '<h2>Critical Path</h2>\n<div class="focus-body">\n  <p class="placeholder">This section is under development.</p>' in page  # like every other section
     page = (folder / "catchment-insights" / "index.html").read_text()
     assert '<section class="focus-panel" role="tabpanel" id="funding-delivery"' in page
     assert (folder / "assets" / "tabs.js").is_file()
@@ -450,15 +449,35 @@ def location_id_of(engine, name):
 
 @pytest.mark.parametrize("text, html", [
     ("One line", "<p>One line</p>"),
-    ("Two\nlines", "<p>Two<br>lines</p>"),
+    ("Two\nlines", "<p>Two<br>\nlines</p>"),
     ("A\n\nB", "<p>A</p>\n<p>B</p>"),
-    ("Groups:\n• One – 27\n- Two\n* Three", "<p>Groups:</p>\n<ul><li>One – 27</li><li>Two</li><li>Three</li></ul>"),
+    ("Groups:\n• One – 27\n- Two\n* Three", "<p>Groups:</p>\n<ul>\n<li>One – 27</li>\n<li>Two</li>\n<li>Three</li>\n</ul>"),
     ("-27 degrees", "<p>-27 degrees</p>"),  # a dash with no space isn't a list
-    ("a < b", "<p>a &lt; b</p>"),
+    ("- A\n  - inside A\n  - > 0.03 = High", "<ul>\n<li>A\n<ul>\n<li>inside A</li>\n<li>&gt; 0.03 = High</li>\n</ul>\n</li>\n</ul>"),
+    ("**Bold** and [a link](https://example.org)", '<p><strong>Bold</strong> and <a href="https://example.org">a link</a></p>'),
+    ("Email a@example.org or see https://example.org",
+     '<p>Email <a href="mailto:a@example.org">a@example.org</a> or see <a href="https://example.org">https://example.org</a></p>'),
+    ("> In a grey box", "<blockquote>\n<p>In a grey box</p>\n</blockquote>"),
+    ("a < b <b>c</b>", "<p>a &lt; b &lt;b&gt;c&lt;/b&gt;</p>"),  # typed HTML is shown as typed
+    ("[x](javascript:alert(1))", "<p>[x](javascript:alert(1))</p>"),  # a link that would run a script isn't made
+    ("C:\\Data\\File_Name_2025.xlsx\n    indented\n---", "<p>C:\\Data\\File_Name_2025.xlsx<br>\nindented<br>\n---</p>"),  # no other Markdown
     (None, ""),
 ])
 def test_hand_written_text_becomes_paragraphs_and_lists(text, html):
-    assert str(site._paragraphs(text)) == html
+    assert str(formatted(text)) == html
+
+
+def test_hand_written_text_can_have_headings_and_sections_that_open_and_close():
+    html = str(formatted("Intro\n\n## Understanding\n\nWhy\n\n### Left-hand panel\n\nOne\n\n#### Risk Levels\n\n"
+                         "Two\n\n### River Status\n\n### EA Data\n\nThree\n\n## After\n\nEnd"))
+    assert html == (
+        "<p>Intro</p>\n<h2>Understanding</h2>\n<p>Why</p>\n"
+        '<details class="section" open>\n<summary>Left-hand panel</summary>\n<div class="section-body">\n'
+        "<p>One</p>\n<h4>Risk Levels</h4>\n<p>Two</p>\n</div>\n</details>\n"  # only the first section starts open
+        '<details class="section">\n<summary>River Status</summary>\n<div class="section-body">\n</div>\n</details>\n'
+        '<details class="section">\n<summary>EA Data</summary>\n<div class="section-body">\n<p>Three</p>\n</div>\n</details>\n'
+        "<h2>After</h2>\n<p>End</p>"  # a ## heading ends the section before it
+    )
 
 
 def test_links_to_the_assets_change_when_the_files_do(database, tmp_path):

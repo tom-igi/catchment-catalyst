@@ -3,7 +3,9 @@
 `model` gathers them: every table and column from schema.yaml (each table's
 `title`, `description` and `filled_by`, each column's `description` and
 `example`), plus the sections, where each downloaded table comes from (with its
-web page and command) and the extra links from diagram.yaml. The admin page adds the row counts and the Excel
+web page and command), what's done to its data on the way in (its
+transformation), where each data table is shown on the dashboards and the extra
+links from diagram.yaml. The admin page adds the row counts and the Excel
 uploads, and templates/home.html draws the diagram from them.
 
 It's made each time the page is opened, so it always matches the schema.yaml
@@ -59,13 +61,14 @@ def model(schema: Schema | None = None, counts: dict[str, int] | None = None,
         raise ValueError(f"The `filled` list in diagram.yaml has {', '.join(unknown)}, which isn't in schema.yaml")
 
     sections = _sections(schema, config)
+    shown = _dashboard(schema, config.get("dashboard") or {})
     return {
         "sections": [
             {"title": s.title, "description": s.description, "data": s.data, "tables": [t.name for t in s.tables]}
             for s in sections
         ],
         "tables": [
-            _table(t, schema, s.title, filled.get(t.name) or {}, (counts or {}).get(t.name))
+            _table(t, schema, s.title, filled.get(t.name) or {}, shown.get(t.name, []), (counts or {}).get(t.name))
             for s in sections for t in s.tables
         ],
         "links": _links(schema, config.get("links") or []),
@@ -91,13 +94,33 @@ def _sections(schema: Schema, config: dict) -> list[Section]:
     return [s for s in sections if s.tables]
 
 
-def _table(table: sa.Table, schema: Schema, section: str, filled: dict, rows: int | None) -> dict:
+def _dashboard(schema: Schema, pages) -> dict[str, list[dict]]:
+    """Where each table is shown on the dashboards: table name -> [{page, panels}], in the dashboards' order."""
+    if not isinstance(pages, dict) or not all(isinstance(panels, dict) for panels in pages.values()):
+        raise ValueError("The `dashboard` list in diagram.yaml should list each page, then each panel on it and its table(s)")
+    shown: dict[str, dict[str, list[str]]] = {}  # table name -> page -> its panels
+    for page, panels in pages.items():
+        for panel, names in panels.items():
+            for name in names if isinstance(names, list) else [names]:
+                if name not in schema.metadata.tables:
+                    raise ValueError(
+                        f"The `dashboard` list in diagram.yaml gives {page}'s {panel} panel the table {name}, "
+                        "which isn't in schema.yaml"
+                    )
+                shown.setdefault(name, {}).setdefault(str(page), []).append(str(panel))
+    return {name: [{"page": page, "panels": panels} for page, panels in by_page.items()] for name, by_page in shown.items()}
+
+
+def _table(table: sa.Table, schema: Schema, section: str, filled: dict, dashboard: list[dict], rows: int | None) -> dict:
     fill = table.info.get("filled_by") or filled.get("how") or "command"
     if fill not in FILLS:
         raise ValueError(f"{table.name}: how it's filled must be one of {', '.join(sorted(FILLS))}, not {fill}")
     url = filled.get("url")
     if url is not None and not str(url).startswith("https://"):
         raise ValueError(f"The `filled` list in diagram.yaml gives {table.name} the web page {url}, which should start with https://")
+    steps = filled.get("transformation") or []
+    if not isinstance(steps, list) or not all(isinstance(step, str) for step in steps):
+        raise ValueError(f"The `filled` list in diagram.yaml gives {table.name} a transformation that isn't a list of steps")
     key = list(table.primary_key.columns)
     return {
         "name": table.name,
@@ -111,6 +134,8 @@ def _table(table: sa.Table, schema: Schema, section: str, filled: dict, rows: in
         "url": url,  # the source's web page
         "command": f"docker compose run --rm {filled['command']}" if filled.get("command") else None,
         "note": filled.get("note"),
+        "transformation": steps,  # what's done to the data on the way in; none means it's copied 1 to 1
+        "dashboard": dashboard,  # where it's shown on the dashboards: [{page, panels}]
         "rows": rows,
         "one_row_per": [_label(c) for c in key] if len(key) > 1 else None,
         "columns": [_column(c, len(key)) for c in table.columns],

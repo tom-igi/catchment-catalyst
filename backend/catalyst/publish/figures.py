@@ -82,8 +82,6 @@ MEASURES = {
 }
 # Best first. Statuses not listed are counted after these.
 STATUS_ORDER = ["High", "Good", "Moderate", "Poor", "Bad"]
-# Statuses that count as achieving good ecological status.
-GOOD_OR_BETTER = {"High", "Good"}
 
 # The Risk Levels tiles: the column in Risk Levels -> the tile's name.
 RISK_NAMES = {
@@ -474,11 +472,6 @@ class Figures:
                 counts[status] = counts.get(status, 0) + 1
         statuses = STATUS_ORDER + sorted((s for s in counts if s not in STATUS_ORDER), key=lambda s: _rank(s, STATUS_ORDER))
         return [(status, counts.get(status)) for status in statuses]
-
-    def failing(self, ids: list[str]) -> int:
-        """How many of these catchments aren't at Good (or High) ecological status in the latest year."""
-        year = self.latest_year()
-        return sum(1 for i in ids if self.ecological.get(i, {}).get(year) and self.ecological[i][year] not in GOOD_OR_BETTER)
 
     def total(self, table: str, column: str, ids: list[str]) -> Total:
         """A column added up over these catchments."""

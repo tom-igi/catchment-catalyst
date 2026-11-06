@@ -210,10 +210,28 @@ def test_tables_outside_the_public_schema_are_left_alone(engine):
     assert plan_changes(engine, make_schema(THINGS)).summaries == ["create table things"]
 
 
-def test_primary_key_changes_are_pointed_out(engine):
+def test_a_primary_key_can_be_changed(engine):
     setup_things(engine)
+    # The numbered ID goes, and the name becomes the key.
+    schema = make_schema(THINGS.replace("          id: {type: integer, primary_key: true, identity: true}\n", "")
+                         .replace("name: {type: text, required: true}", "name: {type: text, primary_key: true}"))
+    plan = plan_changes(engine, schema)
+    assert plan.summaries[0] == "drop primary key (id) of things"
+    assert plan.summaries[-1] == "make (name) the primary key of things"
+    apply_changes(engine, schema, allow_data_loss=True)
+    key = sa.inspect(engine).get_pk_constraint("things")
+    assert (key["constrained_columns"], key["name"]) == (["name"], "pk_things")
+    assert plan_changes(engine, schema).changes == []
+    with engine.begin() as conn:
+        assert conn.scalars(sa.text("SELECT name FROM things ORDER BY name")).all() == ["a", "b"]  # the rows are kept
+
+
+def test_a_primary_key_the_rows_dont_fit_changes_nothing(engine):
+    setup_things(engine, rows=("a", "a"))
     schema = make_schema(THINGS.replace(
         "id: {type: integer, primary_key: true, identity: true}",
         "id: {type: integer, identity: true, required: true}",
     ).replace("name: {type: text, required: true}", "name: {type: text, primary_key: true}"))
-    assert "primary key" in plan_changes(engine, schema).warnings[0]
+    with pytest.raises(sa.exc.IntegrityError):
+        apply_changes(engine, schema)
+    assert sa.inspect(engine).get_pk_constraint("things")["constrained_columns"] == ["id"]

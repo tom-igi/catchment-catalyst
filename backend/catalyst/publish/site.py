@@ -44,10 +44,10 @@ from pathlib import Path
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
-from markupsafe import Markup, escape
 
 from .collect import Location
 from .figures import Figures, measured
+from .text import formatted
 
 HERE = Path(__file__).parent
 ASSETS = HERE / "static"
@@ -127,7 +127,7 @@ def write_location(location: Location, out_dir: Path) -> Path:
 
     for view, focus_areas in (("intervention-management", INTERVENTION_AREAS), ("catchment-insights", INSIGHT_AREAS)):
         _write(building / view / "index.html", env.get_template(f"{view}.html").render(
-            **shared, view=view, tab="", catchment=None, root="../", focus_areas=focus_areas, ids=everything,
+            **shared, view=view, tab="", catchment=None, root="../", focus_areas=focus_areas,
         ))
 
     if final.exists():
@@ -177,7 +177,7 @@ def _environment() -> Environment:
     )
     env.filters.update(
         show=_show, sort_value=_sort_value, number=_number, hours=_hours, status_class=_status_class,
-        paragraphs=_paragraphs, risk_class=_risk_class, anchor=_anchor, measured=measured,
+        formatted=formatted, risk_class=_risk_class, anchor=_anchor, measured=measured,
     )
     return env
 
@@ -237,34 +237,6 @@ def _risk_class(level: str | None) -> str:
 def _anchor(text: str) -> str:
     """A name as a link within a page, e.g. 'Funding & Delivery' -> 'funding-delivery'."""
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
-
-
-BULLET = re.compile(r"^(?:•\s*|[-–*]\s+)")
-
-
-def _paragraphs(text: str | None) -> Markup:
-    """Hand-written text as paragraphs: a blank line starts a new one, and lines starting with •, - or * become a list."""
-    if not text or not text.strip():
-        return Markup("")
-    html = []
-    for block in re.split(r"\n\s*\n", text.replace("\r\n", "\n").replace("\r", "\n").strip()):
-        lines, items = [], []
-        for line in (l.strip() for l in block.split("\n") if l.strip()):
-            if BULLET.match(line):
-                if lines:
-                    html.append(Markup("<p>%s</p>") % Markup("<br>").join(lines))
-                    lines = []
-                items.append(BULLET.sub("", line))
-            else:
-                if items:
-                    html.append(Markup("<ul>%s</ul>") % Markup("").join(Markup("<li>%s</li>") % i for i in items))
-                    items = []
-                lines.append(escape(line))
-        if lines:
-            html.append(Markup("<p>%s</p>") % Markup("<br>").join(lines))
-        if items:
-            html.append(Markup("<ul>%s</ul>") % Markup("").join(Markup("<li>%s</li>") % i for i in items))
-    return Markup("\n").join(html)
 
 
 def _today() -> str:

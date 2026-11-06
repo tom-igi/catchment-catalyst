@@ -71,9 +71,11 @@ Notes:
   refused unless you add `--allow-data-loss`.
 - To rename a table or column, add `renamed_from: <old name>` to it. Otherwise a rename is
   treated as "drop the old one, add a new empty one", which the data-loss check stops.
-- The tool can't change a table's primary key, or move data between columns (e.g. split a
-  column in two). `plan` warns about primary key differences. Moving data needs a one-off
-  script.
+- A change of primary key is made too: the old key is dropped before the other changes and
+  the new one added after them. If the rows don't fit the new key (e.g. two with the same
+  value), the database refuses it and nothing is changed.
+- The tool can't move data between columns (e.g. split a column in two). That needs a
+  one-off script.
 - Only tables in the `public` schema are managed.
 
 ## Filling the tables
@@ -168,14 +170,16 @@ Each location gets a folder (e.g. `published/north-devon/`) with:
 
 Panels whose data has a table are filled in, from the EA's data, the Excel tables (text, risk
 levels, interventions, thresholds, farms, livestock, phosphate, sewerage and so on) and the "i"
-buttons (from the `datasets` table). A panel is shown empty while its table has no rows for that
+buttons (from the Datasets table, also uploaded in Excel: one row per table, with its text). A panel is shown empty while its table has no rows for that
 catchment. Each new data table needs a place on a page, in
 `backend/catalyst/publish/templates/` (calculations such as percentages go in
 `backend/catalyst/publish/figures.py`).
 
-Hand-written text (River Status Text, Location Text) can have paragraphs and lists: in Excel,
-Alt+Enter starts a new line in a cell, a blank line starts a new paragraph, and lines starting
-with a dash, `*` or `•` become a list.
+Hand-written text (River Status Text, Location Text, the "i" text in Datasets) can have
+paragraphs, bullets, bold, links, headings and sections that open and close, using a few
+Markdown marks (`**bold**`, `[words](https://…)`, `## heading`, `### section`, `> grey box`).
+The full list is at the top of `backend/catalyst/publish/text.py`. In Excel, Alt+Enter starts a
+new line in a cell. Web and email addresses become links by themselves.
 
 The styles and scripts are in `backend/catalyst/publish/static/`. The maps use Leaflet (copied
 into `static/leaflet/`) over OpenStreetMap's map images, which are the only thing the pages load

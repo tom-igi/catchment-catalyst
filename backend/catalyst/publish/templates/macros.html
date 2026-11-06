@@ -1,8 +1,8 @@
 {# Pieces shared by the pages. #}
 
 {# A panel's heading. Panels that have an "i" button in the original get one:
-   it shows the dataset's row in the datasets table, and is greyed out until
-   there is one. #}
+   it shows the table's text from the Datasets table, and is greyed out until
+   it has some. #}
 {% macro heading(text, info=false, dataset=none) %}
 <div class="head">
   <h2>{{ text }}</h2>
@@ -10,22 +10,8 @@
   {% set about = dataset.info %}
   <button type="button" class="info" popovertarget="info-{{ dataset.table }}" aria-label="About the {{ dataset.title }} data">i</button>
   <div id="info-{{ dataset.table }}" class="info-box" popover>
-    <h3>{{ about.name }}</h3>
-    {% if about.description %}<p>{{ about.description }}</p>{% endif %}
-    <dl>
-      {% if about.source_organisation or about.source_url %}
-      <dt>Source</dt>
-      <dd>{% if about.source_url %}<a href="{{ about.source_url }}">{{ about.source_organisation or about.source_url }}</a>{% else %}{{ about.source_organisation }}{% endif %}</dd>
-      {% endif %}
-      {% if about.data_date %}
-      <dt>Data from</dt>
-      <dd>{{ about.data_date | show }}</dd>
-      {% endif %}
-      {% if about.caveats %}
-      <dt>Caveats</dt>
-      <dd>{{ about.caveats }}</dd>
-      {% endif %}
-    </dl>
+    <h3>{{ dataset.title }}</h3>
+    {{ about.info_text | formatted }}
   </div>
   {% elif info %}
   <span class="info" aria-hidden="true">i</span>
@@ -54,15 +40,11 @@
 </nav>
 {% endmacro %}
 
-{# The location's text under a dashboard (from Location Text), and its contact email. #}
+{# The location's text under a dashboard (from Location Text). #}
 {% macro about(text, field) %}
-{% if text.get(field) or text.get("contact_email") %}
+{% if text.get(field) %}
 <section class="about">
-  {{ text.get(field) | paragraphs }}
-  {% if text.get("contact_email") %}
-  <p>If you have any queries, or notice any issues with the dashboards or data, please email
-    <a href="mailto:{{ text.contact_email }}">{{ text.contact_email }}</a>.</p>
-  {% endif %}
+  {{ text.get(field) | formatted }}
 </section>
 {% endif %}
 {% endmacro %}

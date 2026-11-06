@@ -131,9 +131,12 @@ def _prepare(conn: sa.Connection, schema: Schema) -> Plan:
         "include_name": lambda name, type_, parent_names: type_ != "table" or name in existing,
     })
     script = produce_migrations(context, schema.metadata)
+    drop_keys, add_keys = _primary_key_changes(conn, schema, existing)
+    changes.extend(drop_keys)
     changes.extend(_describe(op) for op in _flatten(script.upgrade_ops))
+    changes.extend(add_keys)
 
-    return Plan(changes, _primary_key_warnings(conn, schema, existing))
+    return Plan(changes, [])
 
 
 def _rename_to_convention(conn: sa.Connection, schema: Schema, existing: set[str]) -> list[Change]:
@@ -214,21 +217,33 @@ def _flatten(op):
         yield op
 
 
-def _primary_key_warnings(conn: sa.Connection, schema: Schema, existing: set[str]) -> list[str]:
-    """Alembic doesn't detect primary key changes, so at least point them out."""
+def _primary_key_changes(conn: sa.Connection, schema: Schema, existing: set[str]) -> tuple[list[Change], list[Change]]:
+    """Changes of primary key, which Alembic doesn't detect: the old keys, dropped before the
+    other changes (which may drop their columns), and the new ones, added after them (once
+    their columns exist). If the rows don't fit the new key (e.g. two with the same value),
+    the database refuses it and nothing is changed."""
+    preparer = conn.dialect.identifier_preparer
     inspector = sa.inspect(conn)
-    warnings = []
+    drops, adds = [], []
     for table in schema.metadata.sorted_tables:
         if table.name not in existing:
             continue
-        in_db = inspector.get_pk_constraint(table.name)["constrained_columns"]
-        in_file = [c.name for c in table.primary_key.columns]
-        if sorted(in_db) != sorted(in_file):
-            warnings.append(
-                f"{table.name}: the primary key is ({', '.join(in_db)}) in the database but "
-                f"({', '.join(in_file)}) in schema.yaml. This can't be changed automatically."
-            )
-    return warnings
+        in_db = inspector.get_pk_constraint(table.name)
+        old = in_db["constrained_columns"]
+        new = [c.name for c in table.primary_key.columns]
+        if sorted(old) == sorted(new):
+            continue
+        if old:
+            drops.append(Change(
+                "change", f"drop primary key ({', '.join(old)}) of {table.name}",
+                op=ops.DropConstraintOp(in_db["name"], table.name, type_="primary"),
+            ))
+        if new:
+            adds.append(Change(
+                "change", f"make ({', '.join(new)}) the primary key of {table.name}",
+                op=ops.CreatePrimaryKeyOp(preparer.format_constraint(table.primary_key), table.name, new),
+            ))
+    return drops, adds
 
 
 # --- Describing changes ------------------------------------------------------

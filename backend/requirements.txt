@@ -11,3 +11,6 @@ python-multipart==0.0.32
 Jinja2==3.1.6
 itsdangerous==2.2.0
 openpyxl==3.1.5
+# The dashboard: hand-written text (bold, links, headings, sections), and web and email addresses as links
+markdown-it-py[linkify]==4.0.0
+linkify-it-py==2.0.3

@@ -9,7 +9,10 @@
 <style>
   /* The admin page's home: a left-to-right flow diagram of every table, drawn from the model
      below (made by diagram.py and app.py), with a details panel for each table, where it can be
-     downloaded. Each Excel table also has its own source on the left, which opens its upload. */
+     downloaded. Each Excel table also has its own source on the left, which opens its upload.
+     Between each source and its tables is its transformation: what's done to the data on the
+     way in (1 to 1 for Excel uploads, for now). Each data table's box lists where it's shown
+     on the dashboards. */
   :root {
     color-scheme: light dark;
     --bg: #f3f6f7;
@@ -83,7 +86,7 @@
     overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
   }
 
-  main { max-width: 1360px; margin: 0 auto; padding: 24px 32px 104px; }
+  main { max-width: 1840px; margin: 0 auto; padding: 24px 32px 104px; }
 
   /* Top bar (as on the admin page's other pages) */
   .bar {
@@ -136,6 +139,27 @@
   .group.quiet .src-eyebrow { color: var(--muted); font-weight: 600; }
   .group.quiet .src-name { font-size: .9rem; font-weight: 600; }
 
+  /* A source's transformation: what's done to its data on the way into its tables. Dashed
+     while it's 1 to 1 (nothing changes), as a step kept for later. */
+  .xf-step { position: relative; margin: 0 0 0 30px; padding: 8px 0 0 18px; border-left: 2px solid var(--f); }
+  .xf-step::before { content: ""; position: absolute; left: 0; top: calc(50% + 4px); width: 15px; border-top: 2px solid var(--f); }
+  .xf {
+    position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; width: 100%; min-height: 50px;
+    padding: 7px 10px 7px 7px; border: 1.5px solid var(--f); border-radius: 10px;
+    background: var(--card); text-align: left; cursor: pointer;
+    transition: opacity .15s, border-color .15s, box-shadow .15s;
+  }
+  .xf.same { border-style: dashed; background: var(--bg); }
+  .xf:hover { box-shadow: 0 0 0 1px var(--f); }
+  .xf.is-selected { box-shadow: 0 0 0 3px var(--f-soft), 0 0 0 4.5px var(--f); }
+  .xf-icon {
+    flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+    background: var(--f-soft); color: var(--f);
+  }
+  .xf-text { display: block; min-width: 0; line-height: 1.25; }
+  .xf-eyebrow { display: block; font-size: .74rem; font-weight: 650; color: var(--f); }
+  .xf-name { display: block; font-weight: 650; font-size: .9rem; }
+  .xf-sub { display: block; font-size: .78rem; color: var(--muted); }
   .tables {
     list-style: none; display: grid; gap: 8px;
     margin: 0 0 0 30px; padding: 8px 0 0 18px; border-left: 2px solid var(--f);
@@ -175,6 +199,23 @@
   .node-meta .fw { color: var(--f); font-weight: 650; }
   .node-meta .fw svg { vertical-align: -3px; margin-right: 3px; }
   .group.quiet .node { min-height: 50px; box-shadow: none; }
+
+  /* Where a data table is shown on the dashboards: each page, and its panels. Under the table's
+     name, or beside it when the box is wide enough (the Data tables column is the widest). */
+  .tables { container-type: inline-size; }
+  .node.has-dash { flex-wrap: wrap; row-gap: 8px; }
+  .node-dash {
+    flex: 1 1 100%; display: grid; grid-template-columns: 10em minmax(0, 1fr); gap: 4px 10px; align-items: baseline;
+    padding-top: 8px; border-top: 1px solid var(--border); font-size: .78rem; line-height: 1.35;
+  }
+  .nd-page { color: var(--muted); font-weight: 600; }
+  .nd-panels { display: flex; flex-wrap: wrap; gap: 3px 4px; }
+  .nd-panel { padding: 1px 7px; border-radius: 5px; background: var(--quiet-soft); color: var(--text); font-weight: 600; }
+  @container (min-width: 580px) {
+    .node.has-dash { flex-wrap: nowrap; }
+    .node.has-dash .node-text { flex: 0 0 clamp(150px, 24%, 180px); }
+    .node-dash { flex: 1 1 auto; min-width: 0; align-self: stretch; align-content: center; padding: 2px 0 2px 14px; border-top: 0; border-left: 1px solid var(--border); }
+  }
 
   /* The hub and the dashboard tables */
   .hub, .dash { flex-direction: column; align-items: stretch; gap: 6px; padding: 14px 16px; }
@@ -250,7 +291,7 @@
   .col-head .col-text { padding-top: 1px; }
   .col-head .col-sub { display: block; margin-top: 1px; font-size: .82rem; font-weight: 400; color: var(--muted); }
 
-  @media (max-width: 859.98px) {
+  @media (max-width: 959.98px) {
     main { padding: 18px 16px 104px; }
     h1 { font-size: 1.8rem; margin-bottom: 18px; }
     .wide-only { display: none !important; }
@@ -259,15 +300,15 @@
     .dash-end .dashboard { max-width: 100%; }
   }
 
-  /* ------- Wide: four columns with drawn connectors ------- */
-  @media (min-width: 860px) {
+  /* ------- Wide: five columns with drawn connectors ------- */
+  @media (min-width: 960px) {
     main { padding: 24px 24px 104px; }
     .narrow-only { display: none !important; }
     .flow {
       display: grid;
       grid-template-columns:
-        minmax(200px, 2fr) minmax(32px, .35fr) minmax(176px, 1.3fr) minmax(56px, .6fr)
-        minmax(164px, 1.1fr) minmax(36px, .4fr) minmax(140px, 1fr);
+        minmax(180px, 1.3fr) minmax(20px, .1fr) minmax(124px, .72fr) minmax(20px, .1fr)
+        minmax(170px, 3.3fr) minmax(48px, .3fr) minmax(160px, .95fr) minmax(32px, .15fr) minmax(136px, .85fr);
       row-gap: 22px;
       align-items: start;
       padding-bottom: 8px;
@@ -277,10 +318,13 @@
     .col-head[data-col="2"] { grid-column: 3; }
     .col-head[data-col="3"] { grid-column: 5; }
     .col-head[data-col="4"] { grid-column: 7; }
+    .col-head[data-col="5"] { grid-column: 9; }
     .group { display: contents; }
     .src { grid-column: 1; grid-row: var(--row); align-self: center; }
+    .xf-step { grid-column: 3; grid-row: var(--row); align-self: center; margin: 0; padding: 0; border-left: 0; }
+    .xf-step::before { display: none; }
     .tables {
-      grid-column: 3; grid-row: var(--row); align-self: center;
+      grid-column: 5; grid-row: var(--row); align-self: center;
       margin: 0; padding: 0; border-left: 0; gap: 10px;
     }
     .tables > li::before, .tables > li:last-child::after { display: none; }
@@ -289,17 +333,26 @@
       grid-row: var(--span); align-self: stretch;
       display: grid; grid-template-rows: 1fr auto 1fr;
     }
-    .hub-col { grid-column: 5; }
-    .dash-col { grid-column: 7; }
+    .hub-col { grid-column: 7; }
+    .dash-col { grid-column: 9; }
     .hub-col > .hub, .dash-col > .dash-nodes { grid-row: 2; }
     .dash-col > .dash-end { grid-row: 3; align-self: start; }
     .dash-end > svg { margin: 6px 0; }
-    .house-head { grid-column: 1 / 4; grid-row: var(--row); margin: 18px 0 0; }
+    .house-head { grid-column: 1 / 6; grid-row: var(--row); margin: 18px 0 0; }
     .group.quiet .src { align-self: center; }
   }
   @media (min-width: 1200px) {
     main { padding: 28px 32px 104px; }
     .flow { row-gap: 26px; }
+  }
+  /* Below this, the Data tables boxes are too narrow to put the dashboard panels beside the
+     table's name (they go under it), so the other columns get more of the width back. */
+  @media (min-width: 960px) and (max-width: 1599.98px) {
+    .flow {
+      grid-template-columns:
+        minmax(180px, 1.45fr) minmax(20px, .12fr) minmax(124px, .8fr) minmax(20px, .12fr)
+        minmax(170px, 2.4fr) minmax(48px, .35fr) minmax(160px, 1fr) minmax(32px, .2fr) minmax(136px, .9fr);
+    }
   }
 
   /* ------- Details panel ------- */
@@ -343,6 +396,11 @@
   .from p:first-child { margin-top: 0; }
   .fills { margin-top: 16px; }
   .from .muted { color: var(--muted); font-size: .9rem; }
+  .from.same { background: transparent; border: 1.5px dashed var(--f); }
+  .from ol { margin: 6px 0 0; padding-left: 22px; }
+  .from ol li + li { margin-top: 5px; }
+  .from .xf-for { margin-top: 14px; font-weight: 700; }
+  .from .xf-for:first-child { margin-top: 0; }
   .cmd { display: flex; gap: 8px; align-items: stretch; margin-top: 8px; }
   .cmd code {
     flex: 1; min-width: 0; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
@@ -513,10 +571,12 @@ const FILLS = {
   command: { word: "Database command", long: "Changed with a database command", icon: "terminal" },
   admin: { word: "Admin page", long: "Kept by the admin page", icon: "window" },
 };
-const QUIET = { command: true, admin: true };
-// "#catchments" opens a table's details, and "#from-catchments" where its data comes from (for an
-// Excel table, "#upload-ea_scores", its upload). Table names can't have a "-".
-const FROM_HASH = "from-", UPLOAD_HASH = "upload-";
+const QUIET = { command: true, admin: true };  // housekeeping: no data comes in, so no transformation
+// "#catchments" opens a table's details, "#from-catchments" where its data comes from (for an
+// Excel table, "#upload-ea_scores", its upload) and "#transform-catchments" what's done to the data
+// on the way in. Table names can't have a "-".
+const FROM_HASH = "from-", UPLOAD_HASH = "upload-", TRANSFORM_HASH = "transform-";
+const HASH_VIEWS = [[FROM_HASH, "source"], [UPLOAD_HASH, "source"], [TRANSFORM_HASH, "transform"]];
 const canUpload = t => fillOf(t) === "excel" && !!t.update;
 const fillOf = t => (FILLS[t.fill] ? t.fill : "command");
 
@@ -535,6 +595,8 @@ const ICONS = {
   upload: "M12 15V3M7 8l5-5 5 5M5 21h14",
   key: "M10.5 13.5a4 4 0 1 1-5.66 5.66 4 4 0 0 1 5.66-5.66zM10.5 13.5 19 5M15.5 8.5l2.5 2.5M18 6l2 2",
   link: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71",
+  same: "M5 9h14M5 15h14",
+  reshape: "M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5",
 };
 
 /* ---------- Small helpers (all model text goes in with textContent) ---------- */
@@ -580,6 +642,13 @@ function waitingUploads(t) {
   const recent = t.update && Array.isArray(t.update.recent) ? t.update.recent : [];
   return recent.filter(r => r.status === "preview");
 }
+// Where a data table is shown on the dashboards: [{page, panels}], from diagram.yaml.
+function dashboardOf(t) {
+  return (Array.isArray(t.dashboard) ? t.dashboard : [])
+    .filter(p => p && Array.isArray(p.panels) && p.panels.length)
+    .map(p => ({ page: String(p.page), panels: p.panels.map(String) }));
+}
+function stepsOf(g) { return g.members.filter(t => Array.isArray(t.transformation) && t.transformation.length); }
 function columnOf(t, name) { return (t.columns || []).find(c => c.name === name) || null; }
 function columnLabel(t, name) { const c = columnOf(t, name); return c ? (c.label || c.name) : name; }
 function columnLetters(i) {
@@ -618,7 +687,9 @@ function makePlan(model) {
     const key = fill === "api" && t.command ? "command|" + t.command : "table|" + t.name;
     let g = groups.find(x => x.key === key);
     if (!g) {
-      g = { key, id: "src:g" + groups.length, order: groups.length, fill, quiet: !!QUIET[fill],
+      const n = groups.length, quiet = !!QUIET[fill];
+      g = { key, id: "src:g" + n, order: n, fill, quiet,
+            xf: quiet ? null : "xf:g" + n,  // its transformation, between it and its tables
             source: fill === "api" ? (t.source || null) : null, members: [], tables: [], feedsHub: false };
       groups.push(g);
     }
@@ -636,11 +707,15 @@ function makePlan(model) {
   const houseRow = 2 + main.length;
   house.forEach((g, i) => { g.row = houseRow + 1 + i; });
 
-  // Lines: source -> table, source -> hub, table -> hub (by ID), dashboard table -> hub, and faint others.
+  // Lines: source -> transformation -> table (or hub), table -> hub (by ID), dashboard table -> hub,
+  // and faint others. Housekeeping has no transformation, so its lines go straight to the table.
   const wires = [];
   const addWire = (type, a, b, extra) => { wires.push(Object.assign({ id: "w" + wires.length, type, a, b }, extra || {})); };
-  for (const g of groups) for (const t of g.tables) addWire("src", g.id, "tbl:" + t.name, { fill: g.fill });
-  if (hubGroup) addWire("bridge", hubGroup.id, "tbl:" + hub.name, { fill: hubGroup.fill });
+  for (const g of groups) {
+    if (g.xf) addWire("src", g.id, g.xf, { fill: g.fill });
+    for (const t of g.tables) addWire("src", g.xf || g.id, "tbl:" + t.name, { fill: g.fill });
+  }
+  if (hubGroup) addWire("bridge", hubGroup.xf || hubGroup.id, "tbl:" + hub.name, { fill: hubGroup.fill });
   const seen = new Set();
   const hubLabels = new Map();
   const dashLabels = new Map();
@@ -671,18 +746,36 @@ function makePlan(model) {
   };
 }
 
-// Which nodes and lines light up for a key ("tbl:name" or "src:g0").
+// Which nodes and lines light up for a key ("tbl:name", "src:g0" or its transformation, "xf:g0").
 function relations(plan, key) {
   const nodes = new Set([key]);
   const wires = new Set();
   const touching = n => plan.wires.filter(w => w.a === n || w.b === n);
+  const feeds = w => w.type === "src" || w.type === "bridge";  // source -> transformation -> table
+  const add = w => { wires.add(w.id); nodes.add(w.a); nodes.add(w.b); };
+  // Along the feed: back to where the data comes from (`up`), or on to the tables it fills.
+  const follow = (from, up) => {
+    const seen = new Set([from]);
+    for (const todo = [from]; todo.length;) {
+      const n = todo.pop();
+      for (const w of plan.wires) {
+        if (!feeds(w) || (up ? w.b : w.a) !== n) continue;
+        add(w);
+        const next = up ? w.a : w.b;
+        if (!seen.has(next)) { seen.add(next); todo.push(next); }
+      }
+    }
+  };
   if (key.startsWith("tbl:")) {
-    for (const w of touching(key)) { wires.add(w.id); nodes.add(w.a); nodes.add(w.b); }
-  } else if (key.startsWith("src:")) {
-    for (const w of touching(key)) { wires.add(w.id); nodes.add(w.b); }
+    for (const w of touching(key)) add(w);
+    follow(key, true);
+  } else {
+    // A source or its transformation: everything it fills, and those tables' links to the hub.
+    follow(key, true);
+    follow(key, false);
     for (const n of Array.from(nodes)) {
-      if (n === key) continue;
-      for (const w of touching(n)) if (w.type === "hub" && w.a === n) { wires.add(w.id); nodes.add(w.b); }
+      if (!n.startsWith("tbl:")) continue;
+      for (const w of touching(n)) if (w.type === "hub" && w.a === n) add(w);
     }
   }
   return { nodes, wires };
@@ -767,25 +860,26 @@ function start() {
   const flow = $("flow");
   const panel = $("panel"), panelBadge = $("panel-badge"), panelTitle = $("panel-title"), panelBody = $("panel-body");
   const closeBtn = $("panel-close");
-  const wideQuery = window.matchMedia ? window.matchMedia("(min-width: 860px)") : { matches: true };
+  const wideQuery = window.matchMedia ? window.matchMedia("(min-width: 960px)") : { matches: true };
 
   const nodeEls = new Map();   // key -> element that lights up
   const anchors = new Map();   // key -> element the lines are measured from
   const wireEls = new Map();   // wire id -> { g, path }
-  // `current` is the open panel: { name, source }, where source is true for where the table's data
-  // comes from (its source on the left), and false for the table's details.
+  // `current` is the open panel: { name, view }, where view is "table" for the table's details,
+  // "source" for where its data comes from (its source on the left) and "transform" for what's
+  // done to the data on the way in (its transformation).
   let hoverKey = null, focusKey = null, current = null, opener = null;
 
   /* Diagram */
   const svg = svgEl("svg", { class: "wires wide-only", "aria-hidden": "true", focusable: "false" });
   flow.appendChild(svg);
 
-  // Every column but the first is tables, so the headings say so.
-  const heads = [["1", "Where the data comes from"], ["2", "Data tables"]];
-  if (plan.hub) heads.push(["3", titleOf(plan.hub) + " table", "Joins them up by " + plan.hubLabel]);
+  // Every column after the transformation is tables, so the headings say so.
+  const heads = [["1", "Where the data comes from"], ["2", "Transformation", "Changed to fit the table"], ["3", "Data tables", "And where each is on the dashboards"]];
+  if (plan.hub) heads.push(["4", titleOf(plan.hub) + " table", "Joins them up by " + plan.hubLabel]);
   if (plan.dash.length) {
     const name = plan.dash.length === 1 ? titleOf(plan.dash[0]) + " table" : "Dashboard tables";
-    heads.push(["4", name, "Picks the " + titleOf(plan.hub).toLowerCase() + " on each dashboard"]);
+    heads.push(["5", name, "Picks the " + titleOf(plan.hub).toLowerCase() + " on each dashboard"]);
   }
   for (const [n, text, sub] of heads) {
     const h = el("div", "col-head wide-only");
@@ -874,11 +968,12 @@ function start() {
     }
     b.appendChild(el("span", "visually-hidden", " (" + names + ")"));
     b.setAttribute("aria-haspopup", "dialog");
-    b.addEventListener("click", () => openPanel(first.name, true, b));
+    b.addEventListener("click", () => openPanel(first.name, "source", b));
     hoverable(b, g.id);
     nodeEls.set(g.id, b);
     anchors.set(g.id, b);
     wrap.appendChild(b);
+    if (g.xf) wrap.appendChild(transformEl(g));
 
     const ul = el("ul", "tables");
     ul.setAttribute("role", "list");
@@ -896,6 +991,35 @@ function start() {
     }
     wrap.appendChild(ul);
     return wrap;
+  }
+
+  // A source's transformation: the steps for its tables in diagram.yaml, or 1 to 1 (nothing is
+  // changed on the way in) if they have none, as every Excel upload is for now.
+  function transformWords(g) {
+    if (!stepsOf(g).length) return { icon: "same", name: "1 to 1", sub: "No change, for now", same: true };
+    return { icon: "reshape", name: "Reshaped", sub: g.fill === "api" ? "By the importer" : "On upload", same: false };
+  }
+
+  function transformEl(g) {
+    const step = el("div", "xf-step");
+    const words = transformWords(g);
+    const b = el("button", "xf f-" + g.fill + (words.same ? " same" : ""));
+    b.type = "button";
+    b.dataset.node = g.xf;
+    const ic = el("span", "xf-icon");
+    ic.appendChild(icon(words.icon, 16));
+    const tx = el("span", "xf-text");
+    const eyebrow = el("span", "xf-eyebrow narrow-only", "Transformation");  // the column's heading says so on wide screens
+    eyebrow.setAttribute("aria-hidden", "true");
+    tx.append(el("span", "visually-hidden", "Transformation: "), eyebrow, el("span", "xf-name", words.name), el("span", "xf-sub", words.sub));
+    b.append(ic, tx, el("span", "visually-hidden", " (into " + joinWords(g.members.map(titleOf)) + ")"));
+    b.setAttribute("aria-haspopup", "dialog");
+    b.addEventListener("click", () => openPanel(g.members[0].name, "transform", b));
+    hoverable(b, g.xf);
+    nodeEls.set(g.xf, b);
+    anchors.set(g.xf, b);
+    step.appendChild(b);
+    return step;
   }
 
   function groupWords(g) {
@@ -920,7 +1044,7 @@ function start() {
     b.type = "button";
     b.dataset.node = "tbl:" + t.name;
     b.setAttribute("aria-haspopup", "dialog");
-    b.addEventListener("click", () => openPanel(t.name, false, b));
+    b.addEventListener("click", () => openPanel(t.name, "table", b));
     hoverable(b, "tbl:" + t.name);
     nodeEls.set("tbl:" + t.name, b);
     anchors.set("tbl:" + t.name, b);
@@ -934,6 +1058,23 @@ function start() {
     const tx = el("span", "node-text");
     tx.append(el("span", "node-title", titleOf(t)), metaEl(t));
     b.append(ic, tx);
+    const places = dashboardOf(t);
+    if (places.length) {
+      b.classList.add("has-dash");
+      const d = el("span", "node-dash");
+      d.appendChild(el("span", "visually-hidden", "On the dashboards: "));
+      for (const p of places) {
+        const page = el("span", "nd-page", p.page);
+        page.appendChild(el("span", "visually-hidden", ":"));
+        const list = el("span", "nd-panels");
+        p.panels.forEach((name, i) => {
+          if (i) list.appendChild(el("span", "visually-hidden", ", "));  // read out between the chips, not shown
+          list.appendChild(el("span", "nd-panel", name));
+        });
+        d.append(page, list);
+      }
+      b.appendChild(d);
+    }
     return b;
   }
 
@@ -989,11 +1130,12 @@ function start() {
     elm.addEventListener("blur", () => { if (focusKey === key) { focusKey = null; trace(); } });
   }
 
-  // The diagram's key for the open panel: the table, or its source.
+  // The diagram's key for the open panel: the table, its source or its transformation.
   function currentKey() {
     if (!current) return null;
-    const g = current.source ? plan.sources.get(current.name) : null;
-    return g ? g.id : "tbl:" + current.name;
+    const g = current.view !== "table" ? plan.sources.get(current.name) : null;
+    if (!g) return "tbl:" + current.name;
+    return current.view === "transform" && g.xf ? g.xf : g.id;
   }
 
   function trace() {
@@ -1043,16 +1185,19 @@ function start() {
   if (wideQuery.addEventListener) wideQuery.addEventListener("change", queueDraw);
   queueDraw();
 
-  /* Details panel: a table's details, or where its data comes from (for an Excel table, its upload) */
-  function openPanel(name, source, from, instant) {
+  /* Details panel: a table's details ("table"), where its data comes from ("source"; for an Excel
+     table, its upload), or what's done to it on the way in ("transform") */
+  function openPanel(name, view, from, instant) {
     const t = plan.byName.get(name);
     if (!t) return;
-    source = !!(source && plan.sources.has(name));
+    const g = plan.sources.get(name);
+    if (!g || (view === "transform" && !g.xf) || (view !== "source" && view !== "transform")) view = "table";
     if (!current) opener = from || document.activeElement;
-    current = { name, source };
-    if (!source) renderDetails(t);
+    current = { name, view };
+    if (view === "table") renderDetails(t);
+    else if (view === "transform") renderTransform(g);
     else if (canUpload(t)) renderUpload(t, t.update);
-    else renderSource(plan.sources.get(name));
+    else renderSource(g);
     if (instant) {
       panel.classList.add("instant");
       requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.remove("instant")));
@@ -1060,7 +1205,8 @@ function start() {
     panel.classList.add("open");
     document.body.classList.toggle("panel-open-narrow", !wideQuery.matches);
     panel.scrollTop = 0;
-    const hash = "#" + (source ? (canUpload(t) ? UPLOAD_HASH : FROM_HASH) : "") + encodeURIComponent(name);
+    const prefix = view === "transform" ? TRANSFORM_HASH : view === "source" ? (canUpload(t) ? UPLOAD_HASH : FROM_HASH) : "";
+    const hash = "#" + prefix + encodeURIComponent(name);
     if (location.hash !== hash) history.replaceState(null, "", hash);
     trace();
     panelTitle.focus({ preventScroll: true });
@@ -1087,17 +1233,17 @@ function start() {
   });
   window.addEventListener("hashchange", () => {
     const want = fromHash();
-    if (want && plan.byName.has(want.name)) openPanel(want.name, want.source);
+    if (want && plan.byName.has(want.name)) openPanel(want.name, want.view);
     else if (!want) closePanel();
   });
   function fromHash() {
     let raw = location.hash.replace(/^#/, "");
     try { raw = decodeURIComponent(raw); } catch (e) { /* use it as it is */ }
     if (!raw) return null;
-    for (const prefix of [FROM_HASH, UPLOAD_HASH]) {
-      if (raw.startsWith(prefix)) return { name: raw.slice(prefix.length), source: true };
+    for (const [prefix, view] of HASH_VIEWS) {
+      if (raw.startsWith(prefix)) return { name: raw.slice(prefix.length), view };
     }
-    return { name: raw, source: false };
+    return { name: raw, view: "table" };
   }
 
   function jumpButton(t) {
@@ -1106,7 +1252,7 @@ function start() {
     const ic = el("span", "j-icon");
     ic.appendChild(icon(FILLS[fillOf(t)].icon, 16));
     b.append(ic, el("span", null, titleOf(t)));
-    b.addEventListener("click", () => openPanel(t.name, false));
+    b.addEventListener("click", () => openPanel(t.name, "table"));
     return b;
   }
 
@@ -1142,11 +1288,51 @@ function start() {
     panelBody.className = "f-" + f;
     const many = g.members.length > 1;
     panelTitle.textContent = f === "api" && g.source ? g.source : "Where " + titleOf(t) + " comes from";
+    panelBody.replaceChildren(fromBox(t, f, many), fillsRow(g));
+  }
+
+  function fillsRow(g) {
     const fills = el("div", "link-row fills");
     const jumps = el("div", "jumps");
     for (const m of g.members) jumps.appendChild(jumpButton(m));
-    fills.append(el("span", "via", many ? "Fills the tables" : "Fills the table"), jumps);
-    panelBody.replaceChildren(fromBox(t, f, many), fills);
+    fills.append(el("span", "via", g.members.length > 1 ? "Fills the tables" : "Fills the table"), jumps);
+    return fills;
+  }
+
+  // What's done to a source's data on the way into its tables: their steps from diagram.yaml, or
+  // 1 to 1 (nothing changes) if they have none.
+  function renderTransform(g) {
+    const f = g.fill, words = transformWords(g);
+    const badge = el("span", "p-badge f-" + f);
+    const bi = el("span", "b-icon");
+    bi.appendChild(icon(words.icon, 16));
+    badge.append(bi, el("span", null, "Transformation"));
+    panelBadge.replaceChildren(badge);
+    panelBody.className = "f-" + f;
+    panelTitle.textContent = "How the data gets into " + joinWords(g.members.map(titleOf));
+
+    const box = el("section", "from f-" + f + (words.same ? " same" : ""));
+    box.setAttribute("aria-label", "Transformation");
+    const described = stepsOf(g);
+    if (!described.length) {
+      const p = el("p");
+      p.append(el("strong", null, "1 to 1: no change, for now. "), document.createTextNode(f === "excel"
+        ? "The file you upload is already in the table's layout, so each of its rows goes into the table as it is. " +
+          "It's only checked: the column names, each value's type, and that no row is there twice."
+        : "The data goes into the table as it comes."));
+      box.append(p, el("p", "muted",
+        "This step is here for later. If data arrives in a different layout, such as a file someone has been sent, " +
+        "this is where it would be changed to fit the table, so it could be uploaded just as it was sent."));
+    } else {
+      box.appendChild(el("p", null, f === "api" ? "Each time it runs, the importer:" : "On the way in, it:"));
+      for (const m of described) {
+        if (g.members.length > 1) box.appendChild(el("p", "xf-for", titleOf(m)));
+        const ol = el("ol");
+        for (const step of m.transformation) ol.appendChild(el("li", null, step));
+        box.appendChild(ol);
+      }
+    }
+    panelBody.replaceChildren(box, fillsRow(g));
   }
 
   function fromBox(t, f, many) {
@@ -1454,8 +1640,8 @@ function start() {
   /* Go */
   trace();
   if (problems) history.replaceState(null, "", "/admin");  // the page was the answer to an upload
-  const first = problems ? { name: problems.table, source: true } : fromHash();
-  if (first && plan.byName.has(first.name)) openPanel(first.name, first.source, null, true);
+  const first = problems ? { name: problems.table, view: "source" } : fromHash();
+  if (first && plan.byName.has(first.name)) openPanel(first.name, first.view, null, true);
   const message = $("message");
   if (message && current) panelBody.prepend(message);  // where it'll be seen
 }

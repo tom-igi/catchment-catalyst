@@ -24,8 +24,8 @@ sections:
 
   - title: Datasets
     description: >-
-      The list of datasets: one row for each data table below, holding each
-      dataset's source and caveats for the dashboard's "i" info buttons.
+      The text in the dashboard's "i" info buttons: one row for each data
+      table that has one.
     tables: [datasets]
 
   - title: Uploads
@@ -48,36 +48,119 @@ data_tables:
 # who changes them:
 #   command  someone changes it with a database command
 #   admin    the admin page writes it by itself
+#
+# `transformation` is what happens to the data between where it comes from and the table:
+# the diagram's "Transformation" column. A few short steps, shown when its box is clicked.
+# Tables filled by an importer each say what it does to the downloads. Excel uploads are
+# copied 1 to 1 for now (the file is already in the table's layout), so they have none; if
+# one is ever changed on the way in (e.g. a file in someone else's layout), say how here.
+# Put a step in "double quotes" if it has a colon and a space (": ") or a " #" in it.
 filled:
   catchments:
     source: EA Catchment Data Explorer
     url: https://environment.data.gov.uk/catchment-planning/
     command: importer catchments imports/catchments.json
+    transformation:
+      - Downloads each catchment's shapefile from the EA, and reads its details, outline and river line.
+      - Reads its river length and the catchments upstream and downstream from its EA web page, which the download doesn't have.
+      - Works out its area from the outline.
+      - Adds a row for each catchment, or updates its row if it's already there.
   ea_classifications:
     source: EA Catchment Data Explorer
     url: https://environment.data.gov.uk/catchment-planning/
     command: importer classifications
+    transformation:
+      - Downloads the EA's classifications file (CSV) for each management catchment the catchments are in.
+      - Keeps only the rows for the catchments in the Catchments table.
+      - Renames the EA's columns to the table's (e.g. Water Body ID to Catchment ID), and turns years and cycles into numbers.
+      - Replaces every row in the table.
   ea_rnags:
     source: EA Catchment Data Explorer
     url: https://environment.data.gov.uk/catchment-planning/
     command: importer classifications
+    transformation:
+      - Downloads the EA's reasons for not achieving good (CSV) for each management catchment the catchments are in.
+      - Keeps only the rows for the catchments in the Catchments table.
+      - Renames the EA's columns to the table's (e.g. Swmi to Source type).
+      - Replaces every row in the table.
   storm_overflows:
     source: EA storm overflow annual returns
     url: https://www.data.gov.uk/dataset/event-duration-monitoring-storm-overflows-annual-returns
     command: importer storm-overflows
+    transformation:
+      - "Downloads each year's return from 2021: a spreadsheet with a sheet per water company and a row per storm overflow."
+      - Finds each column by its heading, as they move between years.
+      - Keeps the overflows into a catchment in the Catchments table, by their WFD waterbody ID. Those with no ID (mostly into estuaries and the sea) are left out.
+      - "Turns the spill hours into numbers (blank or #N/A means no figure, not zero), and the grid reference into a latitude and longitude."
+      - "Replaces every row in the table: one per overflow per year."
   river_obstacles:
     source: River Obstacles (EA and The Rivers Trust)
     url: https://river-obstacles-theriverstrust.hub.arcgis.com/
     command: importer river-obstacles
+    transformation:
+      - Downloads every obstacle in the box around the catchments from River Obstacles' map service.
+      - Keeps those inside a catchment's outline, and gives each that catchment's ID.
+      - Replaces every row in the table.
   locations:
     how: command
     note: Changed with a database command for now (see OPERATING.md).
-  datasets:
-    how: command
-    note: Nothing fills it yet. It will hold each dataset's source and caveats.
   uploads:
     how: admin
     note: The admin page adds a row each time someone uploads an Excel file.
+
+# Where each table is shown on the dashboards, so someone looking at a panel can find the table
+# to update. Each table's box in the diagram's third column lists its panels, by page.
+#
+# Written as the dashboards are laid out: each page (a Waterbody Dashboard tab, or the Catchment
+# Dashboard), then each panel on it, by its heading, and the table(s) its data comes from. A panel
+# with data from several tables lists them all, e.g. [ea_scores, ea_thresholds]. When a panel is
+# added, renamed or moved on the dashboard (catalyst/publish/templates), change it here too.
+# Put a panel's name in "double quotes" if it has a colon and a space (": ") or a " #" in it.
+dashboard:
+  Every Waterbody tab:  # the column down the left of River Status, EA Data, Land Use Data and Sewerage Data
+    Map colours: ea_classifications
+    Catchment Ranking: catchment_rankings
+    EA Ecological Classification: ea_classifications
+    Failing Elements: ea_classifications
+    EA RNAGs: ea_rnags
+    Text at the bottom: location_text
+  River Status:
+    Why is the river failing?: river_status_text
+    What is happening now?: river_status_text
+    Risk Levels: risk_levels
+    Intervention hypothesis: river_status_text
+    Primary and Contingency Interventions: interventions
+  EA Data:
+    Environment Agency Scoring: [ea_classifications, ea_scores, ea_thresholds]
+  Land Use Data:
+    Habitat and Land Usage: habitat_land_use
+    Risk Levels: risk_levels
+    River Obstacles: river_obstacles
+    Number of Farms: farms
+    Livestock Pressures: livestock
+    Phosphate source (estimated): phosphate_sources
+  Sewerage Data:
+    Intermittent Discharges: location_text
+    Intermittent Sewage Discharges (hrs per year): storm_overflows
+    Outlet Locations: storm_overflows
+    Properties on public and private sewerage: sewerage_properties
+    Continuous Discharge: location_text
+    Source of Phosphate: phosphate_sources
+    Risk Levels: risk_levels
+    Asset Improvement Plans: sewerage_improvements
+  Every dashboard page:
+    '"i" info buttons': datasets  # quoted, as it starts with a quote mark
+  Catchment Dashboard:
+    Map colours: ea_classifications
+    Ecological Class counts: ea_classifications
+    Why is the river system failing?: location_text
+    What is happening now?: location_text
+    Intervention hypothesis: location_text
+    Number of Farms: farms
+    Properties on public and private sewerage: sewerage_properties
+    Sewage outflows (CSO & STW): storm_overflows
+    Habitat and Land Usage: habitat_land_use
+    Text at the bottom: location_text
 
 # Links the database can't check, so they aren't in schema.yaml as `references`:
 # a list of IDs, or a table's name. `to: data tables` means every data table, and

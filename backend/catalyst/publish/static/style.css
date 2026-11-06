@@ -69,9 +69,32 @@ a { color: inherit; }
   background: var(--page); border-top: 12px solid var(--bar); border-bottom: 12px solid var(--bar);
 }
 
-/* The location's text under a dashboard */
-.about { width: 100%; max-width: 1100px; margin: 0 auto; padding: 24px 16px 8px; font-size: 1rem; }
+/* The location's text under a dashboard, laid out as on the original (UnderWaterbodyDashboard.jpg):
+   an introduction (on the Waterbody Dashboard, in a grey box), "Understanding the dashboard",
+   then a section for each part, which opens and closes. text.py makes the HTML. */
+.about {
+  width: 100%; max-width: 1100px; margin: 0 auto; padding: 24px 16px 8px;
+  font: 1rem/1.55 Arial, Helvetica, sans-serif;  /* as on the original's page, like the cards at the top */
+}
 .about p, .about ul { margin: 0 0 14px; }
+.about ul ul { margin: 4px 0 0; }
+.about li + li { margin-top: 4px; }
+.about h2 { margin: 30px 0 8px; font-size: 1.75rem; line-height: 1.25; }
+.about h4 { margin: 20px 0 8px; font-size: 1.05rem; }
+.about blockquote { margin: 0 0 24px; padding: 16px 20px; background: #d9d9d9; }
+.about details { margin: 0 0 2px; background: #f3f3f3; }
+.about summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px;
+  color: #9a9a9a; font-size: .85rem; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; list-style: none;
+}
+.about summary::-webkit-details-marker { display: none; }
+.about summary::after { content: "+"; color: #b0b0b0; font-size: 1.3rem; line-height: 1; }
+.about details[open] > summary { color: #333; }
+.about details[open] > summary::after { content: "\2212"; }  /* a minus sign */
+.about summary:hover { color: #333; }
+.about .section-body { padding: 6px 16px 4px; }
+blockquote { margin: 0 0 14px; padding: 12px 16px; background: rgba(0, 0, 0, .1); }
+blockquote > :last-child { margin-bottom: 0; }
 
 /* Header: the name, the tabs, and a space for the location's logo */
 .site-header { display: flex; align-items: flex-end; gap: 12px; padding: 16px 16px 0; background: #fff; }
@@ -128,10 +151,9 @@ span.info { opacity: .4; }
 }
 .info-box::backdrop { background: rgba(0, 0, 0, .2); }
 .info-box h3 { margin: 0 0 8px; }
-.info-box p { margin: 0 0 10px; }
-.info-box dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; }
-.info-box dt { font-weight: 600; }
-.info-box dd { margin: 0; }
+.info-box p, .info-box ul { margin: 0 0 10px; }
+.info-box ul { padding-left: 20px; }
+.info-box > :last-child { margin-bottom: 0; }
 
 /* Tables */
 table { width: 100%; border-collapse: collapse; font-size: .95rem; }
