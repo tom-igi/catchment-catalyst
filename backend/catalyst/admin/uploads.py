@@ -7,6 +7,7 @@ imports/raw), and gets a row in the uploads table.
 
 from __future__ import annotations
 
+import datetime
 from pathlib import Path
 
 import sqlalchemy as sa
@@ -68,6 +69,15 @@ def last_approved(conn: sa.Connection, schema: Schema) -> dict[str, sa.Row]:
         .distinct(uploads.c.table_name)
     )
     return {row.table_name: row for row in rows}
+
+
+def approved_since(conn: sa.Connection, schema: Schema, since: datetime.datetime) -> list[sa.Row]:
+    """The uploads approved after a time (e.g. the last publish), oldest first."""
+    uploads = _table(schema)
+    return conn.execute(
+        sa.select(uploads).where(uploads.c.status == APPROVED, uploads.c.approved_at > since)
+        .order_by(uploads.c.approved_at, uploads.c.id)
+    ).all()
 
 
 def approve(conn: sa.Connection, schema: Schema, upload_id: int, comparison: Comparison) -> None:

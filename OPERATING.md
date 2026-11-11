@@ -43,7 +43,7 @@ docker compose down
 - Dev: <http://localhost:8080>
 - Live: *to be added*
 
-It shows the data as it was when it was last published (see step 5).
+It shows the data as it was when it was last published (see step 5, "Then publish the dashboard").
 
 ---
 
@@ -122,11 +122,17 @@ docker compose exec db psql -U catalyst -c "UPDATE locations SET catchment_ids =
 
 ### Then publish the dashboard
 
+**The dashboard doesn't change until it's published.** On the admin page, the **Public
+dashboard** box at the top says how many uploads have been approved since the last publish.
+Click its **Publish** button to rebuild the dashboard from the database (it takes a few
+seconds). You can approve several uploads first, check them, then publish once.
+
+After running an import command, publish too: the box only counts Excel uploads. Or publish
+from the command line, which does exactly the same:
+
 ```bash
 docker compose run --rm publish
 ```
-
-Rebuilds the dashboard from the database. **The dashboard doesn't change until you run this.**
 
 ---
 

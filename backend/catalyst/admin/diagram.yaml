@@ -34,6 +34,12 @@ sections:
       what it changed. The files themselves are kept too.
     tables: [uploads]
 
+  - title: Publishes
+    description: >-
+      A record of each time the public dashboards were published: who
+      pressed Publish, and when.
+    tables: [publishes]
+
 data_tables:
   title: Data tables
   description: >-
@@ -107,6 +113,9 @@ filled:
   uploads:
     how: admin
     note: The admin page adds a row each time someone uploads an Excel file.
+  publishes:
+    how: admin
+    note: The admin page adds a row each time someone presses Publish. The publish command adds one too.
 
 # Where each table is shown on the dashboards, so someone looking at a panel can find the table
 # to update. Each table's box in the diagram's third column lists its panels, by page.

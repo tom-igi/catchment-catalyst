@@ -4,6 +4,7 @@
 
 The pages are written to PUBLISHED_DIR (default: published), in a folder per
 location. The database is chosen by the DATABASE_URL environment variable.
+The admin page's Publish button does the same (see run.py).
 """
 
 from __future__ import annotations
@@ -17,8 +18,8 @@ import sqlalchemy as sa
 
 from catalyst.db import load_schema
 
-from . import collect, site
 from .collect import PublishProblem
+from .run import publish_all
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -28,14 +29,9 @@ def main(argv: list[str] | None = None) -> int:
         print("DATABASE_URL is not set.", file=sys.stderr)
         return 2
     out_dir = Path(os.environ.get("PUBLISHED_DIR", "published"))
-    schema = load_schema()
     engine = sa.create_engine(url, connect_args={"connect_timeout": 10})
-
-    # Collect everything before writing anything, so a problem with one
-    # location leaves every dashboard as it was.
     try:
-        with engine.connect() as conn:
-            gathered = [collect.collect(conn, schema, row) for row in collect.locations(conn, schema)]
+        gathered = publish_all(engine, load_schema(), out_dir)
     except PublishProblem as e:
         print(f"Nothing has been published. {e}", file=sys.stderr)
         return 1
@@ -48,19 +44,13 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     finally:
         engine.dispose()
-    if not gathered:
-        print("There are no locations to publish yet. Add one first: see README.md, 'Publishing the dashboard'.", file=sys.stderr)
-        return 1
 
-    out_dir.mkdir(parents=True, exist_ok=True)
     for location in gathered:
-        folder = site.write_location(location, out_dir)
-        print(f"{location.name}: {len(location.catchments)} catchment(s), published to {folder}/")
+        print(f"{location.name}: {len(location.catchments)} catchment(s), published to {out_dir / location.slug}/")
         for dataset in location.datasets:
             count = sum(len(rows) for rows in dataset.rows.values())
             about = "about the location" if dataset.key == "location_id" else f"for {len(dataset.rows)} of the catchments"
             print(f"  {dataset.title}: {count} row(s), {about}")
-    site.write_index([l.name for l in gathered], [l.slug for l in gathered], out_dir)
 
     current = {l.slug for l in gathered}
     for folder in sorted(out_dir.iterdir()):

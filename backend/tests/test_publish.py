@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from catalyst.db import load_schema
 from catalyst.db.sync import apply_changes
 from catalyst.importers.api import catchments, classifications
-from catalyst.publish import collect, figures, site
+from catalyst.publish import collect, figures, last_publish, publish_all, site
 from catalyst.publish.__main__ import main
 from catalyst.publish.collect import PublishProblem
 from catalyst.publish.text import formatted
@@ -258,6 +258,44 @@ def test_the_command_publishes_every_location(database, tmp_path, monkeypatch, c
     assert main([]) == 0
     assert "North Devon: 2 catchment(s)" in capsys.readouterr().out
     assert '<a href="north-devon/">North Devon</a>' in (tmp_path / "index.html").read_text()
+    assert [p.published_by for p in publishes(database)] == [None]  # recorded, as the command
+
+
+def publishes(engine) -> list[sa.Row]:
+    with engine.connect() as conn:
+        return conn.execute(sa.text("SELECT * FROM publishes ORDER BY id")).all()
+
+
+def test_each_publish_is_recorded(database, tmp_path):
+    with database.connect() as conn:
+        assert last_publish(conn, SCHEMA) is None
+    (location,) = publish_all(database, SCHEMA, tmp_path / "out", published_by="tom")
+    assert location.name == "North Devon"
+    assert (tmp_path / "out" / "north-devon" / "index.html").is_file()
+    assert (tmp_path / "out" / "index.html").is_file()
+    publish_all(database, SCHEMA, tmp_path / "out", published_by="alex")
+    first, second = publishes(database)
+    assert (first.published_by, second.published_by) == ("tom", "alex")
+    assert first.published_at <= second.published_at
+    with database.connect() as conn:
+        assert last_publish(conn, SCHEMA).id == second.id
+
+
+def test_a_publish_that_fails_is_not_recorded(database, tmp_path):
+    not_a_folder = tmp_path / "a file"
+    not_a_folder.write_text("")
+    with pytest.raises(OSError):  # the pages can't be written
+        publish_all(database, SCHEMA, not_a_folder)
+    with database.begin() as conn:
+        conn.execute(sa.text("UPDATE locations SET catchment_ids = :ids"), {"ids": [WEST_OKEMENT, "GB999"]})
+    with pytest.raises(PublishProblem, match="GB999"):
+        publish_all(database, SCHEMA, tmp_path / "out")
+    with database.begin() as conn:
+        conn.execute(sa.text("DELETE FROM locations"))
+    with pytest.raises(PublishProblem, match="There are no locations to publish yet"):
+        publish_all(database, SCHEMA, tmp_path / "out")
+    assert publishes(database) == []
+    assert not (tmp_path / "out").exists()  # nothing written
 
 
 @pytest.mark.parametrize("name, expected", [

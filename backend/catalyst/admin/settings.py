@@ -21,6 +21,7 @@ class Settings:
     users: dict[str, str]  # name -> password hash
     secret_key: str  # signs the login cookie
     raw_files_dir: Path  # where uploaded files are kept
+    published_dir: Path = Path("published")  # where the Publish button writes the dashboards' pages
     https_only: bool = False  # send the login cookie over HTTPS only
 
     @classmethod
@@ -38,5 +39,6 @@ class Settings:
             users=users,
             secret_key=env["ADMIN_SECRET_KEY"],
             raw_files_dir=Path(env.get("RAW_FILES_DIR", "imports/raw")),
+            published_dir=Path(env.get("PUBLISHED_DIR", "published")),  # as the publish command
             https_only=env.get("ADMIN_HTTPS_ONLY", "").lower() == "true",
         )

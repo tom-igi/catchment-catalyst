@@ -1,6 +1,7 @@
 # Published dashboards
 
-The public dashboards, written here by the publish step:
+The public dashboards, written here by the publish step, from the admin page's **Publish**
+button or the command:
 
 ```bash
 docker compose run --rm publish

@@ -305,6 +305,31 @@ tables:
         example: 2026-10-29 14:32
         description: When it was approved and the table's rows were replaced
 
+  publishes:
+    title: Publishes
+    description: >-
+      One row each time the public dashboards were published (written again
+      from the database), with the admin page's Publish button or the publish
+      command. The admin page uses it to show how many uploads have been
+      approved since the last publish, so aren't on the dashboards yet.
+    columns:
+      id:
+        type: integer
+        example: 3
+        primary_key: true
+        identity: true
+        description: Publish ID
+      published_at:
+        type: timestamptz
+        example: 2026-11-11 15:02
+        required: true
+        default: now()
+        description: When the publish started. Everything approved before then is on the dashboards.
+      published_by:
+        type: text
+        example: tom
+        description: Who pressed Publish (their admin login name). Empty if it was the publish command.
+
 
 data_tables:
 

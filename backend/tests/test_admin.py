@@ -1,4 +1,4 @@
-"""The admin page: logging in, and uploading an Excel file through to approval.
+"""The admin page: logging in, uploading an Excel file through to approval, and publishing.
 
 The page itself (the diagram of every table) is tested in test_diagram.py.
 """
@@ -34,6 +34,7 @@ def app(engine, tmp_path):
         users={"tom": passwords.hash_password(PASSWORD)},
         secret_key="test secret",
         raw_files_dir=tmp_path,
+        published_dir=tmp_path / "published",
     ))
     yield app
     app.state.engine.dispose()
@@ -82,6 +83,7 @@ def test_every_page_needs_a_login(app):
         response = client.get(path, follow_redirects=False)
         assert (response.status_code, response.headers["location"]) == (303, "/admin/login")
     assert upload(client, SCORES).headers["location"] == "/admin/login"
+    assert client.post("/admin/publish", follow_redirects=False).headers["location"] == "/admin/login"
 
 
 def test_a_wrong_password_is_refused(app):
@@ -231,3 +233,73 @@ def test_cancelling(app, client):
 
 def approve_anyway(client, upload_id):
     return client.post(f"/admin/uploads/{upload_id}/approve", data={"check": "anything"})
+
+
+# --- Publishing ------------------------------------------------------------------
+
+def publish_box(page: str) -> str:
+    """The Publish box at the top of the admin page, as plain text."""
+    box = re.search(r'<section class="publish[^"]*".*?</section>', page, re.S).group(0)
+    return " ".join(re.sub(r"<[^>]+>", " ", box).split())
+
+
+def add_location(app):
+    with app.state.engine.begin() as conn:
+        conn.execute(sa.text("INSERT INTO locations (name, catchment_ids) VALUES ('North Devon', :ids)"), {"ids": [WEST, EAST]})
+
+
+def published_by(app) -> list:
+    with app.state.engine.connect() as conn:
+        return list(conn.scalars(sa.text("SELECT published_by FROM publishes ORDER BY id")))
+
+
+def test_publishing_puts_what_is_approved_on_the_dashboard(app, client, tmp_path):
+    add_location(app)
+    box = publish_box(client.get("/admin").text)
+    assert "Approved uploads go on it when you publish. No publish recorded yet." in box
+
+    page = client.post("/admin/publish")
+    assert page.history[-1].headers["location"] == "/admin"
+    assert "Published North Devon. The public dashboard now shows everything approved so far." in page.text
+    assert (tmp_path / "published" / "north-devon" / "index.html").is_file()
+    assert published_by(app) == ["tom"]
+    assert re.fullmatch(r"Public dashboard Everything approved is on it\. Last published \d+ \w+ \d{4}, \d\d:\d\d, by tom\. Publish",
+                        publish_box(page.text))
+    assert '<section class="publish"' in page.text  # not marked as waiting
+
+    # Approving an upload puts it in the box, until the next publish.
+    upload(client, SCORES)
+    page = approve(client, 1)
+    assert "It will be on the public dashboard once you publish." in page.text
+    upload(client, xlsx(HEADINGS, (WEST, "Fish", 2025, "Poor", 0.16)))
+    approve(client, 2)
+    page = client.get("/admin").text
+    assert "2 uploads approved since the last publish, so not on it yet: EA Scores." in publish_box(page)
+    assert '<section class="publish is-waiting"' in page
+    with app.state.engine.begin() as conn:  # a different table
+        conn.execute(sa.text("UPDATE uploads SET table_name = 'farms' WHERE id = 2"))
+    assert "so not on it yet: EA Scores and Farms." in publish_box(client.get("/admin").text)
+
+    client.post("/admin/publish")
+    assert "Everything approved is on it." in publish_box(client.get("/admin").text)
+    assert published_by(app) == ["tom", "tom"]
+
+
+def test_the_publish_commands_publishes_are_shown_too(app, client):
+    with app.state.engine.begin() as conn:
+        conn.execute(sa.text("INSERT INTO publishes (published_by) VALUES (NULL)"))
+    assert ", with the publish command." in publish_box(client.get("/admin").text)
+
+
+def test_a_problem_publishing_is_shown_and_nothing_changes(app, client, tmp_path):
+    page = client.post("/admin/publish")  # no locations yet
+    assert "Nothing has been published. There are no locations to publish yet." in page.text
+    assert published_by(app) == []
+    assert not (tmp_path / "published").exists()
+
+    add_location(app)
+    app.state.settings.published_dir = tmp_path / "scores.xlsx"  # a file, not a folder
+    app.state.settings.published_dir.write_text("")
+    page = client.post("/admin/publish")
+    assert "The dashboard&#39;s pages couldn&#39;t all be written" in page.text
+    assert published_by(app) == []

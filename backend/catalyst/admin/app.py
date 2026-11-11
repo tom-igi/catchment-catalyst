@@ -9,10 +9,13 @@
     /admin/tables/<table>/download    any table as an Excel file
     /admin/tables/<table>/upload      upload an edited copy (Excel tables only)
     /admin/uploads/<id>               preview what an upload will change; approve or cancel
+    /admin/publish                    publish the dashboards (the Publish button at the top of /admin)
 
 Every page needs a login. Every table can be downloaded, but only tables marked
 `filled_by: excel` in schema.yaml can be uploaded, and each works the same way
-(see catalyst.importers.excel).
+(see catalyst.importers.excel). An approved upload is only on the public
+dashboards once someone presses Publish, which runs the publish step (see
+catalyst.publish), so several uploads can be approved, then published at once.
 """
 
 from __future__ import annotations
@@ -29,6 +32,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
+from catalyst import publish
 from catalyst.db import load_schema
 from catalyst.importers import excel
 
@@ -145,9 +149,25 @@ def _render_home(request: Request, status_code: int = 200, problems: dict | None
             t["download"] = _download_details(schema.metadata.tables[t["name"]])
             if t["name"] in schema.excel_tables:
                 t["update"] = _excel_details(conn, state, schema.metadata.tables[t["name"]], last.get(t["name"]))
+        publishing = _publish_details(conn, schema)
     if problems:
         model["problems"] = problems
-    return _render(request, "home.html", model=model, status_code=status_code)
+    return _render(request, "home.html", model=model, publishing=publishing, status_code=status_code)
+
+
+def _publish_details(conn: sa.Connection, schema) -> dict:
+    """What the Publish box says: when the dashboards were last published, and what's been approved since."""
+    last = publish.last_publish(conn, schema)
+    if last is None:  # not since publishes were first recorded, so what's been approved since is unknown
+        return {"last": None, "waiting": 0, "tables": []}
+    waiting = uploads.approved_since(conn, schema, last.published_at)
+    tables = schema.metadata.tables
+    names = dict.fromkeys(u.table_name for u in waiting)  # each table once, in the order approved
+    return {
+        "last": {"when": _when(last.published_at), "who": last.published_by},
+        "waiting": len(waiting),
+        "tables": [_title(tables[n]) if n in tables else n for n in names],
+    }
 
 
 def _download_details(table: sa.Table) -> dict:
@@ -312,7 +332,8 @@ def approve(request: Request, user: User, upload_id: int, check: Annotated[str, 
         return here
     request.session["message"] = (
         f"Done. {_title(table)} now matches {upload.file_name}: {len(comparison.added)} added, "
-        f"{len(comparison.changed)} changed, {len(comparison.removed)} deleted."
+        f"{len(comparison.changed)} changed, {len(comparison.removed)} deleted. "
+        "It will be on the public dashboard once you publish."
     )
     return RedirectResponse(_upload_panel(table), 303)
 
@@ -339,6 +360,28 @@ def upload_file(request: Request, user: User, upload_id: int):
     if not path.is_file():
         raise HTTPException(404, f"The file for upload {upload_id} isn't there any more ({upload.stored_as}).")
     return FileResponse(path, media_type=XLSX, filename=upload.file_name)
+
+
+# --- Publishing -------------------------------------------------------------------
+
+@router.post("/publish")
+def publish_dashboards(request: Request, user: User):
+    """Write every location's dashboard again from the database, as the publish command does."""
+    state = request.app.state
+    try:
+        published = publish.publish_all(state.engine, state.schema, state.settings.published_dir, published_by=user)
+    except publish.PublishProblem as e:
+        request.session["message"] = f"Nothing has been published. {e}"
+    except sa.exc.DBAPIError as e:
+        request.session["message"] = f"Nothing has been published, because the database gave an error. It said: {e.orig}"
+    except OSError as e:  # e.g. the folder for the pages can't be written to
+        request.session["message"] = (
+            f"The dashboard's pages couldn't all be written, so it may not show the latest data. The error was: {e}"
+        )
+    else:
+        names = _and([l.name for l in published])
+        request.session["message"] = f"Published {names}. The public dashboard now shows everything approved so far."
+    return RedirectResponse("/admin", 303)
 
 
 def _get_upload(conn: sa.Connection, state, upload_id: int, for_update: bool = False) -> sa.Row:
@@ -378,7 +421,7 @@ def _database_error_page(request: Request, exc: sa.exc.DBAPIError):
 def _templates() -> Jinja2Templates:
     templates = Jinja2Templates(directory=Path(__file__).with_name("templates"))
     templates.env.globals.update(title=_title)
-    templates.env.filters.update(cell=_cell, when=_when, rows=_rows)
+    templates.env.filters.update(cell=_cell, when=_when, rows=_rows, and_list=_and)
     return templates
 
 
@@ -404,3 +447,8 @@ def _when(value: datetime.datetime | None) -> str:
 
 def _rows(number: int) -> str:
     return f"{number:,} row{'' if number == 1 else 's'}"
+
+
+def _and(words: list[str]) -> str:
+    """['A', 'B', 'C'] -> 'A, B and C'."""
+    return words[0] if len(words) == 1 else f"{', '.join(words[:-1])} and {words[-1]}"

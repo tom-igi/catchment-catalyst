@@ -89,7 +89,7 @@ A new type of source file means writing one new importer, which should only happ
 3. Add, change or delete rows in Excel, then upload the file.
 4. Review the preview: any problems (with Excel row numbers), and the rows that will be added, changed and deleted.
 5. **Approve.** The data goes into the database (it is not yet public).
-6. **Publish** the location. The public dashboard updates. *(Built as a command for now: `docker compose run --rm publish`. A button in the admin page later.)*
+6. **Publish** the location. The public dashboard updates. *(Built: the **Publish** button at the top of the admin page, which says how many uploads have been approved since the last publish, so several can be approved and published at once. The command `docker compose run --rm publish` does the same.)*
 
 Steps 1–6 are built (§4.4, §5.1).
 
@@ -142,7 +142,7 @@ password) │                                 ▼               ▼             
 | **Web server** | Caddy container | The only part open to the internet. Serves the dashboard and admin portal over HTTPS, with a certificate for each location's address that it gets and renews automatically. Caddy rather than nginx because it does the certificates itself, with a much shorter configuration. *(Not built yet.)* |
 | **Public dashboard** | Plain web pages, written by the publish step and served by the web server | A folder per location, with a URL each. The data is written into the pages, so they never touch the database and make no API calls. No JavaScript framework: the only scripts draw the maps (Leaflet, on an OpenStreetMap background) and sort the tables. *(Built: the five pages of the original (the Overview switched off for now), filled in where there's a table (EA classifications and RNAGs, catchment details, Habitat & Land Use, storm overflows, river obstacles) and otherwise empty.)* |
 | **Published data bundles** | Folder on the VM (`published/`) | One folder per location, holding its pages, map outlines and everything else they need, written by the publish step. Can always be rebuilt from the database. |
-| **Admin portal** | Files served by the web server (at `/admin` or its own address) | Upload, preview, approve and publish screens, plus forms for the hand-written text. Each person has their own name and password; only hashes of the passwords are stored, in the server's settings. Microsoft accounts (Entra ID) could replace this if many more people need access. *(Built so far: the login and the Excel download, upload, preview and approve screens, served by the admin API's container.)* |
+| **Admin portal** | Files served by the web server (at `/admin` or its own address) | Upload, preview, approve and publish screens, plus forms for the hand-written text. Each person has their own name and password; only hashes of the passwords are stored, in the server's settings. Microsoft accounts (Entra ID) could replace this if many more people need access. *(Built so far: the login, the Excel download, upload, preview and approve screens, and the Publish button, served by the admin API's container.)* |
 | **Admin API** | Python container | Behind the admin portal. Checks logins and roles, handles uploads and publishing. |
 | **Import worker** | Python container (same image) | Runs long imports in the background. *(Not needed yet: Excel uploads are checked straight away.)* |
 | **Database** | PostgreSQL 17 + PostGIS container | The single source of truth. Not reachable from the internet. PostGIS handles boundaries and point-in-catchment lookups. |

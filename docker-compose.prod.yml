@@ -66,4 +66,6 @@ services:
     volumes:
       # Uploaded files are kept in imports/raw/<table>/ (moving to Azure storage later).
       - ./imports:/app/imports
+      # The Publish button writes the dashboards' pages here, as the publish command does.
+      - ./published:/app/published
     logging: *logging

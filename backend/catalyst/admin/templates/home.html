@@ -12,7 +12,8 @@
      downloaded. Each Excel table also has its own source on the left, which opens its upload.
      Between each source and its tables is its transformation: what's done to the data on the
      way in (1 to 1 for Excel uploads, for now). Each data table's box lists where it's shown
-     on the dashboards. */
+     on the dashboards. Above the diagram, the Publish box puts what's been approved on the
+     public dashboards. */
   :root {
     color-scheme: light dark;
     --bg: #f3f6f7;
@@ -105,6 +106,32 @@
     display: inline-block; padding: 3px 10px; border-radius: 999px; white-space: nowrap;
     background: var(--catchment); color: var(--on-solid); font-weight: 700; font-size: .8rem; line-height: 1.4;
   }
+
+  /* The Publish box: when the dashboards were last published, what's been approved since, and
+     the button. On the left, so it can still be seen beside an open panel. */
+  .publish {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; max-width: 760px; margin: 0 0 28px;
+    padding: 12px 14px 12px 12px; border: 1px solid var(--border); border-radius: 12px;
+    background: var(--card); box-shadow: var(--shadow);
+  }
+  .publish.is-waiting { background: var(--warn-soft); border-color: var(--warn); }
+  .publish-icon {
+    flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%;
+    background: var(--api-soft); color: var(--api);
+  }
+  .publish.is-waiting .publish-icon { background: var(--card); color: var(--warn); }
+  .publish-text { flex: 1 1 220px; min-width: 0; line-height: 1.4; }
+  .publish h2 { margin: 0; font-size: 1rem; }
+  .publish p { margin: 2px 0 0; font-size: .92rem; }
+  .publish .publish-waiting { color: var(--warn); font-weight: 650; }
+  .publish .publish-last { color: var(--muted); font-size: .85rem; }
+  .publish form { margin: 0 0 0 auto; }
+  .publish-button {
+    display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px; border: 0; border-radius: 8px;
+    background: var(--api); color: var(--on-solid); font-weight: 700; cursor: pointer; white-space: nowrap;
+  }
+  .publish-button:hover { filter: brightness(1.08); }
+  .publish-button:disabled { cursor: progress; opacity: .7; filter: none; }
 
   /* ------- The diagram (narrow first: a stacked flow) ------- */
   .flow { position: relative; }
@@ -536,6 +563,32 @@
 <main>
   {% if message %}<p class="message" id="message" role="status">{{ message }}</p>{% endif %}
   <h1>Your data</h1>
+
+  <section class="publish{% if publishing.waiting %} is-waiting{% endif %}" aria-labelledby="publish-title">
+    <span class="publish-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M4 3h6a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM14 3h6a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM14 12h6a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1zM4 16h6a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1z"/></svg>
+    </span>
+    <div class="publish-text">
+      <h2 id="publish-title">Public dashboard</h2>
+      {% if publishing.waiting %}
+      <p class="publish-waiting">{{ publishing.waiting }} upload{{ "" if publishing.waiting == 1 else "s" }} approved since the last publish, so not on it yet: {{ publishing.tables | and_list }}.</p>
+      {% elif publishing.last %}
+      <p>Everything approved is on it.</p>
+      {% else %}
+      <p>Approved uploads go on it when you publish.</p>
+      {% endif %}
+      <p class="publish-last" id="publish-last">
+        {%- if publishing.last -%}
+        Last published {{ publishing.last.when }}, {% if publishing.last.who %}by {{ publishing.last.who }}{% else %}with the publish command{% endif %}.
+        {%- else -%}
+        No publish recorded yet.
+        {%- endif -%}
+      </p>
+    </div>
+    <form method="post" action="/admin/publish" id="publish-form">
+      <button class="publish-button">Publish</button>
+    </form>
+  </section>
 
   <section class="flow" id="flow" aria-labelledby="flow-title">
     <h2 class="visually-hidden" id="flow-title">The tables, from where their data comes from to the dashboards</h2>
@@ -1647,6 +1700,27 @@ function start() {
 }
 
 if (typeof document !== "undefined" && document.getElementById("model")) start();
+
+/* The Publish button takes a few seconds, so say so, and don't send it twice. */
+if (typeof document !== "undefined" && document.getElementById("publish-form")) {
+  const form = document.getElementById("publish-form"), button = form.querySelector("button");
+  const last = document.getElementById("publish-last"), lastText = last.textContent;
+  let sent = false;
+  form.addEventListener("submit", e => {
+    if (sent) { e.preventDefault(); return; }
+    sent = true;
+    button.disabled = true;
+    button.textContent = "Publishing…";
+    last.textContent = "Writing the dashboard's pages. This takes a few seconds.";
+  });
+  window.addEventListener("pageshow", e => {  // back to this page from the browser's history: ready again
+    if (!e.persisted) return;
+    sent = false;
+    button.disabled = false;
+    button.textContent = "Publish";
+    last.textContent = lastText;
+  });
+}
 {% endraw %}
 </script>
 </body>

@@ -22,7 +22,7 @@ backend/                     all Python code, built into one Docker image
                              storm overflows; River Obstacles)
   catalyst/importers/excel/  tables filled by Excel upload (one shared piece of code for all of them)
   catalyst/admin/            the admin page: a diagram of every table (diagram.py, diagram.yaml);
-                             download any table; upload an Excel table, preview, approve
+                             download any table; upload an Excel table, preview, approve; publish
   catalyst/publish/          the publish step: writes each location's dashboard as web pages
   tests/
 imports/                     lists of what to import, and copies of every download and upload (see imports/README.md)
@@ -37,7 +37,7 @@ Only Docker is needed.
 docker compose up -d                    # start the database, the admin page and the dashboard preview
 docker compose run --rm schema plan     # preview changes needed to match schema.yaml
 docker compose run --rm schema apply    # make them (asks first)
-docker compose run --rm publish         # write the dashboards' pages
+docker compose run --rm publish         # write the dashboards' pages (or the admin page's Publish button)
 docker compose run --rm test            # run the backend tests
 ```
 
@@ -113,6 +113,9 @@ other tables are replaced. Everything downloaded is kept in `imports/raw/`. See
    and deleted.
 5. Approve it, and the table's rows are replaced with the file's. Or cancel, and nothing
    changes.
+6. Click **Publish** (in the Public dashboard box at the top of the admin page) to put
+   everything approved on the public dashboard. Until then, the box says how many uploads
+   are approved but not published, so several can be approved and then published at once.
 
 Each upload replaces the whole table, so always start from a fresh download. Every uploaded
 file is kept (in `imports/raw/<table>/`) and listed under its Upload data: to go back to an
@@ -140,11 +143,16 @@ entry and run `docker compose up -d` again. Without `ADMIN_USERS`, the local log
 
 The public dashboard is plain web pages, written from the database by the publish step.
 Visitors never reach the database, so after the data changes (e.g. an upload is approved),
-publish again:
+publish again, with the **Publish** button at the top of the admin page or the command:
 
 ```bash
 docker compose run --rm publish     # write every location's pages into published/
 ```
+
+Both do exactly the same (`backend/catalyst/publish/run.py`), and each records the publish
+in the `publishes` table (who and when; the command leaves "who" empty). The admin page uses
+it to say how many uploads have been approved since the last publish. Only one publish runs
+at a time: a second one waits for the first to finish.
 
 On your machine, see them at <http://localhost:8080>. The pages copy the original dashboard
 (`Reference/ReferenceImages`): four views, chosen with the cards across the top of every page.

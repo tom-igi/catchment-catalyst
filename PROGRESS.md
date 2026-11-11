@@ -3,7 +3,7 @@
 Where the build is up to, the decisions made along the way, and what's next.
 For the overall design, see [PLAN.md](PLAN.md). For commands, see [README.md](README.md).
 
-**Last updated:** 5 November 2026
+**Last updated:** 11 November 2026
 
 ---
 
@@ -15,12 +15,13 @@ Tom to run things himself, 29 October 2026).
 ```bash
 docker compose up -d                      # start the local database, admin page and dashboard preview
 docker compose run --rm schema plan       # should say "The database already matches schema.yaml."
-docker compose run --rm test              # run the tests (162 passing at the last update)
-docker compose run --rm publish           # rebuild the dashboard pages from the database
+docker compose run --rm test              # run the tests (167 passing at the last update)
+docker compose run --rm publish           # rebuild the dashboard pages (or the admin page's Publish button)
 ```
 
 - Admin page: <http://localhost:8000/admin> (name `admin`, password `admin`): a diagram of every
-  table; click any table to download it, or an Excel table's **Upload data** (on the left) to upload it
+  table; click any table to download it, or an Excel table's **Upload data** (on the left) to upload it,
+  and **Publish** (at the top) to put what's approved on the dashboard
 - Dashboard: <http://localhost:8080> (open North Devon; Langham Lake and West Okement have sample data in every panel)
 
 The local database is on `localhost:5434` (database, user and password are all `catalyst`),
@@ -40,7 +41,7 @@ and optional extras are kept self-contained so they're easy to remove.
 | **Catchments importer** | `backend/catalyst/importers/api/`, `imports/` | Fills the catchments table from the EA's Catchment Data Explorer, for the management catchments (all their rivers) and IDs in `imports/catchments.json`. Preview first, safe to re-run, keeps the downloaded files. |
 | **EA and River Obstacles importers** | `backend/catalyst/importers/api/` | For every imported catchment: the EA's classifications and RNAGs (`importer classifications`), storm overflow spills from the EA's yearly returns (`importer storm-overflows`), and obstacles from River Obstacles (`importer river-obstacles`). Each replaces its table, with a preview first, and keeps the downloads. |
 | **Excel uploads** | `backend/catalyst/importers/excel/` | For every table marked `filled_by: excel`: download it as Excel, upload an edited copy, see what will be added, changed and deleted, then approve. No code per table. |
-| **Admin page** | `backend/catalyst/admin/` | One page behind a login (one name and password per person): a diagram of every table (`diagram.py`, `diagram.yaml`) showing where its data comes from (downloaded or Excel), how the tables join up by Catchment ID, and each table's columns when clicked. Any table can be downloaded as Excel from there; each Excel table has its own **Upload data** box on the left, and the upload's preview is its own page. Made from `schema.yaml` each time it's opened. Runs with `docker compose up -d`. |
+| **Admin page** | `backend/catalyst/admin/` | One page behind a login (one name and password per person): a diagram of every table (`diagram.py`, `diagram.yaml`) showing where its data comes from (downloaded or Excel), how the tables join up by Catchment ID, and each table's columns when clicked. Any table can be downloaded as Excel from there; each Excel table has its own **Upload data** box on the left, and the upload's preview is its own page. Made from `schema.yaml` each time it's opened. A **Publish** button at the top rebuilds the dashboards, and says how many uploads have been approved since the last publish. Runs with `docker compose up -d`. |
 | **Publish step and dashboard** | `backend/catalyst/publish/`, `published/` | Writes each location's dashboard as plain web pages, laid out like the original (`Reference/ReferenceImages`), with four views chosen by cards across the top of every page. **Waterbody Dashboard:** River Status, EA Data, Land Use Data and Sewerage Data, one waterbody at a time (the Overview tab is built but switched off). **Catchment Dashboard:** the whole location on one big map, with its panels over it, and a page per operational catchment. **Intervention Management** and **Catchment Insights:** placeholders with their focus-area buttons. Every panel now has a table. Previewed at <http://localhost:8080>. |
 | **Dev and live setup** | `docker-compose*.yml`, `.env*.example` | The same commands on your machine and on the live server. Only the settings differ. |
 | **Tests** | `backend/tests/` | Cover the schema tool, the importers, the Excel uploads, the admin page (and its diagram) and the publish step. |
@@ -53,6 +54,7 @@ and optional extras are kept self-contained so they're easy to remove.
 | `locations` | Core | ID, name, and the list of catchment IDs | 1 (North Devon, with the 92 catchments) |
 | `datasets` | Core, Excel | The text in each "i" button: one row per data table that has one (table name, text) | 7, **sample** |
 | `uploads` | Core | Every Excel upload: table, file, who, when, status, rows added / changed / deleted | 17 |
+| `publishes` | Core | Every publish of the dashboards: when, and who (empty for the publish command) | 2 (both test publishes, 11 November 2026) |
 | `ea_classifications` | Data, EA | The EA's status for each classification item and year (2009 to 2022), per catchment | 27,294 |
 | `ea_rnags` | Data, EA | The EA's reasons for not achieving good: element, activity, sector | 513 |
 | `storm_overflows` | Data, EA | Each storm overflow's spills (hours, count) per year, 2021 to 2025, with its location | 755 (about 150 overflows into 57 catchments) |
@@ -229,6 +231,29 @@ kept outside the project.
 - **Datasets is just a table name and its "i" text, uploaded in Excel** (Tom, 6 November 2026). It had a numbered ID, name, description, source, link, date, caveats, "national" and two timestamps, but nothing could fill it (only a database command), and the name and source repeated `schema.yaml` and `diagram.yaml`. Now it's two columns, keyed by the table's name, with one free-text box for whatever the "i" should say. It moved out of Housekeeping into the Excel tables, with its own Upload data box, and its box says it's behind the "i" buttons on every dashboard page. Only 7 of the 17 data tables have an "i" button (EA Classifications, Catchment Ranking, Risk Levels, Habitat & Land Use, Livestock, Phosphate Sources, Sewerage Improvements); a row for any other table is kept but not shown. Changing its primary key needed the schema tool to learn to change keys (`_primary_key_changes` in `db/sync.py`; before, it only warned, and `apply` would have left the table with no key).
 - **Each data table's box lists where it's shown on the dashboards** (Tom, 6 November 2026), so someone looking at a panel (e.g. "Intervention hypothesis") can find the table to update. Each box in the "Data tables" column lists the pages and, as small tags, the panels on them. The same panel name can come from different tables on different pages: "Intervention hypothesis" is River Status Text on the River Status tab, but Location Text on the Catchment Dashboard. The list is `dashboard` in `diagram.yaml`, written page by page in the dashboards' order, so it has to be changed by hand when a panel is added, renamed or moved; a test checks every data table is on it. To make room, the page is wider (up to 1840px, from 1440px) and the Data tables column takes most of the extra. On screens 1600px and wider the panels sit beside the table's name; on narrower ones they go under it, so the page is longer there. The Catchments table (River Information, the map outlines) isn't listed, as it isn't in that column.
 
+
+**The Publish button** (agreed 10 November, built 11 November 2026)
+- **A Publish button at the top of the admin page,** rather than publishing automatically after
+  every approval, so several uploads can be approved, checked, then published at once, and
+  nothing goes public as soon as it's approved. It runs the same code as
+  `docker compose run --rm publish` (`publish/run.py`), which takes about 4 seconds for North
+  Devon, so the page simply waits for it ("Publishing…").
+- **Every publish is recorded in a `publishes` table** (when, and who), by the button and the
+  command alike. The box beside the button uses it: "2 uploads approved since the last
+  publish, so not on it yet: Datasets and Location Text", or "Everything approved is on it",
+  with when and by whom it was last published. Until the first publish is recorded it says
+  "No publish recorded yet", as earlier publishes weren't recorded.
+- **Only Excel uploads are counted.** The importers don't record their runs, so after an import,
+  publish anyway.
+- **Only one publish at a time** (a lock in the database), so two people pressing Publish, or a
+  double click, can't write the same folders at once. The second waits, then publishes again.
+- **The box is on the left, under "Your data",** so it can still be seen beside an open panel,
+  e.g. straight after approving an upload. The approval message now ends "It will be on the
+  public dashboard once you publish."
+- **The admin container can now write to `published/`** (both Compose setups), as the publish
+  container could. On the live server, the admin page needs `docker compose up -d --build`
+  and `schema apply` for this.
+
 ---
 
 ## Open questions
@@ -251,7 +276,7 @@ kept outside the project.
 ## Suggested next steps
 
 1. **Look over the four views** at <http://localhost:8080> (Langham Lake and West Okement have every panel filled) and the new tables in the admin page.
-2. **Upload real data** into the new tables as it arrives: download each from the admin page, replace the sample rows, upload, approve, then `docker compose run --rm publish`.
+2. **Upload real data** into the new tables as it arrives: download each from the admin page, replace the sample rows, upload, approve, then click **Publish**.
 3. **The details of Intervention Management and Catchment Insights,** when Tom is ready.
 4. **Agree the rules** for ranking, risk levels, relative coverage and density rating, so they can be worked out rather than typed in.
 5. **Have GitHub run the tests on every push** (offered, not yet agreed).
@@ -270,6 +295,6 @@ kept outside the project.
 - **After a change to `requirements*.txt`, rebuild:** `docker compose up -d --build` and `docker compose run --build --rm test`. Code changes need no rebuild locally, because the admin page restarts by itself.
 - **On the live server, every `docker compose` command needs `ADMIN_USERS` and `ADMIN_SECRET_KEY` in `.env`,** even commands that don't use the admin page. Make the `ADMIN_USERS` entries on your own machine.
 - **The admin page's port is 8000, and the dashboard preview's is 8080** (change `ADMIN_PORT` or `WEB_PORT` in `.env` if either is taken).
-- **The dashboard doesn't update by itself:** after approving an upload, run `docker compose run --rm publish`.
+- **The dashboard doesn't update by itself:** after approving uploads (or running an importer), click **Publish** on the admin page, or run `docker compose run --rm publish`.
 - **Browsers keep copies of the dashboard's styles, scripts and map file,** so every link to them ends with `?v=` and a fingerprint of the files (`version()` in `publish/site.py`). It changes whenever one of them does, so a publish is always seen straight away. (Before this, a browser could show an old stylesheet: Ctrl+F5 fixes that.)
 - **OpenStreetMap's map images are free for light use only** (their tile usage policy). Fine for now; a busy public site may need a paid map provider, which is a one-line change in `static/map.js`.

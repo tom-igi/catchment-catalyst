@@ -73,7 +73,8 @@ services:
       db:
         condition: service_healthy
 
-  # The admin page: log in, download a table as Excel, upload an edited copy.
+  # The admin page: log in, download a table as Excel, upload an edited copy,
+  # and publish the dashboards (into published/, like the publish step).
   # Also makes logins:  docker compose run --rm admin hash-password <name>
   admin:
     build:

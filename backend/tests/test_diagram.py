@@ -18,7 +18,10 @@ data_tables: {title: Data tables, description: One per dataset.}
 
 def render(model: dict, **context) -> str:
     """The admin page for a model, without the database."""
-    return _templates().env.get_template("home.html").render({"model": model, "user": "tom", "message": None, **context})
+    publishing = {"last": None, "waiting": 0, "tables": []}  # the Publish box, before any publish
+    return _templates().env.get_template("home.html").render(
+        {"model": model, "user": "tom", "message": None, "publishing": publishing, **context}
+    )
 
 
 def test_the_model_has_every_table_and_column():
@@ -32,7 +35,7 @@ def test_the_model_has_every_table_and_column():
 
 def test_sections_come_in_the_order_of_diagram_yaml():
     sections = [s["title"] for s in diagram.model(load_schema())["sections"]]
-    assert sections == ["Locations", "Catchments", "Datasets", "Uploads", "Data tables"]  # every core table has a section
+    assert sections == ["Locations", "Catchments", "Datasets", "Uploads", "Publishes", "Data tables"]  # every core table has a section
 
 
 def test_the_model_says_how_each_table_is_filled():
@@ -45,7 +48,7 @@ def test_the_model_says_how_each_table_is_filled():
     assert tables["ea_classifications"]["command"] == tables["ea_rnags"]["command"] != tables["catchments"]["command"]
     assert tables["catchments"]["command"] == "docker compose run --rm importer catchments imports/catchments.json"
     assert tables["ea_scores"]["fill"] == "excel"
-    assert (tables["uploads"]["fill"], tables["locations"]["fill"]) == ("admin", "command")
+    assert (tables["uploads"]["fill"], tables["publishes"]["fill"], tables["locations"]["fill"]) == ("admin", "admin", "command")
     assert all(t["fill"] in {"api", "excel"} for t in tables.values() if t["kind"] == "data")
     assert tables["locations"]["summary"].startswith("One row per dashboard location (e.g. North Devon): ")
     assert tables["ea_scores"]["one_row_per"] == ["Catchment ID", "Measure", "Year"]

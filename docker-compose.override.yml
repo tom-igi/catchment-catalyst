@@ -79,6 +79,8 @@ services:
       - ./backend/catalyst:/app/catalyst:ro
       # Uploaded files are kept in imports/raw/<table>/.
       - ./imports:/app/imports
+      # The Publish button writes the dashboards' pages here, as the publish command does.
+      - ./published:/app/published
 
   # Backend tests. Each test run uses its own throwaway database on `db`.
   test:
