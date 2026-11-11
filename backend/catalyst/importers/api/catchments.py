@@ -16,7 +16,6 @@ import json
 import re
 import zipfile
 from dataclasses import dataclass
-from datetime import datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Callable
@@ -27,6 +26,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from catalyst.db import Schema
 
+from .common import ImportProblem, run_folder
 from .ea_api import EAClient, EAError
 
 BNG = 27700  # British National Grid, used by the EA's shapefiles
@@ -47,10 +47,6 @@ DETAIL_FIELDS = {
     "hydromorph": "hydromorphological_designation",
 }
 ID_COLUMNS = {"river_basin_district_id", "management_catchment_id", "operational_catchment_id"}
-
-
-class ImportProblem(Exception):
-    """The input, or something downloaded, isn't what the importer expects."""
 
 
 @dataclass
@@ -322,7 +318,7 @@ def save(conn: sa.Connection, schema: Schema, catchments: list[Catchment]) -> No
 
 def save_raw_files(catchments: list[Catchment], raw_dir: Path) -> Path:
     """Keep exactly what was downloaded, in a folder for this import run."""
-    run_dir = Path(raw_dir) / "catchments" / datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    run_dir = run_folder(raw_dir, "catchments")
     for c in catchments:
         folder = run_dir / c.id
         folder.mkdir(parents=True, exist_ok=True)

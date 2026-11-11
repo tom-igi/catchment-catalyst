@@ -121,6 +121,7 @@ kept outside the project.
 - **Approval re-checks the preview.** If the table changed in between (e.g. the other person uploaded), approval is refused and the fresh preview is shown. This catches someone uploading from an out-of-date download.
 - **Every uploaded file is kept** (`imports/raw/<table>/`) and listed on the table's page. Undo means downloading an earlier file and uploading it again.
 - **Rows are matched by the primary key,** which is also the duplicate check: the same catchment, measure and year twice in a file is refused, with the Excel row numbers.
+- **The API importers share only a few small pieces** (`importers/api/common.py`, 11 November 2026): `ImportProblem`, `replace_rows` (empty the table, then insert in batches of 5,000) and `run_folder` (`imports/raw/<table>/<date and time>/`). Each source's downloading and reading stays in its own module, because they really are different. No general framework that runs every importer the same way unless many more sources are added.
 - **Excel tables can only have text, number, yes/no and date columns,** and need a primary key made of their own columns (no auto-numbered IDs). The schema tool enforces this. `real` and `numeric` are left out because stored values change slightly, so every upload would show them as changed.
 
 **Admin login**

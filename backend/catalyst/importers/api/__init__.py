@@ -8,5 +8,7 @@ One module per source, run from the command line (see ../__main__.py):
 - storm_overflows.py  storm overflow spills, from the EA's yearly storm overflow returns
 - river_obstacles.py  weirs, culverts and other obstacles, from River Obstacles
 
-All of them download through ea_api.py.
+All of them download through ea_api.py, and share the few small pieces in
+common.py: ImportProblem, replacing a table's rows, and the folder each run's
+downloads are kept in.
 """

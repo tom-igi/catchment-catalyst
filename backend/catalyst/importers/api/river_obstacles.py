@@ -10,7 +10,6 @@ replaces all its rows.
 from __future__ import annotations
 
 import json
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
@@ -18,7 +17,7 @@ import sqlalchemy as sa
 
 from catalyst.db import Schema
 
-from .catchments import ImportProblem
+from .common import ImportProblem, replace_rows, run_folder
 from .ea_api import RIVER_OBSTACLES_PAGE, EAClient, EAError
 
 TABLE = "river_obstacles"
@@ -92,16 +91,12 @@ def place(conn: sa.Connection, schema: Schema, obstacles: list[dict[str, Any]]) 
 
 def save(conn: sa.Connection, schema: Schema, rows: list[dict[str, Any]]) -> None:
     """Replace every row with the new ones."""
-    table = schema.metadata.tables[TABLE]
-    conn.execute(table.delete())
-    if rows:
-        conn.execute(table.insert(), rows)
+    replace_rows(conn, schema.metadata.tables[TABLE], rows)
 
 
 def save_raw_files(pages: list[dict], raw_dir: Path) -> Path:
     """Keep what was downloaded, in a folder for this import run."""
-    run_dir = Path(raw_dir) / TABLE / datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    run_dir.mkdir(parents=True, exist_ok=True)
+    run_dir = run_folder(raw_dir, TABLE)
     for number, page in enumerate(pages, start=1):
         (run_dir / f"page-{number}.geojson").write_text(json.dumps(page), encoding="utf-8")
     return run_dir

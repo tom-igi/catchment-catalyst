@@ -13,7 +13,6 @@ from __future__ import annotations
 import csv
 import io
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
@@ -21,7 +20,7 @@ import sqlalchemy as sa
 
 from catalyst.db import Schema
 
-from .catchments import ImportProblem
+from .common import ImportProblem, replace_rows, run_folder
 from .ea_api import EAClient, EAError
 
 WATERBODY = "Water Body ID"
@@ -139,15 +138,12 @@ def current_counts(conn: sa.Connection, schema: Schema) -> dict[str, int]:
 def save(conn: sa.Connection, schema: Schema, rows: dict[str, list[dict[str, Any]]]) -> None:
     """Replace every row in the tables with the new ones."""
     for name, new in rows.items():
-        table = schema.metadata.tables[name]
-        conn.execute(table.delete())
-        for start in range(0, len(new), 5000):
-            conn.execute(table.insert(), new[start:start + 5000])
+        replace_rows(conn, schema.metadata.tables[name], new)
 
 
 def save_raw_files(downloads: list[Download], raw_dir: Path) -> Path:
     """Keep exactly what was downloaded, in a folder for this import run."""
-    run_dir = Path(raw_dir) / "classifications" / datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    run_dir = run_folder(raw_dir, "classifications")
     for download in downloads:
         folder = run_dir / str(download.management_catchment_id)
         folder.mkdir(parents=True, exist_ok=True)

@@ -24,7 +24,7 @@ from openpyxl import load_workbook
 
 from catalyst.db import Schema
 
-from .catchments import ImportProblem
+from .common import ImportProblem, replace_rows, run_folder
 from .ea_api import EAClient, EAError, EANotFound
 
 TABLE = "storm_overflows"
@@ -205,9 +205,7 @@ def _whole(value: Any) -> int | None:
 def save(conn: sa.Connection, schema: Schema, rows: list[dict[str, Any]]) -> None:
     """Replace every row with the new ones, and work out each outlet's latitude and longitude."""
     table = schema.metadata.tables[TABLE]
-    conn.execute(table.delete())
-    if rows:
-        conn.execute(table.insert(), rows)
+    replace_rows(conn, table, rows)
     point = sa.func.ST_Transform(sa.func.ST_SetSRID(sa.func.ST_MakePoint(table.c.easting, table.c.northing), 27700), 4326)
     conn.execute(table.update().where(table.c.easting.is_not(None)).values(
         longitude=sa.func.ST_X(point), latitude=sa.func.ST_Y(point),
@@ -216,8 +214,7 @@ def save(conn: sa.Connection, schema: Schema, rows: list[dict[str, Any]]) -> Non
 
 def save_raw_files(downloads: list[Download], raw_dir: Path) -> Path:
     """Keep exactly what was downloaded, in a folder for this import run."""
-    run_dir = Path(raw_dir) / TABLE / datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    run_dir.mkdir(parents=True, exist_ok=True)
+    run_dir = run_folder(raw_dir, TABLE)
     for download in downloads:
         (run_dir / f"EDM_{download.year}_Storm_Overflow_Annual_Return.zip").write_bytes(download.data)
     return run_dir

@@ -21,7 +21,7 @@ import sqlalchemy as sa
 from catalyst.db import load_schema
 
 from .api import catchments, classifications, river_obstacles, storm_overflows
-from .api.catchments import ImportProblem
+from .api.common import ImportProblem
 from .api.ea_api import EAClient, EAError
 
 
