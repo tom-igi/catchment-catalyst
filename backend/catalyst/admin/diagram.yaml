@@ -138,7 +138,7 @@ dashboard:
     What is happening now?: river_status_text
     Risk Levels: risk_levels
     Intervention hypothesis: river_status_text
-    Primary and Contingency Interventions: interventions
+    Interventions: [intervention_types, intervention_waterbodies]
   EA Data:
     Environment Agency Scoring: [ea_classifications, ea_scores, ea_thresholds]
   Land Use Data:
@@ -170,6 +170,12 @@ dashboard:
     Sewage outflows (CSO & STW): storm_overflows
     Habitat and Land Usage: habitat_land_use
     Text at the bottom: location_text
+  Intervention Management:
+    Critical Path: location_text
+    Unit Cost of Interventions: [location_text, intervention_unit_costs]
+    Intervention Summary: [location_text, intervention_types]
+    Interventions Detail: [intervention_types, intervention_waterbodies]
+    Community Action: location_text
 
 # Links the database can't check, so they aren't in schema.yaml as `references`:
 # a list of IDs, or a table's name. `to: data tables` means every data table, and

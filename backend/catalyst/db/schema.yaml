@@ -664,46 +664,6 @@ data_tables:
         example: Med-High
         description: How confident the hypothesis is, shown after its heading, e.g. Low, Medium, Med-High, High
 
-  interventions:
-    title: Interventions
-    description: >-
-      The interventions table on the River Status page: what needs to change
-      in each catchment, who leads it, what will be done and how we'll know.
-      One row per intervention, grouped on the page into primary and
-      contingency interventions.
-    filled_by: excel
-    columns:
-      catchment_id:
-        type: text
-        example: GB108050014460
-        primary_key: true
-        references: catchments.id
-      number:
-        type: integer
-        example: 1
-        primary_key: true
-        description: Its place in the catchment's list (1 first), within its priority
-      priority:
-        type: text
-        example: Primary
-        required: true
-        description: Primary or Contingency, which group it's listed in
-      desired_change:
-        type: text
-        example: Reduction in continuous discharges from sewage treatment works to permitted levels
-        required: true
-      lead_partner:
-        type: text
-        example: SWW
-        description: Who leads it, e.g. SWW, Farmers, EA
-      actions:
-        type: text
-        example: Asset and operational improvements
-      how_we_will_know:
-        type: text
-        example: Effluent monitoring & permit compliance data
-        description: Shown under "How we'll know"
-
   risk_levels:
     title: Risk Levels
     description: >-
@@ -930,6 +890,220 @@ data_tables:
         description: Predicted number of spills a year once the work is done
 
   # ---------------------------------------------------------------------------
+  #  Intervention Management: the interventions needed across a location
+  # ---------------------------------------------------------------------------
+
+  intervention_types:
+    title: Intervention Types
+    description: >-
+      The types of intervention on the Intervention Management view (e.g.
+      Investment in STWs, Removing barriers): one row per type, numbered as on
+      the page. Each has a line in the Intervention Summary table, and its own
+      page in Interventions Detail: a table of what it is, its progress, and
+      the waterbodies that need it (Intervention Waterbodies), in groups under
+      headings. The figures in the summary are as typed, so they can be rounded
+      or estimated; its totals are added up from them. Text can have
+      paragraphs, bullets, bold and links, written as described under Location Text.
+    filled_by: excel
+    columns:
+      location_id:
+        type: integer
+        example: 1
+        primary_key: true
+        references: locations.id
+        description: The location (see the Locations table), e.g. 1 for North Devon
+      number:
+        type: integer
+        example: 1
+        primary_key: true
+        description: Its number on the page, e.g. 1 for "1. Investment in STWs (phosphate reduction)"
+      name:
+        type: text
+        example: Investment in STWs (phosphate reduction)
+        required: true
+      button:
+        type: text
+        example: Sewage treatment works investment
+        description: Its button in Interventions Detail, after its number (the name if empty)
+      summary_group:
+        type: text
+        example: Priority interventions (not in order of priority)
+        required: true
+        description: >-
+          The part of the Intervention Summary table it's in, by the part's
+          heading, e.g. Secondary interventions. Each part ends with its total,
+          and the parts are in the order of their lowest number.
+      summary_rwbs:
+        type: integer
+        example: 40
+        description: Intervention Summary, No. of RWBs (river water bodies)
+      summary_cost:
+        type: double
+        example: 120000000
+        description: Intervention Summary, Estimated Cost, in £ (e.g. 120000000 for £120m)
+      percent_available:
+        type: integer
+        example: 100
+        description: Intervention Summary, % Available (of the estimated cost); also used for the totals
+      percent_delivered:
+        type: integer
+        example: 0
+        description: Intervention Summary, % Delivered. Empty shows "Data to follow".
+      summary_lead:
+        type: text
+        example: SWW
+        description: Intervention Summary, Lead (short, e.g. SWW, EA or ?)
+      description:
+        type: text
+        example: Reduce phosphorus and other pollutant discharges from sewage treatment works …
+        description: Interventions Detail, Description
+      lead_organisation:
+        type: text
+        example: South West Water
+        description: Interventions Detail, Lead delivery organisation
+      river_water_bodies:
+        type: text
+        example: 13 highest priority, 27 secondary priority
+        description: Interventions Detail, No. of river water bodies, as written
+      estimated_cost:
+        type: text
+        example: £120m
+        description: Interventions Detail, Estimated total cost, as written
+      funding_available:
+        type: text
+        example: £120m (£42m already secured in AMP8 & AMP9)
+        description: Interventions Detail, Funding available, as written
+      funding_gap:
+        type: text
+        example: £0m
+        description: Interventions Detail, Funding gap, as written
+      funding_route:
+        type: text
+        example: Water company investment (AMP programmes)
+        description: Interventions Detail, Funding route / source
+      ecological_benefit:
+        type: text
+        example: Reduce phosphorus loading from wastewater, improve phosphate and phytobenthos status.
+        description: Interventions Detail, Ecological benefit
+      cost_confidence:
+        type: text
+        example: Medium (£3m is a very broad average)
+        description: Interventions Detail, Confidence in costings
+      progress:
+        type: text
+        example: "- South West Water have plans to invest in sewage treatment works …"
+        description: Interventions Detail, under Progress
+      groups:
+        type: text
+        example: Highest Priority, as Predominantly Waste Water Issue
+        description: >-
+          The headings its waterbodies are grouped under in Interventions
+          Detail, one per line (Alt+Enter between them): the first is group 1,
+          the next group 2, and so on (group_number in Intervention Waterbodies)
+
+  intervention_waterbodies:
+    title: Intervention Waterbodies
+    description: >-
+      Where each type of intervention is needed: one row per waterbody and
+      intervention type, for the tables in Interventions Detail (Intervention
+      Management) and the interventions on each waterbody's River Status page.
+      Update a row as funding is found and delivery starts and finishes.
+    filled_by: excel
+    columns:
+      catchment_id:
+        type: text
+        example: GB108050014050
+        primary_key: true
+        references: catchments.id
+      intervention:
+        type: integer
+        example: 1
+        primary_key: true
+        description: The intervention type, by its number in Intervention Types
+      group_number:
+        type: integer
+        example: 2
+        required: true
+        description: Which of the intervention type's groups it's listed in, e.g. 1 for the first heading in its groups
+      note:
+        type: text
+        example: active mine impacts
+        description: Shown after the waterbody's name, e.g. what makes it a special case
+      size:
+        type: text
+        example: AMP8
+        description: Size of Intervention, e.g. AMP8, c.6 priority farms or 2.4km (9.6km)
+      estimated_cost:
+        type: double
+        example: 3000000
+        description: Estimated Cost, in £
+      funding_available:
+        type: double
+        example: 3000000
+        description: Funding Available, in £. Empty shows nothing; 0 shows £0.
+      started_delivery:
+        type: text
+        example: 2025-2030
+        description: Started Delivery, as written, e.g. 2025-2030, Yes or No
+      finished_delivery:
+        type: text
+        example: 2030-2035
+        description: Finished Delivery, as written, e.g. 2030-2035, Yes or No
+      lead:
+        type: text
+        example: SWW
+
+  intervention_unit_costs:
+    title: Intervention Unit Costs
+    description: >-
+      The indicative cost of each type of intervention, for Unit Cost of
+      Interventions (Intervention Management): one row per type, numbered as
+      in Intervention Types. The text above them is in Location Text. Text can
+      have paragraphs, bullets, bold and links, written as described under
+      Location Text.
+    filled_by: excel
+    columns:
+      location_id:
+        type: integer
+        example: 1
+        primary_key: true
+        references: locations.id
+        description: The location (see the Locations table), e.g. 1 for North Devon
+      number:
+        type: integer
+        example: 1
+        primary_key: true
+        description: Its number on the page, as in Intervention Types
+      title:
+        type: text
+        example: Investment in Sewage Treatment Works (phosphate reduction)
+        required: true
+      intervention:
+        type: text
+        example: reduce phosphorus and other pollutant discharges from sewage treatment works …
+        description: Shown after "Intervention:"
+      delivery_lead:
+        type: text
+        example: South West Water
+        description: Shown after "Delivery lead:"
+      typical_cost:
+        type: text
+        example: "- Small works: £1m"
+        description: Shown under "Typical cost:", usually as bullets, ending with the average assumption used
+      funding_route:
+        type: text
+        example: water company investment (AMP programmes)
+        description: Shown after "Funding route:"
+      cost_confidence:
+        type: text
+        example: medium
+        description: Shown after "Cost confidence:"
+      notes:
+        type: text
+        example: "Note: the £30,000 assumption reflects …"
+        description: Shown last, e.g. a note about the assumption
+
+  # ---------------------------------------------------------------------------
   #  About a whole location
   # ---------------------------------------------------------------------------
 
@@ -982,3 +1156,21 @@ data_tables:
         type: text
         example: The Catchment Dashboard brings together …
         description: Shown under the Catchment Dashboard, written in the same way
+      critical_path:
+        type: text
+        example: "**Starting Position (2025)** …"
+        description: >-
+          Intervention Management, Critical Path: everything under its heading.
+          A line of just --- starts a new box.
+      unit_costs_purpose:
+        type: text
+        example: "**Purpose** This section provides indicative costs …"
+        description: Intervention Management, Unit Cost of Interventions, the box above the costs (which are in Intervention Unit Costs)
+      intervention_summary:
+        type: text
+        example: "**What the analysis tells us** …"
+        description: Intervention Management, Intervention Summary, the text above the table (which is from Intervention Types)
+      community_action:
+        type: text
+        example: Biosphere Partnership organisations are leading on many community engagement projects …
+        description: "Intervention Management, Community Action: everything under its heading"

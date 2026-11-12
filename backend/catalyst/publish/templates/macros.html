@@ -28,9 +28,10 @@
 </ul>
 {% endmacro %}
 
-{# The Waterbody Dashboard's tabs, in its header. Each keeps the chosen catchment. #}
+{# The Waterbody Dashboard's tabs, in its header. Each keeps the chosen catchment, and where
+   you'd scrolled to (keep-scroll.js). #}
 {% macro waterbody_tabs(tabs, tab, catchment, root, show_overview) %}
-<nav class="tabs" aria-label="Waterbody Dashboard pages">
+<nav class="tabs" aria-label="Waterbody Dashboard pages" data-keep-scroll>
   {% if show_overview %}
   <a href="{{ root or './' }}"{% if not tab %} aria-current="page"{% endif %}>Overview</a>
   {% endif %}
@@ -66,10 +67,11 @@
 
 {# The map of the location's catchments, coloured by ecological status (map.js).
    `focus` lists the catchments to zoom to, with the others faded (e.g. an operational catchment's),
-   and `avoid` the panels laid over the map, to fit the catchments beside. #}
-{% macro status_map(location, root, links, selected, focus=none, avoid=none) %}
+   and `avoid` the panels laid over the map, to fit the catchments beside. `keep_scroll` when
+   clicking a catchment opens a page laid out like this one, so it opens where you'd scrolled to. #}
+{% macro status_map(location, root, links, selected, focus=none, avoid=none, keep_scroll=false) %}
 <div id="map" class="map" data-geojson="{{ root }}catchments.geojson?v={{ version }}" data-links="{{ links }}" data-selected="{{ selected }}"
-     {% if focus %}data-focus="{{ focus | join(',') }}" {% endif %}{% if avoid %}data-avoid="{{ avoid }}" {% endif %}role="img" aria-label="Map of the catchments in {{ location.name }}, coloured by ecological status"></div>
+     {% if focus %}data-focus="{{ focus | join(',') }}" {% endif %}{% if avoid %}data-avoid="{{ avoid }}" {% endif %}{% if keep_scroll %}data-keep-scroll {% endif %}role="img" aria-label="Map of the catchments in {{ location.name }}, coloured by ecological status"></div>
 {% endmacro %}
 
 {# A small map of points in the catchment, over its outline (points.js). Empty

@@ -12,8 +12,8 @@
         <tr><th scope="row">Catchment ID</th><td>{{ catchment.id if catchment else "" }}</td></tr>
         <tr><th scope="row">Catchment Area (ha)</th><td>{{ catchment.area_ha | number(1) if catchment else "" }}</td></tr>
         <tr><th scope="row">River Length (km)</th><td>{{ catchment.river_length_km | number(2) if catchment else "" }}</td></tr>
-        <tr><th scope="row">Upstream Rivers</th><td>{% if catchment %}{{ catchment_links(catchment.upstream_ids, location, root ~ tab ~ "/") }}{% endif %}</td></tr>
-        <tr><th scope="row">Downstream Rivers</th><td>{% if catchment %}{{ catchment_links(catchment.downstream_ids, location, root ~ tab ~ "/") }}{% endif %}</td></tr>
+        <tr><th scope="row">Upstream Rivers</th><td data-keep-scroll>{% if catchment %}{{ catchment_links(catchment.upstream_ids, location, root ~ tab ~ "/") }}{% endif %}</td></tr>
+        <tr><th scope="row">Downstream Rivers</th><td data-keep-scroll>{% if catchment %}{{ catchment_links(catchment.downstream_ids, location, root ~ tab ~ "/") }}{% endif %}</td></tr>
       </tbody>
     </table>
   </section>

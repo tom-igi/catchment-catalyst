@@ -25,26 +25,27 @@
     <div class="text">{{ words.get("intervention_hypothesis") | formatted }}</div>
   </section>
 
+  {# From Intervention Management's tables: each intervention links to its page there. #}
   <section class="panel white interventions">
     <div class="scroll">
       <table>
         <thead>
           <tr>
-            <th scope="col">Desired change</th>
-            <th scope="col">Lead partner</th>
-            <th scope="col">Actions</th>
-            <th scope="col">How we'll know</th>
+            <th scope="col">Intervention</th>
+            <th scope="col">Size of Intervention</th>
+            <th scope="col" class="num">Estimated Cost</th>
+            <th scope="col">Lead</th>
           </tr>
         </thead>
-        {% for priority, rows in figures.interventions(catchment_id) %}
+        {% for group, rows in figures.interventions(catchment_id) %}
         <tbody>
-          <tr class="group"><th scope="rowgroup" colspan="4">{{ priority | upper }} INTERVENTIONS</th></tr>
+          <tr class="group"><th scope="rowgroup" colspan="4">{{ group | upper }}</th></tr>
           {% for row in rows %}
           <tr>
-            <td>{{ row.desired_change }}</td>
-            <td>{{ row.lead_partner or "" }}</td>
-            <td>{{ row.actions or "" }}</td>
-            <td>{{ row.how_we_will_know or "" }}</td>
+            <td><a href="{{ root }}intervention-management/#intervention-{{ row.intervention }}">{{ row.name }}</a>{% if row.note %} – {{ row.note }}{% endif %}</td>
+            <td>{{ row.size or "" }}</td>
+            <td class="num">{{ row.estimated_cost | pounds }}</td>
+            <td>{{ row.lead or "" }}</td>
           </tr>
           {% endfor %}
         </tbody>

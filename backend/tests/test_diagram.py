@@ -88,9 +88,10 @@ def test_the_model_has_every_link():
     links = {(l["from"], l["column"], l["to"], l["kind"]) for l in model["links"]}
     data_tables = [t["name"] for t in model["tables"] if t["kind"] == "data"]
     by_catchment = [t["name"] for t in model["tables"] if t["kind"] == "data" and any(c["name"] == "catchment_id" for c in t["columns"])]
-    assert set(data_tables) - set(by_catchment) == {"location_text"}
+    by_location = {"location_text", "intervention_types", "intervention_unit_costs"}  # about a whole location
+    assert set(data_tables) - set(by_catchment) == by_location
     assert {(name, "catchment_id", "catchments", "id") for name in by_catchment} <= links
-    assert ("location_text", "location_id", "locations", "id") in links  # about a whole location
+    assert {(name, "location_id", "locations", "id") for name in by_location} <= links
     assert ("locations", "catchment_ids", "catchments", "list") in links
     assert {("datasets", "table_name", name, "name") for name in data_tables} <= links
     assert ("uploads", "table_name", "ea_scores", "name") in links

@@ -1,8 +1,149 @@
-{# Intervention Management: a placeholder for now. #}
+{# Intervention Management: five focus areas, laid out as on the North Devon Biosphere's
+   pages. Their text is in Location Text; the summary table and Interventions Detail are
+   from Intervention Types and Intervention Waterbodies; Unit Cost of Interventions is
+   from Intervention Unit Costs. A focus area is shown empty until its data is there. #}
 {% extends "focus-areas.html" %}
+{% block note %}{% endblock %}
 {% block section %}
-<h2>{{ name }}</h2>
-<div class="focus-body">
-  <p class="placeholder">This section is under development.</p>
+{% if name == "Critical Path" %}
+<h2>Critical path to Good Ecological Status</h2>
+{% for box in text.get("critical_path") | boxes %}
+<div class="focus-body">{{ box }}</div>
+{% endfor %}
+
+{% elif name == "Unit Cost of Interventions" %}
+<h2>Unit Cost of Interventions</h2>
+{% if text.get("unit_costs_purpose") %}
+<div class="focus-body">{{ text.get("unit_costs_purpose") | formatted }}</div>
+{% endif %}
+{% for cost in figures.unit_costs() %}
+<div class="focus-body unit-cost">
+  <h3>{{ cost.number }}. {{ cost.title }}</h3>
+  {% if cost.intervention %}<p><strong>Intervention:</strong> {{ cost.intervention }}</p>{% endif %}
+  {% if cost.delivery_lead %}<p><strong>Delivery lead:</strong> {{ cost.delivery_lead }}</p>{% endif %}
+  {% if cost.typical_cost %}
+  <p><strong>Typical cost:</strong></p>
+  {{ cost.typical_cost | formatted }}
+  {% endif %}
+  {% if cost.funding_route %}<p><strong>Funding route:</strong> {{ cost.funding_route }}</p>{% endif %}
+  {% if cost.cost_confidence %}<p><strong>Cost confidence:</strong> {{ cost.cost_confidence }}</p>{% endif %}
+  {{ cost.notes | formatted }}
 </div>
+{% endfor %}
+
+{% elif name == "Intervention Summary" %}
+<h2>Intervention Summary</h2>
+{{ text.get("intervention_summary") | formatted }}
+{% set parts = figures.intervention_summary() %}
+{% if parts %}
+<div class="scroll-x">
+<table class="intervention-table summary-table">
+  <thead>
+    <tr>
+      <th scope="col">Intervention</th>
+      <th scope="col" class="c">No. of RWBs</th>
+      <th scope="col" class="c">Estimated Cost</th>
+      <th scope="col" class="c">% Available</th>
+      <th scope="col" class="c">% Delivered</th>
+      <th scope="col" class="c">Lead</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for part in parts %}
+    <tr class="part"><th scope="colgroup" colspan="6">{{ part.name }}</th></tr>
+    {% for row in part.rows %}
+    <tr>
+      <td>{{ row.number }}. {{ row.name }}</td>
+      <td class="c">{{ row.summary_rwbs | show }}</td>
+      <td class="c">{{ row.summary_cost | pounds }}</td>
+      <td class="c">{% if row.percent_available is not none %}{{ row.percent_available }}%{% endif %}</td>
+      <td class="c">{{ "Data to follow" if row.percent_delivered is none else row.percent_delivered ~ "%" }}</td>
+      <td class="c">{{ row.summary_lead or "" }}</td>
+    </tr>
+    {% endfor %}
+    <tr class="total"><th scope="row" colspan="6">Total: {{ part.cost | about_pounds }}, of which {{ part.available | about_pounds }} available, and {{ part.to_find | about_pounds }} to be found</th></tr>
+    {% endfor %}
+    {% if parts | length > 1 %}
+    {% set all = figures.intervention_total() %}
+    <tr class="total"><th scope="row" colspan="6">Overall total: {{ all.cost | about_pounds }}, of which {{ all.available | about_pounds }} available, and {{ all.to_find | about_pounds }} to be found</th></tr>
+    {% endif %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+{% elif name == "Interventions Detail" %}
+<h2>Interventions Detail</h2>
+{% set kinds = figures.intervention_types() %}
+{% set details = [
+  ("Description", "description"), ("Lead delivery organisation", "lead_organisation"),
+  ("No. of river water bodies", "river_water_bodies"), ("Estimated total cost", "estimated_cost"),
+  ("Funding available", "funding_available"), ("Funding gap", "funding_gap"),
+  ("Funding route / source", "funding_route"), ("Ecological benefit", "ecological_benefit"),
+  ("Confidence in costings", "cost_confidence"),
+] %}
+{% if kinds %}
+<div class="interventions-detail" data-tabs>
+  <div class="detail-buttons" role="tablist">
+    {% for kind in kinds %}
+    <button type="button" role="tab" id="tab-intervention-{{ kind.number }}" aria-controls="intervention-{{ kind.number }}">{{ kind.number }}. {{ kind.button or kind.name }}</button>
+    {% endfor %}
+  </div>
+  {% for kind in kinds %}
+  <section class="focus-body intervention" role="tabpanel" id="intervention-{{ kind.number }}" aria-labelledby="tab-intervention-{{ kind.number }}">
+    <h3 class="intervention-title">{{ kind.number }}. {{ kind.name }}</h3>
+    <div class="scroll-x">
+    <table class="intervention-overview">
+      <thead><tr><th scope="colgroup" colspan="2">{{ kind.name }}</th></tr></thead>
+      <tbody>
+        {% for label, field in details if kind[field] %}
+        <tr><th scope="row">{{ label }}</th><td>{{ kind[field] }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% if kind.progress %}
+    <h4>Progress</h4>
+    {{ kind.progress | formatted }}
+    {% endif %}
+    {% for heading, rows in figures.intervention_waterbodies(kind.number) %}
+    {% if heading %}<h4 class="group">{{ heading }}</h4>{% endif %}
+    <div class="scroll-x">
+    <table class="intervention-table sortable">
+      <thead>
+        <tr>
+          <th scope="col">River Water Body</th>
+          <th scope="col" class="c">Size of Intervention</th>
+          <th scope="col" class="c" data-type="number">Estimated Cost</th>
+          <th scope="col" class="c" data-type="number">Funding Available</th>
+          <th scope="col" class="c">Started Delivery</th>
+          <th scope="col" class="c">Finished Delivery</th>
+          <th scope="col" class="c">Lead</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td data-sort="{{ row.name }}"><a href="{{ root }}river-status/{{ row.catchment_id }}/">{{ row.name }}</a>{% if row.note %} – {{ row.note }}{% endif %}</td>
+          <td class="c">{{ row.size or "" }}</td>
+          <td class="c" data-sort="{{ row.estimated_cost | sort_value }}">{{ row.estimated_cost | pounds }}</td>
+          <td class="c" data-sort="{{ row.funding_available | sort_value }}">{{ row.funding_available | pounds }}</td>
+          <td class="c">{{ row.started_delivery or "" }}</td>
+          <td class="c">{{ row.finished_delivery or "" }}</td>
+          <td class="c">{{ row.lead or "" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% endfor %}
+  </section>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% elif name == "Community Action" %}
+<h2>Community Action</h2>
+{{ text.get("community_action") | formatted }}
+{% endif %}
 {% endblock %}

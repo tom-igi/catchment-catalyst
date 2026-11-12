@@ -1,0 +1,211 @@
+# Catchment Insights for North Devon: the questions under each focus area, copied from
+# the North Devon Biosphere's pages (https://www.northdevonbiosphere.org.uk/north-devon-catchment-insights.html,
+# 12 November 2026). Kept here rather than in the database for now: change this file,
+# then publish.
+#
+# Each focus area is named as on its button (INSIGHT_AREAS in site.py) and has:
+#   title    the heading at the top of its section
+#   groups   each with a heading and its questions, shown as rows that open
+# Each question can have an answer, written with the same marks as the other text on the
+# dashboard (bullets, **bold**, links and so on; see publish/text.py). For several lines:
+#
+#     - question: "How many storm overflows are there in the North Devon Catchment?"
+#       answer: |
+#         152 in the latest returns.
+#         - 40 at sewage treatment works
+#
+# A focus area that isn't here says "This section is under development."
+
+State of the Catchment:
+  title: State of the catchment
+  groups:
+    - heading: Overall condition
+      questions:
+        - question: "What is the overall ecological condition of North Devon's rivers?"
+          answer: "..."
+        - question: "How many river water bodies are achieving Good Ecological Status?"
+        - question: "How many river water bodies are in High, Good, Moderate, Poor and Bad status?"
+        - question: "How does North Devon compare with the South West and England as a whole?"
+        - question: "What does the condition of North Devon's rivers tell us about the health of the wider environment?"
+    - heading: Best & worst performing rivers
+      questions:
+        - question: "Which river water bodies are in the best condition, & why do we think this is?"
+        - question: "Which river water bodies are in the poorest condition, & why do we think this is?"
+        - question: "Which river water bodies are closest to achieving Good status?"
+        - question: "Which river water bodies are furthest from achieving Good Ecological Status?"
+        - question: "Which river water bodies are closest to deteriorating to a lower status class?"
+    - heading: Catchment geography
+      questions:
+        - question: "Are some parts of North Devon performing better than others?"
+        - question: "Which sub-catchments contain the greatest number of failing river water bodies?"
+        - question: "Where are the ecological hotspots and coldspots within the catchment?"
+        - question: "Which river water bodies have the greatest influence on downstream ecological status?"
+    - heading: Understanding failure
+      questions:
+        - question: "Which WFD indicators fail most frequently across North Devon?"
+        - question: "Are North Devon's rivers primarily failing because of wastewater, agricultural or other issues?"
+        - question: "Why are so many river water bodies failing"
+        - question: "What proportion of failing river water bodies are failing for only one reason?"
+        - question: "Which river water bodies have the most complex combinations of failures?"
+    - heading: Trends & change
+      questions:
+        - question: "How has the condition of North Devon’s rivers changed over time?"
+        - question: "Which river water bodies have improved most since 2016?"
+        - question: "Which river water bodies have deteriorated most since 2016?"
+
+Agriculture:
+  title: Agriculture
+  groups:
+    - heading: Understanding the agricultural challenge
+      questions:
+        - question: "How important is agriculture in explaining river failure across North Devon?"
+          answer: "..."
+        - question: "How many failing river water bodies are predominantly impacted by agriculture?"
+        - question: "How many failing river water bodies are impacted by agriculture and wastewater together?"
+    - heading: Agricultural pressure
+      questions:
+        - question: "Which river water body catchments have the highest concentrations of agricultural land?"
+        - question: "Which river water bodies have RNAGs from the EA for each of: (1) livestock management, (2) soil management, (3) nutrient management, (4) farm infrastructure, field infrastructure?"
+        - question: "Which river water body catchments have the highest run-off risk?"
+        - question: "Which river water bodies have the highest agricultural phosphate loading?"
+        - question: "Which river water body catchments have the highest livestock risk?"
+        - question: "Which river water body catchments have high or v. high concentrations of each of: (1) beef cows, (2) dairy cows, (3) pigs, (4) poultry, (5) sheep?"
+    - heading: Agricultural interventions
+      questions:
+        - question: "Which agricultural interventions can result in an improvement in water quality?"
+        - question: "What evidence is there of the efficacy of different agricultural interventions on improving water quality?"
+        - question: "What work is the EA doing to improve the agricultural sector’s impact on water quality?"
+        - question: "What work is the agricultural supply chain (supermarkets, food processors) doing to improve water quality impacts?"
+        - question: "What grants are available for farmers for interventions which improve water quality?"
+    - heading: Agricultural intervention strategy
+      questions:
+        - question: "Which agricultural interventions appear most important across North Devon?"
+        - question: "Which river water body catchments should be prioritised first for agricultural interventions?"
+        - question: "How many farms are likely to require targeted intervention?"
+
+Wastewater:
+  title: Wastewater
+  groups:
+    - heading: Sewage treatment works
+      questions:
+        - question: "How many sewage treatment works are there in the North Devon Catchment"
+          answer: "..."
+        - question: "How many (and which) failing river water bodies are predominantly impacted by sewage treatment works, or by sewage treatment works and agriculture together?"
+        - question: "Which river water bodies have the highest STW-derived phosphate loading?"
+        - question: "Which sewage treatment works are not meeting their regulated performance standards?"
+        - question: "How many properties or businesses are each of the sewage treatment works serving?"
+        - question: "Which river water body catchments have the highest concentrations of mains sewerage properties?"
+        - question: "What investments can be made to reduce the water quality impacts of a sewage treatment works?"
+        - question: "What evidence is there of the effectiveness of different sewage treatment works interventions?"
+        - question: "Which sewage treatment works are being investigated or upgraded through AMP8?"
+        - question: "Which sewage treatment works are expected to be considered for investment through AMP9?"
+        - question: "What £ investment is South West Water making in sewage treatment works across N.Devon?"
+        - question: "Which sewage treatment works interventions should be prioritised across North Devon?"
+    - heading: Storm overflows
+      questions:
+        - question: "How important are storm overflows to water quality and public health in North Devon?"
+        - question: "How many storm overflows are there in the North Devon Catchment?"
+        - question: "Which storm overflows spill most frequently?"
+        - question: "Which storm overflows that spill most frequently are an issue for bathing areas of shellfish?"
+        - question: "Which storm overflow interventions can reduce spills and improve water quality?"
+        - question: "What evidence is there of the effectiveness of different storm overflow interventions?"
+        - question: "Which storm overflows are currently being investigated or improved through AMP8?"
+        - question: "Which storm overflows are expected to receive investment through AMP9?"
+        - question: "What £ investment is South West Water making in storm overflows across North Devon?"
+        - question: "Which storm overflow interventions should be prioritised across North Devon?"
+    - heading: Private septic tanks
+      questions:
+        - question: "How many private septic tanks are there in the North Devon Catchment?"
+        - question: "Which failing river water bodies have a high concentration of private septic tanks?"
+        - question: "Which river water bodies have the highest amount of phosphate attributable to private septic tanks?"
+        - question: "What interventions could be made to reduce water quality issues from private septic tanks?"
+        - question: "Which private septic tank interventions should be prioritisied across North Devon?"
+
+Fish:
+  title: Fish
+  groups:
+    - heading: Fish populations & ecological condition
+      questions:
+        - question: "How important are fish failures in explaining river failure across North Devon?"
+          answer: "..."
+        - question: "How many river water bodies are failing primarily because of fish &which have poorest fish status?"
+        - question: "Which fish species does the EA expect to find in North Devon's rivers?"
+        - question: "What do the fish monitoring data tell us about the condition of different fish species across North Devon?"
+        - question: "Which river water bodies have experienced the greatest decline in fish status?"
+        - question: "Which river water bodies are closest to recovering Good fish status?"
+    - heading: Understanding fish failures
+      questions:
+        - question: "What are the most common reasons for fish failure across North Devon?"
+        - question: "How important are barriers to fish passage in explaining fish failures?"
+        - question: "How important are flow, drought and abstraction pressures in explaining fish failures?"
+        - question: "How important are habitat quality and river condition in explaining fish failures?"
+        - question: "Which fish failures may be influenced by monitoring uncertainty or suspect data?"
+    - heading: Barriers, habitats and recovery
+      questions:
+        - question: "How many barriers to fish passage are there across North Devon?"
+        - question: "Which barriers have the greatest impact on fish movement?"
+        - question: "Which river water bodies would benefit most from barrier removal or fish passage improvements?"
+        - question: "Which river water bodies would benefit most from fisheries habitat restoration?"
+    - heading: Fish recovery strategy
+      questions:
+        - question: "Which river water bodies should be prioritised first for fish recovery interventions?"
+        - question: "What would it take to restore Good fish status across North Devon?"
+
+Intervention Strategy:
+  title: Intervention Strategy
+  groups:
+    - heading: TBC
+      questions:
+        - question: TBC
+        - question: TBC
+        - question: TBC
+        - question: TBC
+        - question: TBC
+
+Funding & Delivery:
+  title: Funding & Delivery
+  groups:
+    - heading: TBC
+      questions:
+        - question: TBC
+        - question: TBC
+        - question: TBC
+        - question: TBC
+        - question: TBC
+
+Community Involvement:
+  title: Community Involvement
+  groups:
+    - heading: Why community involvement matters
+      questions:
+        - question: "Why is community involvement important for improving river health?"
+          answer: "..."
+        - question: "What role do local communities already play in protecting North Devon's rivers?"
+    - heading: Citizen science and monitoring
+      questions:
+        - question: "What is citizen science monitoring and what value does it serve?"
+        - question: "What citizen science programmes currently operate across North Devon?"
+        - question: "How can local communities contribute to river monitoring?"
+        - question: "Which river water bodies would benefit most from additional monitoring?"
+        - question: "How can community monitoring complement Environment Agency monitoring?"
+    - heading: Taking action
+      questions:
+        - question: "What actions can communities take to improve river health?"
+        - question: "What actions can landowners and farmers take to improve river health?"
+        - question: "What actions can homeowners and businesses take to reduce their impact on rivers?"
+        - question: "Which river water bodies would benefit most from community-led restoration projects?"
+    - heading: Support & funding
+      questions:
+        - question: "How can individuals get involved in improving North Devon's rivers?"
+        - question: "What grants, funding and support are available for community-led river projects?"
+
+Other:
+  title: Other
+  groups:
+    - heading: TBC
+      questions:
+        - question: TBC
+        - question: TBC
+        - question: TBC
+        - question: TBC
+        - question: TBC
