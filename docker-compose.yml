@@ -20,6 +20,8 @@ services:
   db:
     image: postgis/postgis:17-3.5
     volumes:
+      # On the live server, docker-compose.prod.yml keeps these files in a
+      # folder (db-data/) instead.
       - db-data:/var/lib/postgresql/data
     # Hide the image's start-up script, which pre-installs PostGIS and some
     # US-only extras. A new database then starts empty and the schema tool

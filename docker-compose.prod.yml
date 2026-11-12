@@ -33,6 +33,14 @@ services:
       # Only reachable from the server itself, never from the internet. To
       # look at the live database in DBeaver, connect through an SSH tunnel.
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # The database's files, in this folder (db-data/) rather than a Docker
+      # volume, so everything for the app is in one place. This replaces the
+      # db-data volume in docker-compose.yml. The folder belongs to the
+      # database container's user, so look inside with sudo. Copying it while
+      # the database runs isn't a backup: use pg_dump. `docker compose down -v`
+      # doesn't delete it.
+      - ./db-data:/var/lib/postgresql/data
     logging: *logging
 
   schema:
