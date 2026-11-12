@@ -1,8 +1,29 @@
-{# Catchment Insights: a placeholder for now. #}
+{# Catchment Insights: each focus area's questions, in groups, laid out as on the North Devon
+   Biosphere's pages. They're from content/<location>/catchment-insights.yaml, not the database,
+   for now. A question opens to show its answer. A focus area that isn't in the file is under
+   development. #}
 {% extends "focus-areas.html" %}
 {% block section %}
+{% set area = insights.get(name) %}
+{% if area %}
+<h2>{{ area.get("title") or name }}</h2>
+{% for group in area.get("groups") or [] %}
+<div class="insight-group">
+  {% if group.get("heading") %}<h3>{{ group.get("heading") }}</h3>{% endif %}
+  <div class="questions">
+    {% for item in group.get("questions") or [] %}
+    <details class="question">
+      <summary>{{ item.get("question") }}</summary>
+      <div class="answer">{{ item.get("answer") | formatted }}</div>
+    </details>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+{% else %}
 <h2>{{ name }}</h2>
 <div class="focus-body">
   <p class="placeholder">This section is under development.</p>
 </div>
+{% endif %}
 {% endblock %}

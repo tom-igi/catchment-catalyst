@@ -10,6 +10,8 @@
 //                  operational catchment's on the Catchment Dashboard), if any
 //   data-avoid     panels laid over the map (a CSS selector): the catchments
 //                  are fitted into the space beside them, if there's room
+//   data-keep-scroll  if present, a catchment's page opens where you'd scrolled
+//                  to (keep-scroll.js), as it's laid out like this one
 //
 // The colours come from the --status-... colours in style.css.
 (function () {
@@ -43,7 +45,11 @@
           const status = feature.properties.status;
           layer.bindTooltip(feature.properties.name + (status ? " (" + status + ")" : ""), { sticky: true });
           if (feature.properties.id === selected) return;
-          layer.on("click", function () { window.location.href = element.dataset.links + feature.properties.id + "/"; });
+          layer.on("click", function () {
+            const page = element.dataset.links + feature.properties.id + "/";
+            if ("keepScroll" in element.dataset && window.keepScroll) window.keepScroll(page);
+            window.location.href = page;
+          });
           layer.on("mouseover", function () { layer.setStyle(outline(feature, true)); });
           layer.on("mouseout", function () { layer.setStyle(outline(feature, false)); });
         },

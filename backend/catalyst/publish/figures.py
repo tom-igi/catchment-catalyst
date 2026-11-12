@@ -2,8 +2,9 @@
 ecological status, the counts on the Overview, the EA scoring grid (with its
 values and thresholds), the failing elements and reasons, each habitat's share
 of its catchment, livestock densities, the phosphate sources, the storm
-overflow spills, the points on the small maps, and the Catchment Dashboard's
-totals for the whole location or one of its operational catchments.
+overflow spills, the points on the small maps, the Catchment Dashboard's
+totals for the whole location or one of its operational catchments, and
+Intervention Management's summary totals and lists of waterbodies.
 
 Like collect.py, this knows nothing about web pages. Each figure copes with its
 table not existing (it's simply empty), so the dashboard shows an empty panel
@@ -26,7 +27,6 @@ SCORES = "ea_scores"
 THRESHOLDS = "ea_thresholds"
 HABITAT = "habitat_land_use"
 RIVER_TEXT = "river_status_text"
-INTERVENTIONS = "interventions"
 RISKS = "risk_levels"
 RANKINGS = "catchment_rankings"
 FARMS = "farms"
@@ -35,6 +35,9 @@ PHOSPHATE = "phosphate_sources"
 PROPERTIES = "sewerage_properties"
 IMPROVEMENTS = "sewerage_improvements"
 LOCATION_TEXT = "location_text"
+INTERVENTION_TYPES = "intervention_types"
+INTERVENTION_WATERBODIES = "intervention_waterbodies"
+UNIT_COSTS = "intervention_unit_costs"
 OVERFLOW_YEARS = 5  # years of storm overflow spills shown
 ECOLOGICAL = "Ecological"  # the classification item the maps are coloured by
 CLASSIFICATION_YEARS = 3  # years shown in the "EA Ecological Classification" panel
@@ -94,8 +97,6 @@ RISK_NAMES = {
     "overheating": "Overheating",
     "running_dry": "Running Dry",
 }
-# The interventions table's groups, in order. Any other priority comes after these.
-PRIORITIES = ["Primary", "Contingency"]
 # The Sewerage Data page's Source of Phosphate groups, in order.
 DISCHARGES = ["Continuous", "Diffuse"]
 
@@ -162,6 +163,26 @@ class Discharges:
 
     def total(self) -> float:
         return sum(sum(by_year.values()) for _, by_year in self.sites)
+
+
+@dataclass
+class SummaryPart:
+    """A part of Intervention Management's summary table (e.g. Secondary interventions), with its total."""
+    name: str
+    rows: list[dict[str, Any]]  # its intervention types, by number
+
+    @property
+    def cost(self) -> float:
+        return sum(row["summary_cost"] or 0 for row in self.rows)
+
+    @property
+    def available(self) -> float:
+        """The cost that funding is available for: each type's cost times its % available."""
+        return sum((row["summary_cost"] or 0) * (row["percent_available"] or 0) / 100 for row in self.rows)
+
+    @property
+    def to_find(self) -> float:
+        return self.cost - self.available
 
 
 @dataclass
@@ -352,12 +373,17 @@ class Figures:
         return [(RISK_NAMES[column], row.get(column)) for column in columns]
 
     def interventions(self, catchment_id: str) -> list[tuple[str, list[dict[str, Any]]]]:
-        """The interventions, grouped by priority (Primary first, then Contingency, then any others), each in number order."""
-        dataset = self.location.dataset(INTERVENTIONS)
-        groups: dict[str, list[dict[str, Any]]] = {}
-        for row in sorted(dataset.rows_for(catchment_id) if dataset else [], key=lambda row: row["number"]):
-            groups.setdefault(row["priority"].strip(), []).append(row)
-        return sorted(groups.items(), key=lambda group: _rank(group[0], PRIORITIES))
+        """The River Status page's interventions: the catchment's rows in Intervention Waterbodies, each with its
+        type's name, in the parts of the Intervention Summary table (e.g. Priority interventions), by number."""
+        dataset = self.location.dataset(INTERVENTION_WATERBODIES)
+        kinds = {row["number"]: row for row in self.intervention_types()}
+        groups: dict[str, list[dict[str, Any]]] = {part.name: [] for part in self.intervention_summary()}
+        for row in sorted(dataset.rows_for(catchment_id) if dataset else [], key=lambda row: row["intervention"]):
+            kind = kinds.get(row["intervention"], {})
+            groups.setdefault((kind.get("summary_group") or "").strip(), []).append(
+                {**row, "name": kind.get("name") or f"Intervention {row['intervention']}"}
+            )
+        return [(name, rows) for name, rows in groups.items() if rows]
 
     # -------------------------------------------------------------------------
     #  Land use and sewerage (Land Use Data and Sewerage Data pages)
@@ -499,6 +525,50 @@ class Figures:
         whole = sum(areas.get(i, 0) for i in covered)
         rows = [{"habitat": name, "area_ha": area, "share": 100 * area / whole if whole else None} for name, area in totals.items()]
         return sorted(rows, key=lambda row: row["habitat"].lower()), Total(whole or None, len(covered), len(ids))
+
+    # -------------------------------------------------------------------------
+    #  Intervention Management
+    # -------------------------------------------------------------------------
+
+    def intervention_types(self) -> list[dict[str, Any]]:
+        """The location's types of intervention, by number."""
+        return self._numbered(INTERVENTION_TYPES)
+
+    def unit_costs(self) -> list[dict[str, Any]]:
+        """The cost of each type of intervention, by number."""
+        return self._numbered(UNIT_COSTS)
+
+    def intervention_summary(self) -> list[SummaryPart]:
+        """The summary table's parts (e.g. Priority interventions), in the order of their lowest numbers."""
+        parts: dict[str, list[dict[str, Any]]] = {}
+        for row in self.intervention_types():
+            parts.setdefault(row["summary_group"].strip(), []).append(row)
+        return [SummaryPart(name, rows) for name, rows in parts.items()]
+
+    def intervention_total(self) -> SummaryPart:
+        """Every type of intervention, for the summary table's overall total."""
+        return SummaryPart("Overall total", self.intervention_types())
+
+    def intervention_waterbodies(self, number: int) -> list[tuple[str, list[dict[str, Any]]]]:
+        """The waterbodies that need intervention type `number`, in its groups: (heading, rows), each by
+        waterbody name. A group's heading is its line in the type's `groups` (empty if there's no such line)."""
+        dataset = self.location.dataset(INTERVENTION_WATERBODIES)
+        kind = next((row for row in self.intervention_types() if row["number"] == number), {})
+        headings = [line.strip() for line in (kind.get("groups") or "").splitlines() if line.strip()]
+        groups: dict[int, list[dict[str, Any]]] = {}
+        for catchment in self.location.catchments:  # by name
+            for row in dataset.rows_for(catchment["id"]) if dataset else []:
+                if row["intervention"] == number:
+                    groups.setdefault(row["group_number"], []).append({**row, "catchment_id": catchment["id"], "name": catchment["name"]})
+        return [
+            (headings[group - 1] if 0 < group <= len(headings) else "", rows)
+            for group, rows in sorted(groups.items())
+        ]
+
+    def _numbered(self, table: str) -> list[dict[str, Any]]:
+        """A location's rows in a table numbered 1, 2, 3, ..., in number order."""
+        dataset = self.location.dataset(table)
+        return sorted(dataset.rows_for(self.location.id) if dataset else [], key=lambda row: row["number"])
 
     def _one(self, table: str, key: Any) -> dict[str, Any]:
         """The row for a catchment (or the location) in a table with one row each, or an empty one."""

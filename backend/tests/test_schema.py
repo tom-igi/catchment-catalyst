@@ -134,7 +134,7 @@ def test_duplicate_names_are_rejected(tmp_path):
 def test_which_tables_are_filled_by_excel():
     schema = load_schema()
     assert schema.excel_tables[:3] == ["datasets", "ea_scores", "habitat_land_use"]  # in the order of schema.yaml
-    assert {"river_status_text", "interventions", "risk_levels", "location_text"} <= set(schema.excel_tables)
+    assert {"river_status_text", "intervention_waterbodies", "risk_levels", "location_text"} <= set(schema.excel_tables)
     assert not {"catchments", "ea_classifications", "storm_overflows"} & set(schema.excel_tables)
     assert schema.metadata.tables["catchments"].info["filled_by"] == "api"
 

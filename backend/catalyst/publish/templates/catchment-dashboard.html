@@ -20,7 +20,7 @@
     {% endif %}
     {% if shown %}
     <h2>{{ label }}</h2>
-    <ul class="area-buttons {{ kind }}">
+    <ul class="area-buttons {{ kind }}" data-keep-scroll>
       {% for option in shown %}
       <li><a href="{{ root }}catchment-dashboard/{% if option.slug %}{{ option.slug }}/{% endif %}"{% if option is sameas area %} aria-current="page"{% endif %}>{{ option.name }}</a></li>
       {% endfor %}

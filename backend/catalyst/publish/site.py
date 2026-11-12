@@ -43,14 +43,17 @@ from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any
 
+import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
-from .collect import Location
+from .collect import Location, PublishProblem
 from .figures import Figures, measured
-from .text import formatted
+from .text import boxes, formatted
 
 HERE = Path(__file__).parent
 ASSETS = HERE / "static"
+# Text kept in files rather than the database, for now: a folder per location (by its web address, e.g. north-devon).
+CONTENT = HERE / "content"
 # The Overview tab is switched off for now (29 October 2026): the front page is
 # River Status instead. Set this to True to bring it back.
 SHOW_OVERVIEW = False
@@ -72,7 +75,8 @@ VIEWS = [
     ("catchment-insights", "Catchment Insights",
      "Explore key questions about agriculture, wastewater, fish and river recovery for the catchment.", "insights.jpg"),
 ]
-# The focus areas on the two placeholder views, as their buttons. Each is "under development" for now.
+# The focus areas on Intervention Management and Catchment Insights, as their buttons. Catchment Insights'
+# are "under development" for now.
 INTERVENTION_AREAS = [
     "Critical Path", "Unit Cost of Interventions", "Intervention Summary", "Interventions Detail", "Community Action",
 ]
@@ -90,6 +94,7 @@ def write_location(location: Location, out_dir: Path) -> Path:
     for leftover in (building, old):
         shutil.rmtree(leftover, ignore_errors=True)
 
+    insights = catchment_insights(location.slug)  # before anything is written, as a mistake in it stops the publish
     figures = Figures(location)
     shutil.copytree(ASSETS, building / "assets")
     (building / "catchments.geojson").write_text(json.dumps(_map(location, figures), separators=(",", ":")), encoding="utf-8")
@@ -127,7 +132,7 @@ def write_location(location: Location, out_dir: Path) -> Path:
 
     for view, focus_areas in (("intervention-management", INTERVENTION_AREAS), ("catchment-insights", INSIGHT_AREAS)):
         _write(building / view / "index.html", env.get_template(f"{view}.html").render(
-            **shared, view=view, tab="", catchment=None, root="../", focus_areas=focus_areas,
+            **shared, view=view, tab="", catchment=None, root="../", focus_areas=focus_areas, insights=insights,
         ))
 
     if final.exists():
@@ -135,6 +140,30 @@ def write_location(location: Location, out_dir: Path) -> Path:
     building.rename(final)
     shutil.rmtree(old, ignore_errors=True)
     return final
+
+
+def catchment_insights(location_slug: str) -> dict[str, dict]:
+    """A location's Catchment Insights, from content/<its web address>/catchment-insights.yaml: each focus
+    area's title and groups of questions, by the focus area's name. Empty if the location has no such file."""
+    path = CONTENT / location_slug / "catchment-insights.yaml"
+    if not path.is_file():
+        return {}
+    where = path.relative_to(HERE) if path.is_relative_to(HERE) else path
+    try:
+        areas = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as e:
+        raise PublishProblem(f"{where} isn't valid YAML: {e}") from None
+    unknown = [name for name in areas if name not in INSIGHT_AREAS]
+    if unknown:
+        raise PublishProblem(
+            f"{where} has focus areas that aren't on Catchment Insights: {', '.join(map(str, unknown))}. "
+            f"They're named as on the buttons: {', '.join(INSIGHT_AREAS)}."
+        )
+    for name, area in areas.items():
+        for group in (area or {}).get("groups") or []:
+            if not all(isinstance(item, dict) and item.get("question") for item in group.get("questions") or []):
+                raise PublishProblem(f"{where}: every question in {name} needs a 'question:' line.")
+    return areas
 
 
 def write_index(names: list[str], slugs: list[str], out_dir: Path) -> Path:
@@ -178,6 +207,7 @@ def _environment() -> Environment:
     env.filters.update(
         show=_show, sort_value=_sort_value, number=_number, hours=_hours, status_class=_status_class,
         formatted=formatted, risk_class=_risk_class, anchor=_anchor, measured=measured,
+        boxes=boxes, pounds=_pounds, about_pounds=_about_pounds,
     )
     return env
 
@@ -215,6 +245,20 @@ def _number(value: float | int | None, decimals: int | None = None) -> str:
         return f"{value:,.{decimals}f}"
     text = repr(value)
     return text[:-2] if text.endswith(".0") else text
+
+
+def _pounds(value: float | None) -> str:
+    """An amount of money as on Intervention Management: millions as £120m or £2.04m, less as £54,000."""
+    if value is None:
+        return ""
+    if abs(value) >= 1_000_000:
+        return "£" + f"{value / 1_000_000:.2f}".rstrip("0").rstrip(".") + "m"
+    return f"£{value:,.0f}"
+
+
+def _about_pounds(value: float) -> str:
+    """A total on Intervention Management, in millions to one decimal place: c.£384.7m."""
+    return f"c.£{value / 1_000_000:.1f}m"
 
 
 def _hours(value: float | None) -> str:

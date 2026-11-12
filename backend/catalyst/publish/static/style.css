@@ -378,20 +378,73 @@ th[aria-sort="descending"] button::after { content: "▼"; opacity: 1; font-size
 .focus-heading { margin: 0 0 26px; font: 700 1.6rem/1.3 Arial, Helvetica, sans-serif; text-align: center; }
 .focus-buttons { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin-bottom: 30px; }
 .intervention-management .focus-buttons { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.focus-buttons button {
+.focus-buttons button, .detail-buttons button {
   min-height: 54px; padding: 8px 14px; border: 1px solid #1d1d1d; border-radius: 28px;
   background: #1d1d1d; color: #fff; cursor: pointer;
   font: 700 .72rem/1.7 Arial, Helvetica, sans-serif; letter-spacing: .22em; text-transform: uppercase;
 }
-.focus-buttons button[aria-selected="true"] { background: #fff; color: #1d1d1d; }
+.focus-buttons button[aria-selected="true"], .detail-buttons button[aria-selected="true"] { background: #fff; color: #1d1d1d; }
+.detail-buttons button[aria-selected="true"] { border-width: 2px; background: transparent; }
 [data-tabs]:not(.tabs-ready) [role="tablist"] { display: none; }
 .focus-panel { margin-bottom: 16px; padding: 8px 16px 16px; background: #ddd27b; }
-.catchment-insights .focus-panel { background: #5b84a0; }
 .focus-panel h2 { margin: 0 0 8px; font: 700 1.5rem/1.3 Arial, Helvetica, sans-serif; }
 .focus-body { padding: 16px; background: #f5f6f8; }
 .focus-body p, .focus-body ul { margin: 0 0 12px; }
 .focus-body > :last-child { margin-bottom: 0; }
 .placeholder { color: #555; font-style: italic; }
+
+/* ---------------------------------------------------------------------------
+   Intervention Management, laid out as on the North Devon Biosphere's pages
+   --------------------------------------------------------------------------- */
+.focus-view.intervention-management { max-width: 1200px; font-family: Arial, Helvetica, sans-serif; font-size: 15px; }
+.intervention-management .focus-panel { padding: 4px 10px 20px; background: #e9cf76; }
+.intervention-management .focus-panel > h2 { margin: 6px 0 14px; font-size: 1.85rem; }
+.intervention-management .focus-body { margin-top: 20px; padding: 20px; background: #f4f7f8; line-height: 1.6; }
+.intervention-management .focus-panel > h2 + .focus-body { margin-top: 0; }
+.intervention-management .focus-body h2, .intervention-management .focus-body h3 { margin: 0 0 4px; font-size: 1rem; }
+.intervention-management .focus-body ul { padding-left: 32px; }
+.intervention-management .focus-body p { margin: 0 0 6px; }
+/* Intervention Summary and Community Action: on white, with no boxes */
+.intervention-management #intervention-summary, .intervention-management #community-action { padding: 4px 0 20px; background: none; line-height: 1.6; }
+
+/* ---------------------------------------------------------------------------
+   Catchment Insights, laid out as on the North Devon Biosphere's pages
+   --------------------------------------------------------------------------- */
+.focus-view.catchment-insights { max-width: 1200px; font-family: Arial, Helvetica, sans-serif; font-size: 15px; }
+.catchment-insights .focus-panel { padding: 4px 0 10px; background: none; }
+.catchment-insights .focus-panel > h2 { margin: 6px 0 18px; font-size: 1.85rem; }
+.insight-group { margin-bottom: 30px; padding: 20px; background: #3387a2; }
+.insight-group h3 { margin: 0 0 20px; color: #232323; font-size: 1.5rem; line-height: 1.3; }
+.questions { background: #e0e0e0; }
+.question summary {
+  display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 20px;
+  color: #8a8a8a; font-size: .95rem; text-transform: uppercase; cursor: pointer; list-style: none;
+}
+.question summary::-webkit-details-marker { display: none; }
+.question summary::after { content: "+"; flex: none; color: #b0b0b0; font-size: 1.4rem; line-height: 1; }
+.question[open] > summary::after { content: "\2212"; }  /* a minus sign */
+.question .answer { padding: 10px 20px 20px; background: #fafafa; line-height: 1.6; }
+.question .answer:empty { padding: 4px 20px; }
+.question .answer > :last-child { margin-bottom: 0; }
+
+.scroll-x { overflow-x: auto; }
+.intervention-table, .intervention-overview { margin: 0 0 16px; background: #fff; font: .875rem/1.4 Arial, Helvetica, sans-serif; }
+.intervention-table th, .intervention-table td { padding: 8px; border: 1px solid #999; vertical-align: middle; }
+.intervention-table thead th { background: #0066cc; color: #fff; font-weight: 700; }
+.intervention-table tbody tr:nth-child(even) { background: #f5f5f5; }
+.intervention-table .c { text-align: center; }
+.intervention-table a { color: inherit; }
+.summary-table .part th { background: #d9eaf7; font-weight: 700; }
+.summary-table .total th { background: #e8f4e8; font-weight: 700; }
+.summary-table td:first-child { width: 48%; }
+.intervention-overview th, .intervention-overview td { padding: 10px; border: 1px solid #ccc; vertical-align: top; }
+.intervention-overview thead th { padding: 12px; background: #005a9c; color: #fff; font-weight: 700; }
+.intervention-overview tbody tr:nth-child(odd) { background: #f7f7f7; }
+.intervention-overview tbody th { width: 30%; font-weight: 700; }
+.intervention-management .focus-body .intervention-title { margin: 0 0 12px; font-size: 1.6rem; line-height: 1.3; }
+.intervention h4 { margin: 18px 0 6px; font-size: 1rem; }
+.intervention h4.group { margin-top: 26px; color: #005a9c; font-size: 1.17rem; }
+.detail-buttons { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px 26px; margin-bottom: 14px; }
 
 /* ---------------------------------------------------------------------------
    Narrower screens: one column
@@ -427,5 +480,5 @@ th[aria-sort="descending"] button::after { content: "▼"; opacity: 1; font-size
   .cd-counts { order: 4; }
   .cd-habitat { order: 5; }
   .story-buttons { justify-content: flex-start; }
-  .focus-buttons, .intervention-management .focus-buttons { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .focus-buttons, .intervention-management .focus-buttons, .detail-buttons { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 }

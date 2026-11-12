@@ -336,6 +336,19 @@ def test_every_page_has_the_four_views(database, tmp_path):
     assert '<a class="view-card" href="river-status/" aria-current="page">' in page
 
 
+def test_choosing_another_catchment_or_tab_keeps_your_place(database, tmp_path):
+    folder = publish(database, tmp_path)
+    page = (folder / "land-use" / WEST_OKEMENT / "index.html").read_text()
+    assert f'<script src="../../assets/keep-scroll.js?v={site.version(folder)}"></script>' in page
+    assert '<nav class="tabs" aria-label="Waterbody Dashboard pages" data-keep-scroll>' in page
+    assert 'data-keep-scroll role="img"' in page  # the map: another catchment's page is laid out the same
+    assert '<th scope="row">Upstream Rivers</th><td data-keep-scroll>' in page
+    page = (folder / "catchment-dashboard" / "index.html").read_text()
+    assert '<ul class="area-buttons operational" data-keep-scroll>' in page
+    assert 'data-keep-scroll role="img"' not in page  # its map opens the Waterbody Dashboard, laid out differently
+    assert (folder / "assets" / "keep-scroll.js").is_file()
+
+
 def test_river_status_shows_the_text_risks_interventions_and_ranking(database, tmp_path):
     insert(database, "river_status_text", [{
         "catchment_id": WEST_OKEMENT, "why_failing": "Fish are poor.\n\nThe reasons:\n- Metals\n- Mining",
@@ -343,9 +356,14 @@ def test_river_status_shows_the_text_risks_interventions_and_ranking(database, t
     }])
     insert(database, "risk_levels", [{"catchment_id": WEST_OKEMENT, "untreated_sewage": "Very High", "running_dry": "Low"}])
     insert(database, "catchment_rankings", [{"catchment_id": WEST_OKEMENT, "ranking": 7}])
-    insert(database, "interventions", [
-        {"catchment_id": WEST_OKEMENT, "number": 2, "priority": "Contingency", "desired_change": "Fish passage", "lead_partner": "WRT"},
-        {"catchment_id": WEST_OKEMENT, "number": 3, "priority": "Primary", "desired_change": "Less metal", "lead_partner": "EA"},
+    here = location_id(database)
+    insert(database, "intervention_types", [
+        {"location_id": here, "number": 3, "name": "Less metal", "summary_group": "Priority interventions"},
+        {"location_id": here, "number": 12, "name": "Fish passage", "summary_group": "Secondary interventions"},
+    ])
+    insert(database, "intervention_waterbodies", [
+        {"catchment_id": WEST_OKEMENT, "intervention": 12, "group_number": 1, "estimated_cost": 500_000, "lead": "WRT"},
+        {"catchment_id": WEST_OKEMENT, "intervention": 3, "group_number": 1, "estimated_cost": 250_000, "lead": "EA"},
     ])
     page = (publish(database, tmp_path) / "river-status" / WEST_OKEMENT / "index.html").read_text()
     assert "<p>Fish are poor.</p>\n<p>The reasons:</p>\n<ul>\n<li>Metals</li>\n<li>Mining</li>\n</ul>" in page
@@ -354,7 +372,9 @@ def test_river_status_shows_the_text_risks_interventions_and_ranking(database, t
     assert '<li class="risk-very-high"><span class="risk-name">Untreated Sewage</span><span class="risk-level">Very High</span></li>' in page
     assert '<li class="risk-none"><span class="risk-name">Modification</span><span class="risk-level"></span></li>' in page
     assert "Catchment Ranking: 7/2" in page  # of the location's 2 rivers
-    assert page.index("PRIMARY INTERVENTIONS") < page.index("Less metal") < page.index("CONTINGENCY INTERVENTIONS") < page.index("Fish passage")
+    assert page.index("PRIORITY INTERVENTIONS") < page.index("Less metal") < page.index("SECONDARY INTERVENTIONS") < page.index("Fish passage")
+    assert '<a href="../../intervention-management/#intervention-12">Fish passage</a>' in page  # its page on Intervention Management
+    assert '<td class="num">£500,000</td>' in page
     page = (tmp_path / "north-devon" / "river-status" / EAST_OKEMONT / "index.html").read_text()
     assert "Fish are poor" not in page and "Catchment Ranking:</h2>" in page
 
@@ -456,14 +476,94 @@ def test_the_catchment_dashboard_adds_up_the_location(database, tmp_path):
     assert f'data-focus="{WEST_OKEMENT},{EAST_OKEMONT}"' in page or f'data-focus="{EAST_OKEMONT},{WEST_OKEMENT}"' in page
 
 
-def test_the_placeholder_views_show_their_focus_areas(database, tmp_path):
+def test_catchment_insights_shows_each_focus_areas_questions(database, tmp_path):
+    folder = publish(database, tmp_path)  # North Devon's questions are in content/north-devon/
+    page = (folder / "catchment-insights" / "index.html").read_text()
+    assert page.count('role="tab"') == len(site.INSIGHT_AREAS)
+    assert '<section class="focus-panel" role="tabpanel" id="funding-delivery"' in page
+    assert "<h2>State of the catchment</h2>" in page and "<h3>Overall condition</h3>" in page
+    assert "<summary>How many river water bodies are achieving Good Ecological Status?</summary>" in page
+    assert "under development and is not fully populated" in page  # the note at the top, as on their pages
+    assert "This section is under development." not in page  # every focus area has its questions
+    assert (folder / "assets" / "tabs.js").is_file()
+
+
+def test_catchment_insights_come_from_the_locations_file(database, tmp_path, monkeypatch):
+    monkeypatch.setattr(site, "CONTENT", tmp_path / "content")
+    page = (publish(database, tmp_path / "out") / "catchment-insights" / "index.html").read_text()
+    assert page.count("This section is under development.") == len(site.INSIGHT_AREAS)  # no file for it
+
+    (tmp_path / "content" / "north-devon").mkdir(parents=True)
+    path = tmp_path / "content" / "north-devon" / "catchment-insights.yaml"
+    path.write_text('Fish:\n  title: Fish\n  groups:\n    - heading: Barriers\n      questions:\n'
+                    '        - question: "How many?"\n          answer: "**About 400**"\n        - question: "Where?"\n')
+    page = (publish(database, tmp_path / "out") / "catchment-insights" / "index.html").read_text()
+    assert '<summary>How many?</summary>\n      <div class="answer"><p><strong>About 400</strong></p></div>' in page
+    assert '<summary>Where?</summary>\n      <div class="answer"></div>' in page  # no answer yet
+    assert page.count("This section is under development.") == len(site.INSIGHT_AREAS) - 1
+
+    path.write_text("Fishes:\n  title: Fish\n")  # not a focus area's name
+    with pytest.raises(PublishProblem, match="focus areas that aren't on Catchment Insights: Fishes"):
+        publish(database, tmp_path / "out")
+    path.write_text("Fish:\n  groups:\n    - questions:\n        - answer: No question\n")
+    with pytest.raises(PublishProblem, match="every question in Fish needs a 'question:' line"):
+        publish(database, tmp_path / "out")
+
+
+def test_intervention_management_shows_each_focus_area(database, tmp_path):
+    here = location_id(database)
+    insert(database, "location_text", [{
+        "location_id": here, "critical_path": "**Starting Position (2025)**\n---\n**Step 1: Deliver**",
+        "intervention_summary": "**What the analysis tells us**", "unit_costs_purpose": "**Purpose**",
+        "community_action": "Walk your local river.",
+    }])
+    insert(database, "intervention_types", [
+        {"location_id": here, "number": 1, "name": "Investment in STWs (phosphate reduction)", "button": "Sewage treatment works investment",
+         "summary_group": "Priority interventions (not in order of priority)", "summary_rwbs": 2, "summary_cost": 6_000_000,
+         "percent_available": 100, "percent_delivered": 0, "summary_lead": "SWW", "description": "Reduce phosphorus.",
+         "lead_organisation": "South West Water", "progress": "- AMP8 is being delivered", "groups": "Highest Priority\nSecondary Priority"},
+    ])
+    insert(database, "intervention_types", [  # a separate insert, as it leaves columns out
+        {"location_id": here, "number": 2, "name": "Fish data", "summary_group": "Secondary interventions",
+         "summary_rwbs": 1, "summary_cost": 54_000, "percent_available": 0, "percent_delivered": None},
+    ])
+    insert(database, "intervention_waterbodies", [
+        {"catchment_id": WEST_OKEMENT, "intervention": 1, "group_number": 2, "size": "AMP9", "estimated_cost": 3_000_000,
+         "funding_available": 3_000_000, "finished_delivery": "2030-2035", "lead": "SWW"},
+    ])
+    insert(database, "intervention_waterbodies", [{"catchment_id": EAST_OKEMONT, "intervention": 1, "group_number": 1, "estimated_cost": 3_000_000, "lead": "SWW"}])
+    insert(database, "intervention_waterbodies", [
+        {"catchment_id": WEST_OKEMENT, "intervention": 2, "group_number": 1, "note": "abandoned mine", "estimated_cost": 6_000,
+         "funding_available": 0, "lead": "WRT"},
+    ])
+    insert(database, "intervention_unit_costs", [
+        {"location_id": here, "number": 1, "title": "Investment in Sewage Treatment Works", "delivery_lead": "South West Water",
+         "typical_cost": "- Small works: £1m\n- Medium works: £3m"},
+    ])
+    numbers = figures.Figures(gather(database))
+    priority, secondary = numbers.intervention_summary()
+    assert (priority.name, priority.cost, priority.available, priority.to_find) == ("Priority interventions (not in order of priority)", 6_000_000, 6_000_000, 0)
+    assert numbers.intervention_total().cost == 6_054_000 and numbers.intervention_total().to_find == 54_000
+    assert [(heading, [row["catchment_id"] for row in rows]) for heading, rows in numbers.intervention_waterbodies(1)] == [
+        ("Highest Priority", [EAST_OKEMONT]), ("Secondary Priority", [WEST_OKEMENT]),
+    ]
+
     folder = publish(database, tmp_path)
     page = (folder / "intervention-management" / "index.html").read_text()
-    assert page.count('role="tab"') == len(site.INTERVENTION_AREAS)
-    assert '<h2>Critical Path</h2>\n<div class="focus-body">\n  <p class="placeholder">This section is under development.</p>' in page  # like every other section
-    page = (folder / "catchment-insights" / "index.html").read_text()
-    assert '<section class="focus-panel" role="tabpanel" id="funding-delivery"' in page
-    assert (folder / "assets" / "tabs.js").is_file()
+    assert "under development" not in page
+    assert '<div class="focus-body"><p><strong>Starting Position (2025)</strong></p></div>' in page  # --- starts a new box
+    assert '<div class="focus-body"><p><strong>Step 1: Deliver</strong></p></div>' in page
+    assert "<h3>1. Investment in Sewage Treatment Works</h3>" in page and "<li>Medium works: £3m</li>" in page
+    assert '<tr class="part"><th scope="colgroup" colspan="6">Secondary interventions</th></tr>' in page
+    assert "<td class=\"c\">£6m</td>" in page and "<td class=\"c\">£54,000</td>" in page
+    assert "<td class=\"c\">Data to follow</td>" in page  # no % delivered yet
+    assert "Total: c.£6.0m, of which c.£6.0m available, and c.£0.0m to be found" in page
+    assert "Overall total: c.£6.1m, of which c.£6.0m available, and c.£0.1m to be found" in page
+    assert '<button type="button" role="tab" id="tab-intervention-1" aria-controls="intervention-1">1. Sewage treatment works investment</button>' in page
+    assert '<button type="button" role="tab" id="tab-intervention-2" aria-controls="intervention-2">2. Fish data</button>' in page  # no button text: its name
+    assert '<h4 class="group">Highest Priority</h4>' in page
+    assert f'<a href="../river-status/{WEST_OKEMENT}/">West Okement</a> – abandoned mine' in page
+    assert "<p>Walk your local river.</p>" in page
 
 
 def test_tables_about_a_whole_location_only_have_its_own_row(database):

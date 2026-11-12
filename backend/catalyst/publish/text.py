@@ -14,6 +14,9 @@ be typed into an Excel cell (Alt+Enter starts a new line in a cell):
                                   up to the next ## or ###. The first one starts open.
     #### Heading                  a smaller heading, e.g. inside a section
     > words                       a paragraph in a grey box
+    ---  on a line of its own     starts a new box, in the text boxes that are shown as a row of
+                                  boxes (Critical Path on Intervention Management); elsewhere it's
+                                  shown as typed
 
 Anything else, such as HTML, is shown just as it was typed.
 """
@@ -36,6 +39,12 @@ _markdown = MarkdownIt("zero", {"breaks": True, "linkify": True, "html": False})
 BULLET = re.compile(r"^([ \t]*)(?:•[ \t]*|[-–*][ \t]+)(?=\S)")
 SECTION_START = '<details class="section"{open}>\n<summary>{title}</summary>\n<div class="section-body">\n'
 SECTION_END = "</div>\n</details>\n"
+BOX_BREAK = re.compile(r"^[ \t]*---[ \t]*$", re.MULTILINE)
+
+
+def boxes(text: str | None) -> list[Markup]:
+    """The text split into boxes at each line of just ---, each formatted. Empty parts are left out."""
+    return [formatted(part) for part in BOX_BREAK.split(text or "") if part.strip()]
 
 
 def formatted(text: str | None) -> Markup:

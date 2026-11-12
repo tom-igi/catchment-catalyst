@@ -14,7 +14,7 @@
     <section class="panel white map-panel">
       {{ heading("Click the map to select a river catchment") }}
       {{ legend(figures) }}
-      {{ status_map(location, root, root ~ tab ~ "/", catchment.id if catchment else "") }}
+      {{ status_map(location, root, root ~ tab ~ "/", catchment.id if catchment else "", keep_scroll=true) }}
     </section>
 
     <section class="panel dark ranking">

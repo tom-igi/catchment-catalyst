@@ -4,13 +4,17 @@
 //
 // Works on every element with data-tabs that has role="tab" buttons and
 // role="tabpanel" sections (each button's aria-controls names its section).
-// Without this script every section is shown and the buttons are hidden, so
-// nothing is out of reach. A link to a section's ID (#fish) opens it.
+// One can be inside another's section, e.g. the twelve interventions inside
+// Interventions Detail: each only uses its own buttons. Without this script
+// every section is shown and the buttons are hidden, so nothing is out of
+// reach. A link to a section's ID (#fish), or to anything inside it, opens it.
 (function () {
   "use strict";
 
   document.querySelectorAll("[data-tabs]").forEach(function (box) {
-    const buttons = Array.from(box.querySelectorAll('[role="tab"]'));
+    const buttons = Array.from(box.querySelectorAll('[role="tab"]')).filter(function (button) {
+      return button.closest("[data-tabs]") === box;  // not those of a set of tabs inside this one
+    });
     const panels = buttons.map(function (button) { return document.getElementById(button.getAttribute("aria-controls")); });
     if (!buttons.length || panels.some(function (panel) { return !panel; })) return;
     box.classList.add("tabs-ready");
@@ -36,7 +40,8 @@
       });
     });
 
-    const linked = panels.findIndex(function (panel) { return "#" + panel.id === window.location.hash; });
+    const target = window.location.hash ? document.getElementById(decodeURIComponent(window.location.hash.slice(1))) : null;
+    const linked = panels.findIndex(function (panel) { return target && panel.contains(target); });
     show(linked >= 0 ? linked : 0, false);
   });
 })();
