@@ -280,6 +280,117 @@ The database only accepts connections from the server itself. To use DBeaver fro
 machine, open an SSH tunnel (`ssh -L 5435:localhost:5432 <user>@<server>`), then connect to
 `localhost`, port `5435`, with the user and password from the server's `.env`.
 
+### Deploying to the shared test VM
+
+For the client demo, the app runs on IGI's shared test VM (20.39.226.55), next to Brownfield
+GIS, at <https://rivers.smartbiosphere.com>. **Not done yet** (11 November 2026). The steps are
+below.
+
+**How it's set up.** Only one program on the VM can use the web ports (80 and 443), so they
+belong to a shared *front door*. That's a Caddy server from the
+[front-door](https://github.com/tom-igi/front-door) repo, in `/opt/front-door` on the VM. It
+already serves brownfield.igiltd.com. This app's address is set up there too, but switched off
+(`caddy/sites/rivers.caddy.off`). Once it's on, the front door gets the HTTPS certificate
+by itself, and serves:
+
+| Address | What it shows |
+|---|---|
+| `https://rivers.smartbiosphere.com/` | Goes straight to North Devon (`/north-devon/`). The list of locations is still at `/index.html` |
+| `https://rivers.smartbiosphere.com/admin` | The admin page |
+| Everything else | The published dashboards, from `published/` |
+
+On the VM, `.env` adds `docker-compose.front-door.yml` to the usual live settings. It:
+
+- adds a small `web` container that serves `published/` to the front door;
+- takes away the admin page's port, so it's reached only through the front door (at the
+  address above, not an SSH tunnel), and its login cookie is sent over HTTPS only;
+- moves the database to port 5433, because Brownfield's has 5432. For DBeaver, tunnel with
+  `ssh -L 5435:localhost:5433 <user>@20.39.226.55` instead.
+
+So the web server under "Not set up yet" below isn't needed there. The backups still are.
+
+#### Steps
+
+Before you start:
+
+1. **Everything is pushed to GitHub,** including `docker-compose.front-door.yml`.
+2. **DNS:** wherever smartbiosphere.com's DNS is managed, add an A record
+   `rivers.smartbiosphere.com` → `20.39.226.55`. On the VM,
+   `getent hosts rivers.smartbiosphere.com` should print that address. Wait until it does:
+   Let's Encrypt checks it, and too many failed attempts lock you out for an hour.
+3. **Room on the VM** for a second database: check with `free -h` and `df -h /`.
+
+On the VM (run `git` without `sudo`):
+
+4. Get the code, and check the folders the containers write to are theirs:
+
+   ```bash
+   sudo mkdir /opt/catchment-catalyst && sudo chown "$USER": /opt/catchment-catalyst
+   git clone https://github.com/tom-igi/catchment-catalyst.git /opt/catchment-catalyst
+   cd /opt/catchment-catalyst
+   id -u
+   ```
+
+   The containers write to `published/` and `imports/` as user number 1000. If `id -u` doesn't
+   print `1000`, give them those folders: `sudo chown -R 1000:1000 published imports`.
+
+5. Make the settings file and switch it to the front-door settings. Then fill in the
+   passwords as in "First-time setup", step 4, above, and check it:
+
+   ```bash
+   cp .env.prod.example .env
+   sed -i 's|^COMPOSE_FILE=.*|COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml:docker-compose.front-door.yml|' .env
+   nano .env
+   docker compose config --quiet && echo OK
+   ```
+
+6. Start it and create the tables:
+
+   ```bash
+   docker compose up -d --build
+   docker compose run --build --rm schema apply
+   docker ps --format '{{.Names}}\t{{.Ports}}'
+   ```
+
+   The database should show `127.0.0.1:5433`. The admin page and `web` should show no ports.
+
+7. Import the EA data and add North Devon, with the commands in OPERATING.md §5 ("Tables filled
+   from an outside source" and "Locations"). Add `--build` to each `docker compose run`.
+
+8. Switch the address on. In the front-door repo on your machine, rename
+   `caddy/sites/rivers.caddy.off` to `caddy/sites/rivers.caddy`, then commit and push. Then on the VM:
+
+   ```bash
+   cd /opt/front-door
+   git pull
+   docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
+   docker compose logs -f caddy
+   ```
+
+   Wait for `certificate obtained successfully` with `rivers.smartbiosphere.com`, then press
+   Ctrl+C. Brownfield isn't interrupted. Until the first publish, the address shows a "not
+   found" error.
+
+9. At <https://rivers.smartbiosphere.com/admin>, upload the Excel tables, approve them, and
+   click **Publish**. The admin page can only be reached once step 8 is done.
+
+10. Check that <https://rivers.smartbiosphere.com> opens on North Devon's dashboard.
+
+11. Fill in OPERATING.md §2 and §3 (the live commands and address), and set up the nightly
+    backups ("Not set up yet", below).
+
+Instead of steps 7 and 9, the database on your machine could be copied across (`pg_dump` here,
+`pg_restore` on the VM), to show exactly what's on your machine. This hasn't been tried yet.
+
+**Things to know on the VM:**
+
+- Updating to new code is as in "Updating to the latest code", above. The front door's own
+  settings live in the front-door repo, not here.
+- `docker compose down -v` deletes the database there too.
+- A "502 Bad Gateway" at the address means the admin page or `web` container isn't running:
+  check with `docker compose ps` in `/opt/catchment-catalyst`.
+- The front door's README has the rest: how to undo things, logs, and troubleshooting.
+
 ### Not set up yet
 
 These get added to `docker-compose.prod.yml` when the site is ready to go public: the web

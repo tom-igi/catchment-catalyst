@@ -1,0 +1,52 @@
+# Run behind the test VM's front door: one shared web server (Caddy) that owns
+# ports 80 and 443 for every demo app on the VM. It serves this app, with HTTPS,
+# at https://rivers.smartbiosphere.com, passing the admin page (/admin) to the
+# admin container and everything else, the published dashboards, to the web
+# container below. Its setup is in the front-door repo (github.com/tom-igi/front-door).
+#
+# Used on the test VM only, as a third settings file. The VM's .env has
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml:docker-compose.front-door.yml
+# Needs Docker Compose 2.24.4 or later (for !override and !reset).
+
+services:
+
+  db:
+    # Another app's database already has port 5432 on the VM. Still only
+    # reachable from the VM itself: for DBeaver, tunnel to 5433 instead.
+    ports: !override
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+
+  admin:
+    environment:
+      # Visitors reach the admin page over HTTPS now, so the login cookie is
+      # only ever sent over HTTPS.
+      ADMIN_HTTPS_ONLY: "true"
+    # No port of its own: the front door reaches it over the front-door network.
+    ports: !reset []
+    networks:
+      default:
+      front-door:
+        # The name the front door's Caddyfile uses for this container.
+        aliases: [catchment-admin]
+
+  # Serves published/ to the front door: the same small web server as on your
+  # machine (docker-compose.override.yml), with no port of its own.
+  web:
+    image: caddy:2.10-alpine
+    command: ["caddy", "file-server", "--root", "/srv", "--listen", ":8080"]
+    volumes:
+      - ./published:/srv:ro
+    networks:
+      front-door:
+        # The name the front door's Caddyfile uses for this container.
+        aliases: [catchment-web]
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+
+networks:
+  front-door:
+    external: true

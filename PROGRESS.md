@@ -257,13 +257,22 @@ kept outside the project.
 
 ---
 
+**Hosting the demo (11 November 2026)**
+- **The client demo goes on IGI's shared test VM** (20.39.226.55), next to Brownfield GIS, rather than on a VM of its own. The dedicated VM in PLAN.md §6.2 is for when the platform is built properly. Not deployed yet: see TODO.md, and the steps in README.md, "Deploying to the shared test VM".
+- **Address: `rivers.smartbiosphere.com`.** Plain English for the public, where "catchment" and "intervention" are jargon. The other options were `riverrecovery` and `riverhealth`. `riveraction` was avoided because River Action is a well-known campaign group. The separate live sensor dashboard (on Azure App Service) will have its own smartbiosphere.com address.
+- **A shared front door owns the web ports.** Only one program on a machine can use ports 80 and 443, so a Caddy server from the [front-door](https://github.com/tom-igi/front-door) repo sends each address to its app and gets the HTTPS certificates. So on that VM, this app doesn't run the web server of its own that PLAN.md §5.1 describes. Instead, `docker-compose.front-door.yml` adds a small `web` container for `published/` and moves the database to port 5433.
+- **The address opens North Devon directly** (a redirect from `/` to `/north-devon/`), because smartbiosphere.com is North Devon's. The list of locations is still at `/index.html`.
+- **The dashboards can be embedded** in another site, such as Smart Biosphere's (no `X-Frame-Options`). The admin page can't be.
+
+---
+
 ## Open questions
 
-- **Web address for each location:** for now it comes from the name (`north-devon`). Will each location have its own domain, or a path on one shared domain?
+- **Web address for each location:** for now it comes from the name (`north-devon`). North Devon's demo is at `rivers.smartbiosphere.com` (above). For other locations: will each have its own domain, or a path on one shared domain?
 - **Managing locations:** add a page to the admin site, or keep using SQL while there are only one or two?
 - **Several locations in one table:** when that happens, replace only the rows for the catchments in the file (PLAN.md §3.4), so locations don't have to share one Excel file.
 - **Estuaries and coastal waters:** import them too, so every upstream/downstream ID finds a name?
-- **When the VM is set up:** is UK South the right region? Does the private repository need a deploy key?
+- **When the platform's own VM is set up** (the demo uses the shared test VM, where git access is already set up): is UK South the right region? Does the private repository need a deploy key?
 - **EA Data values:** the EA's download has statuses but not the numbers on the original (EQRs, mg/l), so they go in EA Scores (Excel) for now. Where did the original's come from, and could they be downloaded instead?
 - **2025 classifications:** wait for the Catchment Data Explorer, or import the EA's separate 2025 download?
 - **Storm overflows with no waterbody ID:** also tie them to a catchment by location? That would add a few North Devon stream outfalls (e.g. Fremington) the original doesn't show.
@@ -278,10 +287,11 @@ kept outside the project.
 
 1. **Look over the four views** at <http://localhost:8080> (Langham Lake and West Okement have every panel filled) and the new tables in the admin page.
 2. **Upload real data** into the new tables as it arrives: download each from the admin page, replace the sample rows, upload, approve, then click **Publish**.
-3. **The details of Intervention Management and Catchment Insights,** when Tom is ready.
-4. **Agree the rules** for ranking, risk levels, relative coverage and density rating, so they can be worked out rather than typed in.
-5. **Have GitHub run the tests on every push** (offered, not yet agreed).
-6. **More from the EA, if wanted:** the Catchment Data Explorer also has `objectives` (target status and date per item), `investigations` and `site-classifications` (monitoring sites) per management catchment.
+3. **Deploy the demo to the shared test VM,** when Tom says: README.md, "Deploying to the shared test VM".
+4. **The details of Intervention Management and Catchment Insights,** when Tom is ready.
+5. **Agree the rules** for ranking, risk levels, relative coverage and density rating, so they can be worked out rather than typed in.
+6. **Have GitHub run the tests on every push** (offered, not yet agreed).
+7. **More from the EA, if wanted:** the Catchment Data Explorer also has `objectives` (target status and date per item), `investigations` and `site-classifications` (monitoring sites) per management catchment.
 
 ---
 

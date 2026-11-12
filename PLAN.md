@@ -212,6 +212,8 @@ One `docker compose up` starts (built so far: the database, plus the schema tool
 
 ### 6.2 The live VM
 
+For the client demo, the app first runs on IGI's shared test VM instead, behind its front door (README.md, "Deploying to the shared test VM"). The VM below is for when the platform is built properly.
+
 - Ubuntu LTS, around Azure's B2s size (2 processors, 4 GB memory), with enough disk for the database and Docker images. Region: UK South (to be confirmed).
 - A fixed public IP address, with each location's domain name pointed at it.
 - Network rules: ports 80 and 443 open to everyone; SSH only from known IP addresses. The database port is never opened.
