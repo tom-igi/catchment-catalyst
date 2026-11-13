@@ -37,10 +37,15 @@
   {{ location.name }}. Published {{ published }}. Catchment details, outlines, classifications, reasons for not
   achieving good and storm overflow returns: © Environment Agency copyright and/or database right, Open Government
   Licence. River obstacles: River Obstacles (Environment Agency and The Rivers Trust), CC BY-SA 4.0.
+  {% if postcode_search %}
+  Postcodes: contains OS data © Crown copyright and database right {{ year }}; contains Royal Mail data © Royal Mail
+  copyright and database right {{ year }}; contains National Statistics data © Crown copyright and database right {{ year }}.
+  {% endif %}
 </footer>
 <script src="{{ root }}assets/keep-scroll.js?v={{ version }}"></script>
 <script src="{{ root }}assets/leaflet/leaflet.js?v={{ version }}"></script>
 <script src="{{ root }}assets/map.js?v={{ version }}"></script>
+<script src="{{ root }}assets/postcode.js?v={{ version }}"></script>
 <script src="{{ root }}assets/points.js?v={{ version }}"></script>
 <script src="{{ root }}assets/sort.js?v={{ version }}"></script>
 <script src="{{ root }}assets/tabs.js?v={{ version }}"></script>

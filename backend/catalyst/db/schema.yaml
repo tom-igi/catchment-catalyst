@@ -630,6 +630,34 @@ data_tables:
         type: double
         example: -3.99751
 
+  postcodes:
+    title: Postcodes
+    description: >-
+      Every postcode whose centre is inside a catchment, from Ordnance
+      Survey's Code-Point Open, for the Waterbody Dashboard's postcode search.
+      A postcode outside every catchment (e.g. by an estuary or the sea) has
+      no row. Filled by `importer postcodes`, which replaces every row.
+    filled_by: api
+    columns:
+      postcode:
+        type: text
+        example: EX36 3AA
+        primary_key: true
+        description: With a space before the last three characters
+      catchment_id:
+        type: text
+        example: GB108050013950
+        required: true
+        index: true
+        references: catchments.id
+      latitude:
+        type: double
+        example: 51.01742
+        description: The postcode's centre (Code-Point Open's point for it)
+      longitude:
+        type: double
+        example: -3.8358
+
   # ---------------------------------------------------------------------------
   #  Waterbody Dashboard: the hand-written analysis, one catchment at a time
   # ---------------------------------------------------------------------------

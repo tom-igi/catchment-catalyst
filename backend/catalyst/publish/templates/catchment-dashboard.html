@@ -1,7 +1,7 @@
 {# The Catchment Dashboard: the whole location (or one of its operational
    catchments) on one big map, with its panels laid over the map as on the
    original. `area` is the management or operational catchment shown, and
-   `ids` its catchments. Clicking a catchment opens it in the Waterbody Dashboard. #}
+   `ids` its catchments. Its catchments can't be clicked (Tom, 13 November 2026). #}
 {% extends "base.html" %}
 {% from "macros.html" import heading, status_map, about, total_note with context %}
 {% block title %}{{ area.name if area else location.name }} · Catchment Dashboard · {{ location.name }}{% endblock %}
@@ -9,7 +9,7 @@
 {% block content %}
 {% set company = figures.company() %}
 <div class="catchment-dashboard">
-  {{ status_map(location, root, root ~ "river-status/", "", ids if area and area.slug else none,
+  {{ status_map(location, root, none, "", ids if area and area.slug else none,
                 ".cd-areas, .cd-counts, .cd-story, .cd-figures, .cd-habitat") }}
 
   <section class="panel white cd-areas" aria-label="Choose part of the catchment">

@@ -107,6 +107,15 @@ filled:
       - Downloads every obstacle in the box around the catchments from River Obstacles' map service.
       - Keeps those inside a catchment's outline, and gives each that catchment's ID.
       - Replaces every row in the table.
+  postcodes:
+    source: Ordnance Survey Code-Point Open
+    url: https://osdatahub.os.uk/downloads/open/CodePointOpen
+    command: importer postcodes
+    transformation:
+      - Downloads Code-Point Open, the centre point of every postcode in Great Britain.
+      - Keeps the postcodes whose centre is inside a catchment's outline, and gives each that catchment's ID. The rest (e.g. by an estuary or the sea) are left out.
+      - Turns each centre from British National Grid into a latitude and longitude.
+      - Replaces every row in the table.
   locations:
     how: command
     note: Changed with a database command for now (see OPERATING.md).
@@ -128,6 +137,7 @@ filled:
 dashboard:
   Every Waterbody tab:  # the column down the left of River Status, EA Data, Land Use Data and Sewerage Data
     Map colours: ea_classifications
+    Postcode search: postcodes
     Catchment Ranking: catchment_rankings
     EA Ecological Classification: ea_classifications
     Failing Elements: ea_classifications

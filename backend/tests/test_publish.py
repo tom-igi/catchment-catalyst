@@ -345,7 +345,7 @@ def test_choosing_another_catchment_or_tab_keeps_your_place(database, tmp_path):
     assert '<th scope="row">Upstream Rivers</th><td data-keep-scroll>' in page
     page = (folder / "catchment-dashboard" / "index.html").read_text()
     assert '<ul class="area-buttons operational" data-keep-scroll>' in page
-    assert 'data-keep-scroll role="img"' not in page  # its map opens the Waterbody Dashboard, laid out differently
+    assert 'data-keep-scroll role="img"' not in page  # its map's catchments can't be clicked
     assert (folder / "assets" / "keep-scroll.js").is_file()
 
 
@@ -470,7 +470,7 @@ def test_the_catchment_dashboard_adds_up_the_location(database, tmp_path):
     assert '<a href="../catchment-dashboard/torridge/">Torridge</a>' in page
     assert "Number of Farms: 68 <small" in page and "(1 of 2 waterbodies)" in page
     assert "<p>Most rivers are failing.</p>" in page
-    assert 'data-links="../river-status/"' in page  # clicking a catchment opens it in the Waterbody Dashboard
+    assert 'data-geojson="../catchments.geojson?v=' in page and "data-links" not in page  # its catchments can't be clicked
     page = (folder / "catchment-dashboard" / "torridge" / "index.html").read_text()
     assert '<a href="../../catchment-dashboard/torridge/" aria-current="page">Torridge</a>' in page
     assert f'data-focus="{WEST_OKEMENT},{EAST_OKEMONT}"' in page or f'data-focus="{EAST_OKEMONT},{WEST_OKEMENT}"' in page
@@ -627,3 +627,43 @@ def test_links_to_the_assets_change_when_the_files_do(database, tmp_path):
     with database.begin() as conn:
         conn.execute(sa.text("UPDATE locations SET catchment_ids = :ids"), {"ids": [WEST_OKEMENT]})
     assert site.version(publish(database, tmp_path)) != first  # the map changed
+
+
+# --- The postcode search ------------------------------------------------------
+
+def test_the_postcode_search_finds_the_catchment_each_postcode_is_in(database, tmp_path):
+    folder = publish(database, tmp_path)  # no postcodes imported: no search
+    page = (folder / "river-status" / WEST_OKEMENT / "index.html").read_text()
+    assert "<h2>Click the map to select a river catchment</h2>" in page
+    assert '<form class="postcode"' not in page and "Royal Mail" not in page
+    assert not (folder / "postcodes").exists()
+
+    insert(database, "postcodes", [
+        {"postcode": "EX20 1AA", "catchment_id": WEST_OKEMENT, "latitude": 50.7, "longitude": -4.0},
+        {"postcode": "EX20 1AB", "catchment_id": EAST_OKEMONT, "latitude": 50.7, "longitude": -3.9},
+        {"postcode": "EX21 5AA", "catchment_id": WEST_OKEMENT, "latitude": 50.8, "longitude": -4.1},
+    ])
+    folder = publish(database, tmp_path)
+    assert sorted(p.name for p in (folder / "postcodes").iterdir()) == ["EX20.json", "EX21.json"]  # a file per district
+    assert json.loads((folder / "postcodes" / "EX20.json").read_text()) == {"1AA": WEST_OKEMENT, "1AB": EAST_OKEMONT}
+    version = site.version(folder)
+    for tab in site.TABS:
+        page = (folder / tab / WEST_OKEMENT / "index.html").read_text()
+        assert "<h2>Click the map to select a river catchment, or enter a postcode</h2>" in page
+        assert f'data-postcodes="../../postcodes/" data-version="{version}" data-links="../../{tab}/"' in page  # stays on the tab
+        assert f'data-selected="{WEST_OKEMENT}" data-selected-name="West Okement" data-location="North Devon"' in page
+    page = (folder / "land-use" / "index.html").read_text()  # before a catchment is chosen
+    assert 'data-postcodes="../postcodes/"' in page and 'data-selected="" data-selected-name=""' in page
+    assert f'<script src="../assets/postcode.js?v={version}"></script>' in page
+    assert "contains Royal Mail data © Royal Mail" in page  # the credit line Code-Point Open's licence asks for
+    assert (folder / "assets" / "postcode.js").is_file()
+
+    with database.begin() as conn:
+        conn.execute(sa.text("UPDATE postcodes SET catchment_id = :id WHERE postcode = 'EX21 5AA'"), {"id": EAST_OKEMONT})
+    assert site.version(publish(database, tmp_path)) != version  # browsers fetch the changed file again
+
+    with database.begin() as conn:
+        conn.execute(sa.text("UPDATE locations SET catchment_ids = :ids"), {"ids": [WEST_OKEMENT]})
+    folder = publish(database, tmp_path)
+    assert sorted(p.name for p in (folder / "postcodes").iterdir()) == ["EX20.json"]  # only the location's own catchments
+    assert json.loads((folder / "postcodes" / "EX20.json").read_text()) == {"1AA": WEST_OKEMENT}

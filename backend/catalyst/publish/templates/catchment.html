@@ -3,7 +3,7 @@
    side, and its name across the top. Each tab fills in the panels block.
    With no catchment chosen, everything is shown empty. #}
 {% extends "base.html" %}
-{% from "macros.html" import heading, legend, status_map, waterbody_tabs, about with context %}
+{% from "macros.html" import heading, legend, status_map, postcode_form, waterbody_tabs, about with context %}
 {% block title %}{% if catchment %}{{ catchment.name }} · {% endif %}{{ tabs[tab] }} · {{ location.name }}{% endblock %}
 {% block tabs %}{{ waterbody_tabs(tabs, tab, catchment, root, show_overview) }}{% endblock %}
 {% block about %}{{ about(text, "about_waterbody_dashboard") }}{% endblock %}
@@ -12,7 +12,12 @@
 <div class="catchment-page">
   <div class="side">
     <section class="panel white map-panel">
+      {% if postcode_search %}
+      {{ heading("Click the map to select a river catchment, or enter a postcode") }}
+      {{ postcode_form(location, root, root ~ tab ~ "/", catchment) }}
+      {% else %}
       {{ heading("Click the map to select a river catchment") }}
+      {% endif %}
       {{ legend(figures) }}
       {{ status_map(location, root, root ~ tab ~ "/", catchment.id if catchment else "", keep_scroll=true) }}
     </section>

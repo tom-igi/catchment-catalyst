@@ -17,6 +17,8 @@ address:
     <location>/intervention-management/         Intervention Management
     <location>/catchment-insights/              Catchment Insights
     <location>/catchments.geojson               the outlines, rivers and ecological statuses, for the maps
+    <location>/postcodes/<district>.json        each postcode in a catchment, by district (e.g. EX31.json),
+                                                for the Waterbody Dashboard's postcode search
     <location>/assets/                          styles, scripts, pictures and the map library
 
 where <tab> is river-status, ea-data, land-use or sewerage. Clicking the map
@@ -25,7 +27,7 @@ picks a catchment and stays on the same tab, as in the original.
 The folder is built next to the old one and swapped in at the end, so a
 half-written dashboard is never served.
 
-Every link to a file in assets/ (and to catchments.geojson) ends with
+Every link to a file in assets/ (and to catchments.geojson and postcodes/) ends with
 ?v=<version>, a fingerprint of those files. Browsers keep copies of such
 files, so without it a visitor could be shown an old stylesheet or map after a
 publish. The version only changes when one of the files does, so browsers can
@@ -98,10 +100,14 @@ def write_location(location: Location, out_dir: Path) -> Path:
     figures = Figures(location)
     shutil.copytree(ASSETS, building / "assets")
     (building / "catchments.geojson").write_text(json.dumps(_map(location, figures), separators=(",", ":")), encoding="utf-8")
+    districts = postcode_districts(location)
+    for district, units in districts.items():
+        _write(building / "postcodes" / f"{district}.json", json.dumps(units, separators=(",", ":"), sort_keys=True))
     env = _environment()
     shared = {
         "location": location, "figures": figures, "text": figures.location_text(), "tabs": TABS, "views": VIEWS,
-        "show_overview": SHOW_OVERVIEW, "published": _today(), "version": version(building),
+        "show_overview": SHOW_OVERVIEW, "published": _today(), "year": datetime.date.today().year,
+        "version": version(building), "postcode_search": bool(districts),
     }
     waterbody = {**shared, "view": "river-status"}
     front, tab = ("overview.html", "") if SHOW_OVERVIEW else ("river-status.html", "river-status")
@@ -166,6 +172,20 @@ def catchment_insights(location_slug: str) -> dict[str, dict]:
     return areas
 
 
+def postcode_districts(location: Location) -> dict[str, dict[str, str]]:
+    """The location's postcodes for the postcode search (postcode.js): by district, the part before
+    the space, each with its catchment's ID, e.g. {"EX36": {"3AA": "GB108050013950", ...}}. A
+    postcode that isn't here is outside the location's catchments. Empty if the Postcodes table
+    has none for it."""
+    dataset = location.dataset("postcodes")
+    districts: dict[str, dict[str, str]] = {}
+    for catchment_id, rows in (dataset.rows.items() if dataset else []):
+        for row in rows:
+            district, unit = row["postcode"].split(" ")
+            districts.setdefault(district, {})[unit] = catchment_id
+    return districts
+
+
 def write_index(names: list[str], slugs: list[str], out_dir: Path) -> Path:
     """A page listing every location, for looking at them before they each get their own address."""
     path = out_dir / "index.html"
@@ -174,9 +194,11 @@ def write_index(names: list[str], slugs: list[str], out_dir: Path) -> Path:
 
 
 def version(folder: Path) -> str:
-    """A fingerprint of a location folder's assets and map file, added to their links so browsers fetch them again when they change."""
+    """A fingerprint of a location folder's assets, map file and postcode files, added to their links so browsers
+    fetch them again when they change."""
     digest = hashlib.sha256()
-    files = sorted(p for p in (folder / "assets").rglob("*") if p.is_file()) + [folder / "catchments.geojson"]
+    files = (sorted(p for p in (folder / "assets").rglob("*") if p.is_file()) + [folder / "catchments.geojson"]
+             + sorted((folder / "postcodes").glob("*.json")))
     for path in files:
         digest.update(path.relative_to(folder).as_posix().encode() + b"\0" + path.read_bytes() + b"\0")
     return digest.hexdigest()[:10]

@@ -19,7 +19,7 @@ backend/                     all Python code, built into one Docker image
   catalyst/db/schema.py      reads and checks schema.yaml
   catalyst/db/sync.py        compares schema.yaml with the database and applies changes
   catalyst/importers/api/    tables filled from outside sources (the EA's catchments, classifications, RNAGs,
-                             storm overflows; River Obstacles)
+                             storm overflows; River Obstacles; Ordnance Survey's postcodes)
   catalyst/importers/excel/  tables filled by Excel upload (one shared piece of code for all of them)
   catalyst/admin/            the admin page: a diagram of every table (diagram.py, diagram.yaml);
                              download any table; upload an Excel table, preview, approve; publish
@@ -84,7 +84,7 @@ Each table is filled in one way, set by `filled_by` in `schema.yaml`:
 
 | `filled_by` | How | Tables so far |
 |---|---|---|
-| `api` | An importer downloads the data from an outside service (`backend/catalyst/importers/api/`) | Catchments, EA Classifications, EA Reasons for Not Achieving Good, Storm Overflows, River Obstacles |
+| `api` | An importer downloads the data from an outside service (`backend/catalyst/importers/api/`) | Catchments, EA Classifications, EA Reasons for Not Achieving Good, Storm Overflows, River Obstacles, Postcodes |
 | `excel` | Someone uploads an Excel file in the admin page (`backend/catalyst/importers/excel/`) | EA Scores, Habitat & Land Use |
 
 ### From an API
@@ -97,6 +97,7 @@ docker compose run --rm importer catchments imports/catchments.json   # catchmen
 docker compose run --rm importer classifications                      # the EA's classifications and RNAGs
 docker compose run --rm importer storm-overflows                      # storm overflow spills, from the EA's yearly returns
 docker compose run --rm importer river-obstacles                      # weirs, culverts and so on, from River Obstacles
+docker compose run --rm importer postcodes                            # the postcodes in each catchment, for the postcode search
 ```
 
 Each downloads and checks everything first, shows what it will change, and asks before saving

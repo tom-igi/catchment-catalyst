@@ -3,7 +3,7 @@
 Where the build is up to, the decisions made along the way, and what's next.
 For the overall design, see [PLAN.md](PLAN.md). For commands, see [README.md](README.md).
 
-**Last updated:** 12 November 2026
+**Last updated:** 13 November 2026
 
 ---
 
@@ -15,7 +15,7 @@ Tom to run things himself, 29 October 2026).
 ```bash
 docker compose up -d                      # start the local database, admin page and dashboard preview
 docker compose run --rm schema plan       # should say "The database already matches schema.yaml."
-docker compose run --rm test              # run the tests (170 passing at the last update)
+docker compose run --rm test              # run the tests (183 passing at the last update)
 docker compose run --rm publish           # rebuild the dashboard pages (or the admin page's Publish button)
 ```
 
@@ -39,7 +39,7 @@ and optional extras are kept self-contained so they're easy to remove.
 | **Database master file** | `backend/catalyst/db/schema.yaml` | Lists every table and column. The only place the database structure is defined. |
 | **Schema tool** | `backend/catalyst/db/` | `schema plan` previews changes, `schema apply` makes them. All-or-nothing, refuses to delete data unless told to, handles renames and changes of primary key. |
 | **Catchments importer** | `backend/catalyst/importers/api/`, `imports/` | Fills the catchments table from the EA's Catchment Data Explorer, for the management catchments (all their rivers) and IDs in `imports/catchments.json`. Preview first, safe to re-run, keeps the downloaded files. |
-| **EA and River Obstacles importers** | `backend/catalyst/importers/api/` | For every imported catchment: the EA's classifications and RNAGs (`importer classifications`), storm overflow spills from the EA's yearly returns (`importer storm-overflows`), and obstacles from River Obstacles (`importer river-obstacles`). Each replaces its table, with a preview first, and keeps the downloads. |
+| **EA, River Obstacles and postcode importers** | `backend/catalyst/importers/api/` | For every imported catchment: the EA's classifications and RNAGs (`importer classifications`), storm overflow spills from the EA's yearly returns (`importer storm-overflows`), obstacles from River Obstacles (`importer river-obstacles`), and the postcodes inside it from Ordnance Survey's Code-Point Open (`importer postcodes`). Each replaces its table, with a preview first, and keeps the downloads. |
 | **Excel uploads** | `backend/catalyst/importers/excel/` | For every table marked `filled_by: excel`: download it as Excel, upload an edited copy, see what will be added, changed and deleted, then approve. No code per table. |
 | **Admin page** | `backend/catalyst/admin/` | One page behind a login (one name and password per person): a diagram of every table (`diagram.py`, `diagram.yaml`) showing where its data comes from (downloaded or Excel), how the tables join up by Catchment ID, and each table's columns when clicked. Any table can be downloaded as Excel from there; each Excel table has its own **Upload data** box on the left, and the upload's preview is its own page. Made from `schema.yaml` each time it's opened. A **Publish** button at the top rebuilds the dashboards, and says how many uploads have been approved since the last publish. Runs with `docker compose up -d`. |
 | **Publish step and dashboard** | `backend/catalyst/publish/`, `published/` | Writes each location's dashboard as plain web pages, laid out like the original (`Reference/ReferenceImages`), with four views chosen by cards across the top of every page. **Waterbody Dashboard:** River Status, EA Data, Land Use Data and Sewerage Data, one waterbody at a time (the Overview tab is built but switched off). **Catchment Dashboard:** the whole location on one big map, with its panels over it, and a page per operational catchment. **Intervention Management:** its five focus areas as on the North Devon Biosphere's pages (Critical Path, Unit Cost of Interventions, Intervention Summary, Interventions Detail with a page per intervention, Community Action). **Catchment Insights:** its eight focus areas' questions, as on the North Devon Biosphere's pages, from a file (`publish/content/north-devon/catchment-insights.yaml`) rather than the database. Every panel now has a table. Previewed at <http://localhost:8080>. |
@@ -59,6 +59,7 @@ and optional extras are kept self-contained so they're easy to remove.
 | `ea_rnags` | Data, EA | The EA's reasons for not achieving good: element, activity, sector | 513 |
 | `storm_overflows` | Data, EA | Each storm overflow's spills (hours, count) per year, 2021 to 2025, with its location | 755 (about 150 overflows into 57 catchments) |
 | `river_obstacles` | Data, River Obstacles | Weirs, culverts, fords and so on, with their location | 423 (in 80 catchments) |
+| `postcodes` | Data, Ordnance Survey | Each postcode whose centre is inside a catchment, for the postcode search | 5,104 (in all 92) |
 | `ea_scores` | Data, Excel | The measured values behind the EA's statuses (e.g. Fish (EQR) 0.36), per measure and year (2016, 2019, 2022, 2025): EA Data page | 1,704 (all 92) |
 | `ea_thresholds` | Data, Excel | Poor / Moderate / Good / High thresholds per measure: EA Data page | 1,012 (all 92) |
 | `habitat_land_use` | Data, Excel | Area of each habitat type, and its relative coverage: Land Use Data, Catchment Dashboard | 459 (all 92) |
@@ -75,7 +76,7 @@ and optional extras are kept self-contained so they're easy to remove.
 | `intervention_unit_costs` | Data (by location), Excel | Intervention Management: the indicative cost of each type of intervention | 12 |
 | `location_text` | Data (by location), Excel | One row per location: the Catchment Dashboard's three texts, the Sewerage Data page's two explanations, the text under each dashboard (with its sections), and Intervention Management's four texts (Critical Path, the Unit Cost purpose, the Summary's introduction, Community Action) | 1 |
 
-`catchments` and the four EA / River Obstacles tables are filled by importers; the rest of the
+`catchments`, the four EA / River Obstacles tables and `postcodes` are filled by importers; the rest of the
 data tables by Excel upload.
 
 **Every Excel table now has the real data** (12 November 2026, uploads 21 to 34), from the
@@ -146,7 +147,7 @@ The scripts that built and uploaded the files were one-offs, kept outside the pr
 - **A new data table no longer appears by itself:** it needs a place on a page. The original layout has no space for a generic table.
 - **The "i" buttons show the table's text from Datasets,** with the table's title as the heading, and are greyed out until it has a row. The text is split into paragraphs and lists like the other hand-written text. A web address in it is shown as plain text, not a link.
 - **Tables are sortable** by clicking a heading (a small script, `static/sort.js`). Numbers sort as numbers, and empty cells always go last.
-- **Choosing another catchment keeps your place** (Tom, 12 November 2026). Clicking a catchment on a Waterbody Dashboard map, a tab, an upstream or downstream river, or a management / operational catchment button on the Catchment Dashboard opens the new page scrolled to where you were, not at the top. Those pages share a layout, so you stay on the same panel. A small script (`static/keep-scroll.js`) does it for links inside anything marked `data-keep-scroll`, and `map.js` asks it to when its map has `data-keep-scroll`. The position is kept in the browser tab's session storage, only for the page being opened and only for 30 seconds. The view cards at the top, and clicking a waterbody on the Catchment Dashboard's big map (which opens the Waterbody Dashboard, laid out differently), still open at the top. Without the script, pages open at the top as before.
+- **Choosing another catchment keeps your place** (Tom, 12 November 2026). Clicking a catchment on a Waterbody Dashboard map, a tab, an upstream or downstream river, or a management / operational catchment button on the Catchment Dashboard opens the new page scrolled to where you were, not at the top. Those pages share a layout, so you stay on the same panel. A small script (`static/keep-scroll.js`) does it for links inside anything marked `data-keep-scroll`, and `map.js` asks it to when its map has `data-keep-scroll`. The position is kept in the browser tab's session storage, only for the page being opened and only for 30 seconds. The view cards at the top still open at the top. Without the script, pages open at the top as before.
 - **Maps: Leaflet over OpenStreetMap,** with the catchment outlines coloured by ecological status (the colours are in `style.css`) and the rivers drawn on top. The original has no background map or rivers; Tom preferred them (29 October 2026). Leaflet is copied into the project rather than loaded from elsewhere.
 - **One self-contained folder per location** (`published/north-devon/`), so each can later be served at its own address. Each folder is built alongside the old one and swapped in, so a half-written dashboard is never served.
 - **A location's web address comes from its name** (North Devon → `north-devon`), for now.
@@ -164,6 +165,19 @@ The scripts that built and uploaded the files were one-offs, kept outside the pr
 - **River obstacles come from River Obstacles** (the EA and The Rivers Trust), via its public map service, and are tied to the catchment whose outline they're inside. Obstacle 39245 in Langham Lake matches the original.
 - **Licences:** the EA data is Open Government Licence; River Obstacles is CC BY-SA 4.0. Both are credited in the dashboard's footer. Offering River Obstacles as a download would bring in CC BY-SA's "share alike" condition.
 
+**The postcode search** (Tom, 13 November 2026: "go ahead with option 1, I dont like nearest catchment, just say it is outside the catchments")
+- **The Waterbody Dashboard's map panel has a postcode box:** "Click the map to select a river catchment, or enter a postcode". A postcode opens the catchment it's in, on the same tab and scrolled to the same place, as clicking the map does, and the page then says "EX36 3AA is in Nadrid Water." beside the Go button (below it if there isn't room).
+- **The heading is sized to the panel so it fits on one line** (Tom: "preferably so it all fits on one line"), from 1.05rem down to 0.8rem (the footer's size), where it wraps instead. With Windows' Segoe UI it's on one line on screens 1536 px wide and up (12.8 px there, 16 px at 1920 px), and two lines at 1366 px and below. One line there would need about 11 px text.
+- **Still static, with no server code and no outside service.** The publish step writes the location's postcodes into `postcodes/<district>.json` (e.g. `EX36.json`: `{"3AA": "<catchment ID>", ...}`), one small file per district (19 files, 168 KB, the biggest 19 KB). `static/postcode.js` fetches only the one it needs. postcodes.io (a free lookup service) was the other option, turned down because each visitor's postcode would go to a third party and the search would depend on it.
+- **The postcodes come from Ordnance Survey's Code-Point Open** (free, OS OpenData licence), the centre point of every postcode in Great Britain, via `importer postcodes`. The importer keeps the postcodes whose centre is inside a catchment's outline (checked in PostGIS, like River Obstacles). A postcode that crosses a boundary goes to the catchment its centre is in.
+- **A postcode outside every catchment is just "outside the North Devon catchments"**, with no "nearest catchment" (Tom). That's a lot of the towns: only 5,104 of the 10,183 postcodes around the catchments are inside one. Central Barnstaple (all of EX31 1xx) is outside, as are about 70% of EX31 and EX34 (Ilfracombe) and half of EX39 (Bideford), because they're by the estuaries or the sea, which aren't imported. EX19, EX36, EX37 and EX38 are all, or almost all, inside. Importing estuaries and coastal waters (Open questions) would cover more.
+- **A misspelt postcode that looks like a real one also says "outside",** since only the postcodes inside are published. One that isn't shaped like a postcode (e.g. "EX36") says "That doesn't look like a full postcode".
+- **The page only says which catchment a postcode is in after checking it,** so a link with `?postcode=` on the end can't make it say something untrue.
+- **The footer credits Ordnance Survey, Royal Mail and National Statistics,** as Code-Point Open's licence asks, with the year of the publish. The box and the credit only appear while the Postcodes table has rows for the location.
+- **Ordnance Survey updates Code-Point Open every three months** (the one imported is October 2026). Re-run `importer postcodes`, then publish.
+- **Tried in a real browser** (headless Chromium): a postcode inside, outside, in a district with no file, half a postcode, one in the catchment already shown, a link naming the wrong catchment, the tab and scroll position kept, and a phone-width screen.
+- **Not on the test VM yet.** To put it there: pull, `schema apply`, `importer postcodes`, then publish (all with `--build`).
+
 **The four views** (Tom, 5 November 2026)
 - **Cards across the top of every page** choose the view: Waterbody Dashboard (the four tabs we
   already had, unchanged in layout), Catchment Dashboard, Intervention Management and Catchment
@@ -179,7 +193,8 @@ The scripts that built and uploaded the files were one-offs, kept outside the pr
 - **Its operational catchment buttons each open a page** (`catchment-dashboard/torridge/`) with
   the map zoomed to them (the rest faded) and every count and total narrowed to their waterbodies.
   A management catchment that is the whole location is the Catchment Dashboard's front page.
-  Clicking a waterbody opens it in the Waterbody Dashboard.
+  Its waterbodies can't be clicked (Tom, 13 November 2026; they used to open the Waterbody
+  Dashboard). Hovering still shows a waterbody's name and status, with no highlight.
 - **The Catchment Dashboard's text is one set per location** (`location_text`), and stays the
   same when an operational catchment is chosen, as a Power BI text box would. Text per
   operational catchment would be a small change if it's wanted.
@@ -401,7 +416,7 @@ database the same, so literally just adding the data")
 
 ## Suggested next steps
 
-1. **Publish the real data** (the admin page's **Publish** button), then look over the four views at <http://localhost:8080>.
+1. **Look over the four views at <http://localhost:8080>** (published 13 November 2026, with the real data and the postcode search), then put the postcode search on the test VM (see "The postcode search").
 2. **Decide the open questions the data raised:** the interventions layout, the operational catchment texts and the EA's Point / Diffuse figures (Open questions). In December 2026, check the Catchment Data Explorer for the 2025 classifications and re-run `importer classifications`.
 3. **Finish the demo on the shared test VM:** deployed 12 November 2026, waiting for the DNS record. Once it's in, check the address, then set up nightly backups and fill in OPERATING.md §2 and §3.
 4. **Answers for Catchment Insights,** as they're written (in its content file), and the TBC focus areas' questions; move them into the database if they're to be edited on the admin page.

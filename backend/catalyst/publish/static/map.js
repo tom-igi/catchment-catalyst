@@ -1,10 +1,12 @@
 // The catchment maps: every catchment in the location, coloured by its
 // ecological status as on the original dashboard, with its rivers, over an
-// OpenStreetMap background. Clicking a catchment opens its page.
+// OpenStreetMap background. Clicking a catchment opens its page, where the map
+// says where to (not on the Catchment Dashboard, where they can't be clicked).
 //
 // The page sets what to show, on the map's element:
 //   data-geojson   the file of outlines and rivers (catchments.geojson), with each catchment's status
-//   data-links     what goes before a catchment ID to link to its page
+//   data-links     what goes before a catchment ID to link to its page. Without
+//                  it, the catchments can't be clicked: only their names show
 //   data-selected  the catchment to highlight, if one is chosen
 //   data-focus     the catchments to zoom to, with the others faded (e.g. an
 //                  operational catchment's on the Catchment Dashboard), if any
@@ -21,6 +23,7 @@
   if (!element || !window.L) return;
 
   const selected = element.dataset.selected;
+  const links = element.dataset.links;
   const focus = element.dataset.focus ? new Set(element.dataset.focus.split(",")) : null;
   const styles = getComputedStyle(document.documentElement);
 
@@ -44,9 +47,9 @@
         onEachFeature: function (feature, layer) {
           const status = feature.properties.status;
           layer.bindTooltip(feature.properties.name + (status ? " (" + status + ")" : ""), { sticky: true });
-          if (feature.properties.id === selected) return;
+          if (links === undefined || feature.properties.id === selected) return;
           layer.on("click", function () {
-            const page = element.dataset.links + feature.properties.id + "/";
+            const page = links + feature.properties.id + "/";
             if ("keepScroll" in element.dataset && window.keepScroll) window.keepScroll(page);
             window.location.href = page;
           });

@@ -4,6 +4,7 @@
     python -m catalyst.importers classifications
     python -m catalyst.importers storm-overflows
     python -m catalyst.importers river-obstacles
+    python -m catalyst.importers postcodes
 
 The database is chosen by the DATABASE_URL environment variable. Everything
 downloaded is kept in RAW_FILES_DIR (default: imports/raw).
@@ -20,7 +21,7 @@ import sqlalchemy as sa
 
 from catalyst.db import load_schema
 
-from .api import catchments, classifications, river_obstacles, storm_overflows
+from .api import catchments, classifications, postcodes, river_obstacles, storm_overflows
 from .api.common import ImportProblem
 from .api.ea_api import EAClient, EAError
 
@@ -41,6 +42,7 @@ def main(argv: list[str] | None = None) -> int:
     for name, help in (
         ("storm-overflows", "import storm overflow spills from the EA's annual returns, for every imported catchment"),
         ("river-obstacles", "import weirs, culverts and other river obstacles, for every imported catchment"),
+        ("postcodes", "import the postcodes inside every imported catchment, from Ordnance Survey's Code-Point Open"),
     ):
         commands.add_parser(name, help=help).add_argument("-y", "--yes", action="store_true", help="don't ask for confirmation")
     args = parser.parse_args(argv)
@@ -63,6 +65,7 @@ def main(argv: list[str] | None = None) -> int:
             "classifications": _import_classifications,
             "storm-overflows": _import_storm_overflows,
             "river-obstacles": _import_river_obstacles,
+            "postcodes": _import_postcodes,
         }[args.command](engine, yes=args.yes)
     except sa.exc.OperationalError as e:
         print(f"Could not connect to the database: {e.orig}", file=sys.stderr)
@@ -233,6 +236,45 @@ def _import_river_obstacles(engine: sa.Engine, yes: bool) -> int:
     with engine.begin() as conn:
         river_obstacles.save(conn, schema, rows)
     print(f"\nDone. The downloaded files are kept in {raw_dir}")
+    return 0
+
+
+def _import_postcodes(engine: sa.Engine, yes: bool) -> int:
+    schema = load_schema()
+    table = schema.metadata.tables[postcodes.TABLE]
+    with engine.connect() as conn:
+        area = river_obstacles.box(conn, schema)
+        before = conn.scalar(sa.select(sa.func.count()).select_from(table))
+    if area is None:
+        print("There are no catchments yet: import them first (`importer catchments`).", file=sys.stderr)
+        return 1
+
+    print("Downloading Code-Point Open (every postcode in Great Britain) from Ordnance Survey...")
+    try:
+        download = postcodes.fetch()
+        print(f"  ✓ {len(download) / 1_000_000:.1f} MB. Reading it...")
+        nearby = postcodes.read(download, area)
+        with engine.connect() as conn:
+            rows = postcodes.place(conn, schema, nearby)
+    except ImportProblem as e:
+        print(f"\nNothing has been imported: {e}", file=sys.stderr)
+        return 1
+
+    districts: dict[str, int] = {}
+    for row in rows:
+        district = row["postcode"].split(" ")[0]
+        districts[district] = districts.get(district, 0) + 1
+    print(f"\nOf the {len(nearby):,} postcodes in the box around the catchments, {len(rows):,} are inside "
+          f"{len({r['catchment_id'] for r in rows})} catchment(s), replacing the {before:,} row(s) now. By district:")
+    print("  " + ", ".join(f"{district} {count}" for district, count in sorted(districts.items(), key=lambda d: -d[1])))
+    if not yes and not _confirm("\nReplace them? [y/N] "):
+        print("Nothing has been imported.")
+        return 1
+
+    raw_dir = postcodes.save_raw_files(download, Path(os.environ.get("RAW_FILES_DIR", "imports/raw")))
+    with engine.begin() as conn:
+        postcodes.save(conn, schema, rows)
+    print(f"\nDone. The downloaded file is kept in {raw_dir}")
     return 0
 
 

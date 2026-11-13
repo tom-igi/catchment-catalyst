@@ -89,10 +89,11 @@ docker compose run --rm importer catchments imports/catchments.json   # a few mi
 docker compose run --rm importer classifications
 docker compose run --rm importer storm-overflows                      # a minute or two
 docker compose run --rm importer river-obstacles
+docker compose run --rm importer postcodes                            # for the postcode search
 ```
 
 Run them again whenever the EA updates its data (classifications about once a year, storm
-overflow returns each spring).
+overflow returns each spring). Ordnance Survey updates the postcodes every three months.
 
 To see every import command:
 

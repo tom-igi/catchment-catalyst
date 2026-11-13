@@ -51,7 +51,7 @@ Every table and column is listed in one master file, `backend/catalyst/db/schema
 
 ### 3.2 Data tables (one per thing shown on the dashboard)
 
-Each dataset has its own table, and each row has a catchment ID. Built so far: `ea_classifications`, `ea_rnags`, `storm_overflows` and `river_obstacles` (importers), and, filled by Excel, `ea_scores`, `ea_thresholds`, `habitat_land_use`, `river_status_text`, `interventions`, `risk_levels`, `catchment_rankings`, `farms`, `livestock`, `phosphate_sources`, `sewerage_properties` and `sewerage_improvements`. Data about a whole location goes in tables keyed by **location ID** instead: the first is `location_text` (5 November 2026). Catchment data tables come in three kinds:
+Each dataset has its own table, and each row has a catchment ID. Built so far: `ea_classifications`, `ea_rnags`, `storm_overflows`, `river_obstacles` and `postcodes` (importers), and, filled by Excel, `ea_scores`, `ea_thresholds`, `habitat_land_use`, `river_status_text`, `interventions`, `risk_levels`, `catchment_rankings`, `farms`, `livestock`, `phosphate_sources`, `sewerage_properties` and `sewerage_improvements`. Data about a whole location goes in tables keyed by **location ID** instead: the first is `location_text` (5 November 2026). Catchment data tables come in three kinds:
 
 - **One row per waterbody:** e.g. number of farms, properties on SWW or private sewerage, risk levels.
 - **Many rows per waterbody:** e.g. EA classification items per year, habitat types, livestock types, phosphate sources, SWW discharge sites per year, asset improvement plans.
