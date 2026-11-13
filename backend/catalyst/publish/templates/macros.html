@@ -86,6 +86,29 @@
 </form>
 {% endmacro %}
 
+{# The location's catchments by name (catchment-list.js): choosing one opens it on the same tab, as
+   clicking the map does. Listed A to Z; with a switch to list them under their operational catchments
+   ("By area") instead, if they're in more than one. `links` is what goes before a catchment ID to link
+   to its page. #}
+{% macro catchment_list(location, links, catchment) %}
+{% set ordered = location.catchments | sort(attribute="name") %}
+{% set groups = ordered | map(attribute="operational_catchment") | map("default", "Other", true) | unique | list %}
+<div class="catchment-list" data-links="{{ links }}">
+  <select aria-label="Choose a river catchment by name" autocomplete="off">
+    <option value="" disabled{% if not catchment %} selected{% endif %}>Or choose from the list</option>
+    {% for c in ordered %}
+    <option value="{{ c.id }}" data-group="{{ c.operational_catchment or 'Other' }}"{% if catchment and c.id == catchment.id %} selected{% endif %}>{{ c.name }}</option>
+    {% endfor %}
+  </select>
+  {% if groups | length > 1 %}
+  <div class="list-order" role="radiogroup" aria-label="How to list them">
+    <label><input type="radio" name="list-order" value="name" autocomplete="off" checked> A to Z</label>
+    <label><input type="radio" name="list-order" value="area" autocomplete="off"> By area</label>
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
 {# A small map of points in the catchment, over its outline (points.js). Empty
    until a catchment is chosen. #}
 {% macro points_map(location, root, catchment, points, colour, label) %}

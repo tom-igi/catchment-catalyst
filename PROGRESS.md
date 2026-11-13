@@ -15,7 +15,7 @@ Tom to run things himself, 29 October 2026).
 ```bash
 docker compose up -d                      # start the local database, admin page and dashboard preview
 docker compose run --rm schema plan       # should say "The database already matches schema.yaml."
-docker compose run --rm test              # run the tests (183 passing at the last update)
+docker compose run --rm test              # run the tests (184 passing at the last update)
 docker compose run --rm publish           # rebuild the dashboard pages (or the admin page's Publish button)
 ```
 
@@ -177,6 +177,11 @@ The scripts that built and uploaded the files were one-offs, kept outside the pr
 - **Ordnance Survey updates Code-Point Open every three months** (the one imported is October 2026). Re-run `importer postcodes`, then publish.
 - **Tried in a real browser** (headless Chromium): a postcode inside, outside, in a district with no file, half a postcode, one in the catchment already shown, a link naming the wrong catchment, the tab and scroll position kept, and a phone-width screen.
 - **Not on the test VM yet.** To put it there: pull, `schema apply`, `importer postcodes`, then publish (all with `--build`).
+
+**Choosing a catchment by name** (Tom, 13 November 2026: "a dropdown where all the catchments are listed … alphabetical and grouped and the user just selects")
+- **A list of every waterbody, under the postcode box** on the Waterbody Dashboard's map panel ("Or choose from the list"). Choosing one opens it on the same tab, scrolled to the same place, as clicking the map does. On a waterbody's page, the list shows that waterbody.
+- **A to Z, or "By area":** a small switch beside the list (below it on narrower screens) puts the waterbodies under their EA operational catchments instead, A to Z within each: Hartland and Clovelly Streams (3), Taw and North Devon Streams (52) and Torridge (37), the same groups as the Catchment Dashboard's buttons. A to Z is the default. The browser remembers the choice (local storage) for the next page. The switch only appears when a location's waterbodies are in more than one operational catchment.
+- **The page lists them A to Z, and `static/catchment-list.js` regroups them,** so nothing else is published. No two North Devon waterbodies share a name.
 
 **The four views** (Tom, 5 November 2026)
 - **Cards across the top of every page** choose the view: Waterbody Dashboard (the four tabs we

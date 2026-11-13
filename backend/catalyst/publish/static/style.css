@@ -199,6 +199,24 @@ th[aria-sort="descending"] button::after { content: "▼"; opacity: 1; font-size
 .postcode-message { flex: 1 1 9em; min-width: 0; margin: 0; font-size: .9rem; line-height: 1.3; }
 .postcode-message:empty { display: none; }
 
+/* The catchments by name (catchment-list.js), with its A to Z / By area switch beside it,
+   or below it if there isn't room */
+.catchment-list { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 8px; }
+.catchment-list select {
+  flex: 1 1 12em; min-width: 0; padding: 5px 6px; border: 1px solid #999; border-radius: 4px;
+  background: #fff; color: var(--text); font: inherit; font-size: .95rem;
+}
+.list-order { display: flex; flex: 0 0 auto; }
+.list-order label {
+  position: relative; padding: 4px 9px; border: 1px solid var(--dark); font-size: .85rem;
+  white-space: nowrap; cursor: pointer;
+}
+.list-order label:first-child { border-radius: 4px 0 0 4px; }
+.list-order label + label { border-left: 0; border-radius: 0 4px 4px 0; }
+.list-order label:has(input:checked) { background: var(--dark); color: #fff; }
+.list-order label:has(input:focus-visible) { outline: 2px solid var(--navy-light); outline-offset: 2px; }
+.list-order input { position: absolute; opacity: 0; pointer-events: none; }
+
 /* Maps (map.js) */
 .map { height: 360px; background: #fff; }
 .map:not([data-links]) path.leaflet-interactive { cursor: inherit; }  /* catchments that can't be clicked */

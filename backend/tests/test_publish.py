@@ -667,3 +667,23 @@ def test_the_postcode_search_finds_the_catchment_each_postcode_is_in(database, t
     folder = publish(database, tmp_path)
     assert sorted(p.name for p in (folder / "postcodes").iterdir()) == ["EX20.json"]  # only the location's own catchments
     assert json.loads((folder / "postcodes" / "EX20.json").read_text()) == {"1AA": WEST_OKEMENT}
+
+
+def test_the_catchments_can_be_chosen_by_name(database, tmp_path):
+    folder = publish(database, tmp_path)
+    page = (folder / "ea-data" / WEST_OKEMENT / "index.html").read_text()
+    assert '<div class="catchment-list" data-links="../../ea-data/">' in page  # stays on the tab, as the map does
+    assert page.index(f'<option value="{EAST_OKEMONT}" data-group="Torridge">East Okemont River</option>') < page.index(
+        f'<option value="{WEST_OKEMENT}" data-group="Torridge" selected>West Okement</option>')  # A to Z, with this one chosen
+    assert '<option value="" disabled>Or choose from the list</option>' in page
+    assert 'class="list-order"' not in page  # all in one operational catchment: nothing to group by
+    assert f'<script src="../../assets/catchment-list.js?v={site.version(folder)}"></script>' in page
+    page = (folder / "river-status" / "index.html").read_text()  # before a catchment is chosen
+    assert '<option value="" disabled selected>Or choose from the list</option>' in page
+
+    with database.begin() as conn:
+        conn.execute(sa.text("UPDATE catchments SET operational_catchment = 'Taw' WHERE id = :id"), {"id": EAST_OKEMONT})
+    page = (publish(database, tmp_path) / "ea-data" / WEST_OKEMENT / "index.html").read_text()
+    assert f'<option value="{EAST_OKEMONT}" data-group="Taw">' in page
+    assert '<label><input type="radio" name="list-order" value="name" autocomplete="off" checked> A to Z</label>' in page
+    assert '<label><input type="radio" name="list-order" value="area" autocomplete="off"> By area</label>' in page
