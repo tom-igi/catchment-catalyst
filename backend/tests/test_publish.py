@@ -650,6 +650,7 @@ def test_the_postcode_search_finds_the_catchment_each_postcode_is_in(database, t
     for tab in site.TABS:
         page = (folder / tab / WEST_OKEMENT / "index.html").read_text()
         assert "<h2>Click the map to select a river catchment, or enter a postcode</h2>" in page
+        assert 'aria-label="Postcode" placeholder="EX37 9AY"' in page  # an example, in grey
         assert f'data-postcodes="../../postcodes/" data-version="{version}" data-links="../../{tab}/"' in page  # stays on the tab
         assert f'data-selected="{WEST_OKEMENT}" data-selected-name="West Okement" data-location="North Devon"' in page
     page = (folder / "land-use" / "index.html").read_text()  # before a catchment is chosen
@@ -687,3 +688,4 @@ def test_the_catchments_can_be_chosen_by_name(database, tmp_path):
     assert f'<option value="{EAST_OKEMONT}" data-group="Taw">' in page
     assert '<label><input type="radio" name="list-order" value="name" autocomplete="off" checked> A to Z</label>' in page
     assert '<label><input type="radio" name="list-order" value="area" autocomplete="off"> By area</label>' in page
+    assert page.index('class="list-order"') < page.index('<select aria-label="Choose a river catchment by name"')  # the switch first

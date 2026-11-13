@@ -76,11 +76,12 @@
 {% endmacro %}
 
 {# The postcode search (postcode.js): a postcode opens the catchment it's in, on the same tab,
-   as clicking the map does. `links` is what goes before a catchment ID to link to its page. #}
+   as clicking the map does. `links` is what goes before a catchment ID to link to its page.
+   The box shows an example in grey until it's clicked: a real postcode, in Langham Lake. #}
 {% macro postcode_form(location, root, links, catchment) %}
 <form class="postcode" data-postcodes="{{ root }}postcodes/" data-version="{{ version }}" data-links="{{ links }}"
       data-selected="{{ catchment.id if catchment else '' }}" data-selected-name="{{ catchment.name if catchment else '' }}" data-location="{{ location.name }}">
-  <input type="text" name="postcode" aria-label="Postcode" autocomplete="postal-code" autocapitalize="characters" spellcheck="false" maxlength="10">
+  <input type="text" name="postcode" aria-label="Postcode" placeholder="EX37 9AY" autocomplete="postal-code" autocapitalize="characters" spellcheck="false" maxlength="10">
   <button type="submit">Go</button>
   <p class="postcode-message" role="status"></p>
 </form>
@@ -88,24 +89,24 @@
 
 {# The location's catchments by name (catchment-list.js): choosing one opens it on the same tab, as
    clicking the map does. Listed A to Z; with a switch to list them under their operational catchments
-   ("By area") instead, if they're in more than one. `links` is what goes before a catchment ID to link
-   to its page. #}
+   ("By area") instead, if they're in more than one, before the list. `links` is what goes before a
+   catchment ID to link to its page. #}
 {% macro catchment_list(location, links, catchment) %}
 {% set ordered = location.catchments | sort(attribute="name") %}
 {% set groups = ordered | map(attribute="operational_catchment") | map("default", "Other", true) | unique | list %}
 <div class="catchment-list" data-links="{{ links }}">
-  <select aria-label="Choose a river catchment by name" autocomplete="off">
-    <option value="" disabled{% if not catchment %} selected{% endif %}>Or choose from the list</option>
-    {% for c in ordered %}
-    <option value="{{ c.id }}" data-group="{{ c.operational_catchment or 'Other' }}"{% if catchment and c.id == catchment.id %} selected{% endif %}>{{ c.name }}</option>
-    {% endfor %}
-  </select>
   {% if groups | length > 1 %}
   <div class="list-order" role="radiogroup" aria-label="How to list them">
     <label><input type="radio" name="list-order" value="name" autocomplete="off" checked> A to Z</label>
     <label><input type="radio" name="list-order" value="area" autocomplete="off"> By area</label>
   </div>
   {% endif %}
+  <select aria-label="Choose a river catchment by name" autocomplete="off">
+    <option value="" disabled{% if not catchment %} selected{% endif %}>Or choose from the list</option>
+    {% for c in ordered %}
+    <option value="{{ c.id }}" data-group="{{ c.operational_catchment or 'Other' }}"{% if catchment and c.id == catchment.id %} selected{% endif %}>{{ c.name }}</option>
+    {% endfor %}
+  </select>
 </div>
 {% endmacro %}
 
