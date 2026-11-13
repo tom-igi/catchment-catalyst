@@ -3,6 +3,22 @@
 Written 12 November 2026, agreed with Tom. When Tom says "execute DASHBOARD-IDEAS-PLAN.md" (or
 similar), build everything below without stopping to ask, unless something blocks you.
 
+**Build it with one Claude, one version at a time** (Tom, 13 November 2026). Don't use subagents,
+workflows or anything else that runs several Claude agents at the same time. The first attempt
+gave each version its own agent, all running at once, and quickly used up Tom's credits. See
+"Where it's up to" just below before starting.
+
+**Where it's up to (13 November 2026).** That first attempt, on 12 November, stopped partway:
+- Step 1 (section 3) was done: `published/north-devon-ideas/shared/` has the data export,
+  `format.js`, Leaflet and a `DATA.md` describing the data. Check it against section 3 and reuse
+  it, rather than exporting again.
+- All seven version folders were started (6 to 16 files each), but none were checked, so it isn't
+  known whether any of them is finished or works.
+- There's no `index.html` (the choosing page) and no screenshots.
+
+So start by opening each version and deciding, one at a time, whether to finish it or start that
+version again from scratch.
+
 Tom will look at all seven and choose the one he likes best, or mix ideas from several. These are
 for choosing a design, not for going live.
 
@@ -10,6 +26,8 @@ for choosing a design, not for going live.
 
 ## 1. The rules (read these first)
 
+- **One Claude, one version at a time.** No subagents or parallel agents (see the top of this
+  file).
 - **Don't change anything that already exists.** That means no changes to `backend/`, the
   database, `schema.yaml`, `published/north-devon/`, `.gitignore`, the Docker files or the
   tests. Only read from them. The only things you add are the new folder below (and a short
@@ -613,17 +631,14 @@ Keep this page simple: it's for choosing, not one of the designs.
 1. Read this file and PROGRESS.md. Check `docker compose ps` (start it with
    `docker compose up -d` if needed).
 2. Do Step 1 (section 3) yourself, and check the export.
-3. Build the seven versions. They don't depend on each other, so a subagent can build each one
-   at the same time. Give each subagent:
-   - the path to this file
-   - its version number
-   - the paths of the data and shared files
-   - this instruction: only write inside its own version folder, read sections 1, 2 and 4 in
-     full, and don't use the Playwright browser (it's shared, so parallel use clashes)
-   
-   It may use `node --check file.js` (Node is installed) to check its scripts, and
+3. Build the seven versions yourself, one after another, in order (1 to 7). Don't hand them to
+   subagents. Finish and check each version (step 4) before starting the next, so that if the
+   run stops partway, the versions already done are finished and usable. Each version only
+   writes inside its own folder.
+
+   Use `node --check file.js` (Node is installed) to check scripts, and
    `curl http://localhost:8080/north-devon-ideas/<folder>/` to check files are served.
-4. Check each version yourself, one at a time, in the Playwright browser:
+4. Check each version, as soon as it's built, in the Playwright browser:
    - laptop size (1440×900) and phone size (390×844)
    - no console errors
    - try the main flow from start to finish
@@ -633,7 +648,7 @@ Keep this page simple: it's for choosing, not one of the designs.
    - go through checklist section 4 and confirm each item can be found
    - look again at section 2: would Tom think this looks hand-made?
    
-   Fix what you find, or send it back to that version's subagent.
+   Fix what you find before moving on to the next version.
 5. Take a screenshot of each version's first screen for the choosing page. Playwright can only
    save files under `/tmp/.playwright-mcp/` or this repo, so save them straight into
    `published/north-devon-ideas/shots/`. Then build `index.html` (section 7).
