@@ -19,7 +19,9 @@ backend/                     all Python code, built into one Docker image
   catalyst/db/schema.py      reads and checks schema.yaml
   catalyst/db/sync.py        compares schema.yaml with the database and applies changes
   catalyst/importers/api/    tables filled from outside sources (the EA's catchments, classifications, RNAGs,
-                             storm overflows; River Obstacles; Ordnance Survey's postcodes)
+                             storm overflows and the Untreated Sewage risk; River Obstacles; Ordnance Survey's postcodes)
+  catalyst/importers/inputs/ tables worked out from a source file (one of the original Power BI dashboard's),
+                             uploaded as it came, with the original's formulas (one module per file)
   catalyst/importers/excel/  tables filled by Excel upload (one shared piece of code for all of them)
   catalyst/admin/            the admin page: a diagram of every table (diagram.py, diagram.yaml);
                              download any table; upload an Excel table, preview, approve; publish
@@ -47,8 +49,9 @@ published dashboards at <http://localhost:8080>.
 The admin page is a diagram of every table: where its data comes from and how they join up.
 Click a table to see its columns and download it as Excel (any table; map shapes are left
 out). On the left, where the data comes from, each import command has a box (with the
-source's website and the command that downloads its tables again), and so does each table
-filled by Excel upload (**Upload data**, to upload an edited copy). It's made from `schema.yaml` each time it's opened, plus
+source's website and the command that downloads its tables again), each source file
+(**Upload file**, to upload it as it came, with the Power BI dashboard's formulas as its
+transformation), and each table filled by Excel upload (**Upload data**, to upload an edited copy). It's made from `schema.yaml` each time it's opened, plus
 `backend/catalyst/admin/diagram.yaml` (the sections, and where each downloaded table comes
 from, its website and its command: add a new importer's table there).
 
@@ -85,7 +88,8 @@ Each table is filled in one way, set by `filled_by` in `schema.yaml`:
 | `filled_by` | How | Tables so far |
 |---|---|---|
 | `api` | An importer downloads the data from an outside service (`backend/catalyst/importers/api/`) | Catchments, EA Classifications, EA Reasons for Not Achieving Good, Storm Overflows, River Obstacles, Postcodes |
-| `excel` | Someone uploads an Excel file in the admin page (`backend/catalyst/importers/excel/`) | EA Scores, Habitat & Land Use |
+| `input` | Someone uploads a source file as it came, in the admin page; the original Power BI dashboard's formulas work out its tables (`backend/catalyst/importers/inputs/`, see [POWERBI-INPUTS-PLAN.md](POWERBI-INPUTS-PLAN.md)) | Livestock, Livestock Pressure (from APHA's livestock data); Catchment Ranking, Farms, Sewerage Properties, Ecological Classes (from the Waterbody Lookup); ESME Risk Levels (from ESME); Habitat & Land Use (from Natural England's habitats); River Information (from the Waterbody Lookup); River Status Text (from Improvement Information); Phosphate Sources, Phosphate Continuous and Diffuse (from SAGIS); Sewerage Improvements (from Water UK's storm overflow plans); EA Scores, EA Thresholds (from the EA's classification facts) |
+| `excel` | Someone uploads an Excel file in the table's layout, in the admin page (`backend/catalyst/importers/excel/`) | Datasets, Location Text and Intervention Management's three tables |
 
 ### From an API
 
@@ -104,6 +108,19 @@ Each downloads and checks everything first, shows what it will change, and asks 
 (add `--yes` to skip the question). Running one again is safe: catchments are updated, and the
 other tables are replaced. Everything downloaded is kept in `imports/raw/`. See
 `imports/README.md`.
+
+### From a source file (the admin page)
+
+1. Log in to the admin page and click the source file's **Upload file**, on the left (e.g.
+   APHA livestock data). It says which sheet and columns the file needs.
+2. Upload the file as it came, without changing it.
+3. The preview shows what will be added, changed and deleted in each table it fills, and
+   any rows left out (waterbodies that aren't in the Catchments table).
+4. Approve it, and every table it fills is changed at once. Then **Publish**, as below.
+
+Each of its tables has a **Power BI's formulas** box in the Transformation column: its inputs
+(the file's columns it reads), the function (how each of the table's columns is worked out, with
+where that is in the Power BI file), and the table. To add another source file, see `backend/catalyst/importers/inputs/__init__.py`.
 
 ### From Excel (the admin page)
 

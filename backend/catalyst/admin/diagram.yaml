@@ -56,16 +56,21 @@ data_tables:
 #   admin    the admin page writes it by itself
 #
 # `transformation` is what happens to the data between where it comes from and the table:
-# the diagram's "Transformation" column. A few short steps, shown when its box is clicked.
+# the diagram's "Transformation" column, a box for each table. A few short steps, shown when
+# its box is clicked, with `input` (what's downloaded, in words) and `inputs` (its columns).
 # Tables filled by an importer each say what it does to the downloads. Excel uploads are
-# copied 1 to 1 for now (the file is already in the table's layout), so they have none; if
-# one is ever changed on the way in (e.g. a file in someone else's layout), say how here.
+# copied 1 to 1 (the file is already in the table's layout), so they have none. Tables
+# worked out from a source file (`filled_by: input`) aren't listed here at all: their source
+# and steps are in their input's code (catalyst/importers/inputs/), next to the formulas.
 # Put a step in "double quotes" if it has a colon and a space (": ") or a " #" in it.
 filled:
   catchments:
     source: EA Catchment Data Explorer
     url: https://environment.data.gov.uk/catchment-planning/
     command: importer catchments imports/catchments.json
+    input: Each catchment's shapefile from the EA's Catchment Data Explorer, and its web page there
+    inputs: [WB_NAME, WB_CAT, RBD_ID, RBD_NAME, MANCAT_ID, MNCAT_NAME, OPCAT_ID, OPCAT_NAME, hydromorph, the outline,
+             the river line, "Length (web page)", "Upstream and downstream waterbodies (web page)"]
     transformation:
       - Downloads each catchment's shapefile from the EA, and reads its details, outline and river line.
       - Reads its river length and the catchments upstream and downstream from its EA web page, which the download doesn't have.
@@ -75,6 +80,8 @@ filled:
     source: EA Catchment Data Explorer
     url: https://environment.data.gov.uk/catchment-planning/
     command: importer classifications
+    input: The EA's classifications.csv for each management catchment
+    inputs: [Water Body ID, Classification Item, Year, Cycle, Classification Level, Status, Certainty]
     transformation:
       - Downloads the EA's classifications file (CSV) for each management catchment the catchments are in.
       - Keeps only the rows for the catchments in the Catchments table.
@@ -84,6 +91,9 @@ filled:
     source: EA Catchment Data Explorer
     url: https://environment.data.gov.uk/catchment-planning/
     command: importer classifications
+    input: The EA's rnags.csv for each management catchment
+    inputs: [ID, Water Body ID, Cycle, Classification Element, Classification Status, Activity, Activity Certainty,
+             Business Sector, Category, Swmi, National Swmi Header]
     transformation:
       - Downloads the EA's reasons for not achieving good (CSV) for each management catchment the catchments are in.
       - Keeps only the rows for the catchments in the Catchments table.
@@ -93,16 +103,33 @@ filled:
     source: EA storm overflow annual returns
     url: https://www.data.gov.uk/dataset/event-duration-monitoring-storm-overflows-annual-returns
     command: importer storm-overflows
+    input: Each year's storm overflow annual return, a sheet per water company
+    inputs: [Unique ID, Water Company Name, "Site Name (WaSC operational)", EA Permit Reference, Activity Reference on Permit,
+             Storm Discharge Asset Type, Outlet Discharge NGR, WFD Waterbody ID, "Receiving Water / Environment (common name)",
+             Total Duration, Counted spills]
     transformation:
       - "Downloads each year's return from 2021: a spreadsheet with a sheet per water company and a row per storm overflow."
       - Finds each column by its heading, as they move between years.
       - Keeps the overflows into a catchment in the Catchments table, by their WFD waterbody ID. Those with no ID (mostly into estuaries and the sea) are left out.
       - "Turns the spill hours into numbers (blank or #N/A means no figure, not zero), and the grid reference into a latitude and longitude."
       - "Replaces every row in the table: one per overflow per year."
+  sewage_overflow_pressure:
+    source: EA storm overflow annual returns
+    url: https://www.data.gov.uk/dataset/event-duration-monitoring-storm-overflows-annual-returns
+    command: importer storm-overflows
+    input: The same returns, as read into Storm Overflows
+    inputs: [WFD Waterbody ID, Total Duration]
+    transformation:
+      - Adds up the spill hours of all the overflows into each catchment in the latest year of the returns (2025 now). An overflow with no figure adds nothing, and a catchment with none has 0 hours. In Power BI, this is the DAX measure Total Spill Duration 2025 (in seconds).
+      - Matches overflows to catchments by their waterbody ID. The original matched by name, so it missed the few whose waterbody name the water company typed differently (e.g. MOLE).
+      - "Works out the pressure from the spill hours: Very High above 1,440 hours, High above 720, Medium above 240, Low above 120, otherwise Very Low. It's the Untreated Sewage tile in Risk Levels. In Power BI, this is the DAX measure Sewage Overflow Pressure (5,184,000, 2,592,000, 864,000 and 432,000 seconds)."
+      - Replaces every row in the table, at the same time as Storm Overflows.
   river_obstacles:
     source: River Obstacles (EA and The Rivers Trust)
     url: https://river-obstacles-theriverstrust.hub.arcgis.com/
     command: importer river-obstacles
+    input: Every obstacle in the box around the catchments, from River Obstacles' map service
+    inputs: [globalid, ea_obstructid, site_name, obstacle_type, origin, status, the point]
     transformation:
       - Downloads every obstacle in the box around the catchments from River Obstacles' map service.
       - Keeps those inside a catchment's outline, and gives each that catchment's ID.
@@ -111,6 +138,8 @@ filled:
     source: Ordnance Survey Code-Point Open
     url: https://osdatahub.os.uk/downloads/open/CodePointOpen
     command: importer postcodes
+    input: "Code-Point Open: the centre of every postcode in Great Britain"
+    inputs: [Postcode, Positional_quality_indicator, Eastings, Northings]
     transformation:
       - Downloads Code-Point Open, the centre point of every postcode in Great Britain.
       - Keeps the postcodes whose centre is inside a catchment's outline, and gives each that catchment's ID. The rest (e.g. by an estuary or the sea) are left out.
@@ -136,24 +165,25 @@ filled:
 # Put a panel's name in "double quotes" if it has a colon and a space (": ") or a " #" in it.
 dashboard:
   Every Waterbody tab:  # the column down the left of River Status, EA Data, Land Use Data and Sewerage Data
-    Map colours: ea_classifications
+    Map colours: [ea_classifications, ecological_classes]
     Postcode search: postcodes
     Catchment Ranking: catchment_rankings
-    EA Ecological Classification: ea_classifications
+    EA Ecological Classification: [ea_classifications, ecological_classes]
     Failing Elements: ea_classifications
     EA RNAGs: ea_rnags
     Text at the bottom: location_text
   River Status:
     Why is the river failing?: river_status_text
     What is happening now?: river_status_text
-    Risk Levels: risk_levels
+    Risk Levels: [sewage_overflow_pressure, sewerage_properties, livestock_pressure, esme_risk_levels]
     Intervention hypothesis: river_status_text
     Interventions: [intervention_types, intervention_waterbodies]
   EA Data:
     Environment Agency Scoring: [ea_classifications, ea_scores, ea_thresholds]
   Land Use Data:
+    River Information: river_information
     Habitat and Land Usage: habitat_land_use
-    Risk Levels: risk_levels
+    Risk Levels: [livestock_pressure, esme_risk_levels]
     River Obstacles: river_obstacles
     Number of Farms: farms
     Livestock Pressures: livestock
@@ -164,14 +194,14 @@ dashboard:
     Outlet Locations: storm_overflows
     Properties on public and private sewerage: sewerage_properties
     Continuous Discharge: location_text
-    Source of Phosphate: phosphate_sources
-    Risk Levels: risk_levels
+    Source of Phosphate: phosphate_point_diffuse
+    Risk Levels: [sewage_overflow_pressure, sewerage_properties]
     Asset Improvement Plans: sewerage_improvements
   Every dashboard page:
     '"i" info buttons': datasets  # quoted, as it starts with a quote mark
   Catchment Dashboard:
-    Map colours: ea_classifications
-    Ecological Class counts: ea_classifications
+    Map colours: [ea_classifications, ecological_classes]
+    Ecological Class counts: [ea_classifications, ecological_classes]
     Why is the river system failing?: location_text
     What is happening now?: location_text
     Intervention hypothesis: location_text
@@ -195,4 +225,4 @@ links:
   - {from: catchments.upstream_ids, to: catchments}
   - {from: catchments.downstream_ids, to: catchments}
   - {from: datasets.table_name, to: data tables}
-  - {from: uploads.table_name, to: excel tables}
+  - {from: uploads.uploaded_to, to: excel tables}  # or a source file's code

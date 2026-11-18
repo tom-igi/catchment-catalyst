@@ -30,7 +30,7 @@ NAMING_CONVENTION = {
 }
 
 TOP_LEVEL_OPTIONS = {"extensions", "tables", "data_tables"}
-TABLE_OPTIONS = {"title", "description", "filled_by", "columns", "indexes", "renamed_from"}
+TABLE_OPTIONS = {"title", "description", "filled_by", "input", "columns", "indexes", "renamed_from"}
 COLUMN_OPTIONS = {
     "type", "description", "required", "primary_key", "identity", "unique",
     "index", "default", "references", "on_delete", "renamed_from", "example",
@@ -52,7 +52,14 @@ KEYS = {CATCHMENT_COLUMN: CATCHMENT_REFERENCE, LOCATION_COLUMN: LOCATION_REFEREN
 FILLED_BY = {
     "api": "an importer, from an outside service's API (backend/catalyst/importers/api/)",
     "excel": "uploading an Excel file in the admin page (backend/catalyst/importers/excel/)",
+    "input": (
+        "worked out from a source file uploaded as it comes in the admin page, with the original "
+        "Power BI dashboard's formulas (backend/catalyst/importers/inputs/)"
+    ),
 }
+# Tables filled by uploading a file in the admin page. Both kinds replace the table's rows
+# with the upload's, so they have the same rules (see _check_excel_table).
+UPLOADED = {"excel", "input"}
 # Column types an Excel upload can fill: text, whole numbers, numbers, yes/no
 # and dates. (real and numeric aren't included: their values change slightly
 # when stored, so every upload would look like it changed them. Use double.)
@@ -106,8 +113,13 @@ class Schema:
 
     @property
     def excel_tables(self) -> list[str]:
-        """The tables filled by Excel upload, in the order of schema.yaml."""
+        """The tables filled by Excel upload (1 to 1), in the order of schema.yaml."""
         return [t.name for t in self.metadata.tables.values() if t.info.get("filled_by") == "excel"]
+
+    @property
+    def input_tables(self) -> dict[str, str]:
+        """The tables worked out from a source file: table name -> the input that fills it, in the order of schema.yaml."""
+        return {t.name: t.info["input"] for t in self.metadata.tables.values() if t.info.get("filled_by") == "input"}
 
 
 def load_schema(path: Path | str = SCHEMA_FILE) -> Schema:
@@ -222,12 +234,21 @@ def _build_table(where, name, spec, known_columns, schema: Schema, problems: lis
     filled_by = spec.get("filled_by")
     if filled_by is not None and filled_by not in FILLED_BY:
         problems.append(f"{where}: 'filled_by' must be one of: {', '.join(FILLED_BY)}")
+    input_name = spec.get("input")
+    if filled_by == "input":
+        if not isinstance(input_name, str) or not NAME_RE.match(input_name):
+            problems.append(
+                f"{where}: tables with 'filled_by: input' need 'input', the name of the source file's "
+                "code in backend/catalyst/importers/inputs/, e.g. input: apha_livestock"
+            )
+    elif input_name is not None:
+        problems.append(f"{where}: 'input' is only for tables with 'filled_by: input'")
     table = sa.Table(
         name, schema.metadata, *columns,
         comment=spec.get("description"),
-        info={"title": spec.get("title"), "filled_by": filled_by},  # not stored in the database
+        info={"title": spec.get("title"), "filled_by": filled_by, "input": input_name},  # not stored in the database
     )
-    if filled_by == "excel":
+    if filled_by in UPLOADED:
         _check_excel_table(where, table, problems)
     for cols, unique, using in indexes:
         if all(c in table.c for c in cols):
@@ -332,7 +353,11 @@ def key_column(table: sa.Table) -> str:
 
 
 def _check_excel_table(where, table: sa.Table, problems) -> None:
-    """An Excel upload must be able to fill every column, and match its rows to the table's."""
+    """An Excel upload must be able to fill every column, and match its rows to the table's.
+
+    The same goes for a table worked out from a source file: its rows are compared and
+    replaced in the same way.
+    """
     if not table.primary_key.columns:
         problems.append(
             f"{where}: tables filled by Excel need a primary key, so each uploaded row "

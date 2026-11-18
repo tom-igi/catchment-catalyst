@@ -121,12 +121,12 @@
 {% endif %}
 {% endmacro %}
 
-{# Links to other catchments: a link if it's in this location, otherwise its name. #}
-{% macro catchment_links(ids, location, links) %}
-{% set here = location.catchment_ids() %}
-{% for id in ids or [] %}
-{% if id in here %}<a href="{{ links }}{{ id }}/">{{ location.names[id] }}</a>{% elif id in location.names %}{{ location.names[id] }} ({{ id }}){% else %}{{ id }}{% endif %}{{ ", " if not loop.last else "" }}
+{# Rivers up or downstream: a list of (text, catchment ID or None), each with an ID linked to its page. #}
+{% macro river_links(rivers, links) %}
+{% for text, id in rivers %}
+{% if id %}<a href="{{ links }}{{ id }}/">{{ text }}</a>{% else %}{{ text }}{% endif %}{{ ", " if not loop.last else "" }}
 {% else %}
 None
 {% endfor %}
 {% endmacro %}
+

@@ -1,5 +1,5 @@
 {% extends "catchment.html" %}
-{% from "macros.html" import heading, risk_levels, catchment_links, points_map with context %}
+{% from "macros.html" import heading, risk_levels, river_links, points_map with context %}
 {% block panels %}
 {% set catchment_id = catchment.id if catchment else "" %}
 <div class="grid land-use">
@@ -9,11 +9,13 @@
         <tr><th scope="col">River Information</th><th></th></tr>
       </thead>
       <tbody>
+        {% set river = figures.river_info(catchment) if catchment else {} %}
         <tr><th scope="row">Catchment ID</th><td>{{ catchment.id if catchment else "" }}</td></tr>
-        <tr><th scope="row">Catchment Area (ha)</th><td>{{ catchment.area_ha | number(1) if catchment else "" }}</td></tr>
-        <tr><th scope="row">River Length (km)</th><td>{{ catchment.river_length_km | number(2) if catchment else "" }}</td></tr>
-        <tr><th scope="row">Upstream Rivers</th><td data-keep-scroll>{% if catchment %}{{ catchment_links(catchment.upstream_ids, location, root ~ tab ~ "/") }}{% endif %}</td></tr>
-        <tr><th scope="row">Downstream Rivers</th><td data-keep-scroll>{% if catchment %}{{ catchment_links(catchment.downstream_ids, location, root ~ tab ~ "/") }}{% endif %}</td></tr>
+        <tr><th scope="row">Catchment Area (ha)</th><td>{{ river.area_ha | number(1) if catchment else "" }}</td></tr>
+        <tr><th scope="row">River Length (km)</th><td>{{ river.length_km | number(2) if catchment else "" }}</td></tr>
+        <tr><th scope="row">River System</th><td>{{ (river.river_system or "") if catchment else "" }}</td></tr>
+        <tr><th scope="row">Upstream Rivers</th><td data-keep-scroll>{% if catchment %}{{ river_links(river.upstream, root ~ tab ~ "/") }}{% endif %}</td></tr>
+        <tr><th scope="row">Downstream Rivers</th><td data-keep-scroll>{% if catchment %}{{ river_links(river.downstream, root ~ tab ~ "/") }}{% endif %}</td></tr>
       </tbody>
     </table>
   </section>
@@ -98,7 +100,7 @@
           {% for row in (figures.livestock(catchment) if catchment else []) %}
           <tr>
             <td>{{ row.livestock }}</td>
-            <td class="num" data-sort="{{ row.number }}">{{ row.number | number(0) }}</td>
+            <td class="num" data-sort="{{ row.number | sort_value }}">{{ row.number | number(0) if row.number is not none else (row.number_note or "") }}</td>
             <td class="num" data-sort="{{ row.density | sort_value }}">{{ row.density | number(1) }}</td>
             <td>{{ row.density_rating or "" }}</td>
           </tr>

@@ -61,11 +61,21 @@ It shows the data as it was when it was last published (see step 5, "Then publis
 
 ## 5. Update the tables in the database
 
-Most tables are updated in one of the two ways below; the admin page (step 4) marks each table
-**Downloaded** or **Excel upload**. Locations are the exception, and are changed with the
-commands after that.
+Most tables are updated in one of the three ways below; the admin page (step 4) marks each table
+**Downloaded**, **Source file** or **Excel upload**. Locations are the exception, and are changed
+with the commands after that.
 
-### Tables updated by Excel upload (e.g. EA Scores, Habitat & Land Use)
+### Tables worked out from a source file (e.g. Livestock, from APHA's livestock data)
+
+They're marked **Source file** (purple) on the admin page. Each file has its own box on the left
+with an **Upload file** button.
+
+1. Go to <http://localhost:8000/admin> and log in.
+2. Click the file's **Upload file**. It says which sheet and columns it needs.
+3. Upload the file as it came, check the preview (it shows each table the file fills), and
+   click **Approve**.
+
+### Tables updated by Excel upload (e.g. Location Text, Intervention Waterbodies)
 
 They're marked **Uploaded in Excel** (green) on the admin page, and each has its own box on
 the left of the diagram with an **Upload data** button.
@@ -128,7 +138,7 @@ dashboard** box at the top says how many uploads have been approved since the la
 Click its **Publish** button to rebuild the dashboard from the database (it takes a few
 seconds). You can approve several uploads first, check them, then publish once.
 
-After running an import command, publish too: the box only counts Excel uploads. Or publish
+After running an import command, publish too: the box only counts uploads. Or publish
 from the command line, which does exactly the same:
 
 ```bash

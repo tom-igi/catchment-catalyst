@@ -47,9 +47,12 @@ def test_the_model_says_how_each_table_is_filled():
     # Tables downloaded by the same command share one box on the page.
     assert tables["ea_classifications"]["command"] == tables["ea_rnags"]["command"] != tables["catchments"]["command"]
     assert tables["catchments"]["command"] == "docker compose run --rm importer catchments imports/catchments.json"
-    assert tables["ea_scores"]["fill"] == "excel"
+    assert tables["ea_scores"]["fill"] == "input" and tables["location_text"]["fill"] == "excel"
     assert (tables["uploads"]["fill"], tables["publishes"]["fill"], tables["locations"]["fill"]) == ("admin", "admin", "command")
-    assert all(t["fill"] in {"api", "excel"} for t in tables.values() if t["kind"] == "data")
+    assert all(t["fill"] in {"api", "input", "excel"} for t in tables.values() if t["kind"] == "data")
+    # Tables worked out from the same source file share one box on the page, too.
+    assert tables["livestock"]["fill"] == tables["livestock_pressure"]["fill"] == "input"
+    assert tables["livestock"]["input"] == tables["livestock_pressure"]["input"] == "apha_livestock"
     assert tables["locations"]["summary"].startswith("One row per dashboard location (e.g. North Devon): ")
     assert tables["ea_scores"]["one_row_per"] == ["Catchment ID", "Measure", "Year"]
 
@@ -61,8 +64,36 @@ def test_the_model_says_what_happens_to_the_data_on_the_way_in():
         if t["fill"] == "api":
             assert t["transformation"] and all(isinstance(step, str) and step.endswith(".") for step in t["transformation"]), t["name"]
     assert "#N/A" in " ".join(tables["storm_overflows"]["transformation"])  # not cut off as a YAML comment
-    # ...and Excel uploads are copied 1 to 1, for now.
+    # ...Excel uploads are copied 1 to 1...
     assert all(t["transformation"] == [] for t in tables.values() if t["fill"] == "excel")
+    # ...and a source file's tables are worked out with the original Power BI dashboard's formulas.
+    sources = {i["name"]: i for i in diagram.model(load_schema())["inputs"]}
+    assert sources["waterbody_lookup"]["tables"] == ["catchment_rankings", "farms", "sewerage_properties", "ecological_classes", "river_information"]
+    assert sources["apha_livestock"]["headings"][0] == "Catchment Name" and sources["apha_livestock"]["sheet"] == "Appendix 1 EIR2026_00630"
+
+
+def test_each_table_has_its_own_transformation():
+    tables = {t["name"]: t for t in diagram.model(load_schema())["tables"]}
+    # A source file's: its inputs (the file's columns it reads), and a step for each of its columns, as the Power BI did.
+    pressure = tables["livestock_pressure"]["transform"]
+    assert (pressure["kind"], pressure["name"], pressure["sub"]) == ("input", "Power BI's formulas", "6 columns in, 5 steps")
+    assert (pressure["file"], pressure["sheet"]) == ("APHA Livestock Data Feb 2026.xlsx", "Appendix 1 EIR2026_00630")
+    assert pressure["inputs"][0] == "Catchment Name" and "Pig Density Per SqKm" in pressure["inputs"]
+    assert [step["columns"] for step in pressure["steps"]] == [
+        ["catchment_id"], ["nitrogen_load"], ["phosphate_load"], ["nitrogen_and_phosphate_load"], ["pressure"],
+    ]
+    assert pressure["steps"][3]["inputs"] == ["nitrogen_load", "phosphate_load"]  # columns worked out before
+    assert "Very High above 40,000" in pressure["steps"][-1]["text"] and pressure["steps"][-1]["power_bi"]
+    assert tables["phosphate_point_diffuse"]["transform"]["sheet"] == "Phosphate Point vs Diffuse"  # its own sheet
+    # An importer's: what it downloads, and its steps.
+    rnags = tables["ea_rnags"]["transform"]
+    assert (rnags["kind"], rnags["name"], rnags["file"]) == ("api", "Reshaped", "The EA's rnags.csv for each management catchment")
+    assert "Swmi" in rnags["inputs"] and rnags["steps"][0]["text"].startswith("Downloads")
+    # An Excel table's: 1 to 1. Housekeeping: none.
+    assert tables["location_text"]["transform"]["name"] == "1 to 1"
+    assert tables["uploads"]["transform"] is None
+    for t in tables.values():  # every table data comes into has one
+        assert (t["transform"] is not None) == (t["fill"] in {"api", "input", "excel"}), t["name"]
 
 
 def test_the_model_says_where_each_data_table_is_on_the_dashboards():
@@ -80,7 +111,10 @@ def test_the_model_says_where_each_data_table_is_on_the_dashboards():
     # A panel with data from several tables is listed for each, in the dashboards' order.
     for name in ["ea_classifications", "ea_scores", "ea_thresholds"]:
         assert {"page": "EA Data", "panels": ["Environment Agency Scoring"]} in tables[name]["dashboard"]
-    assert [place["page"] for place in tables["risk_levels"]["dashboard"]] == ["River Status", "Land Use Data", "Sewerage Data"]
+    # The Risk Levels tiles: each table that has some of them, on the pages it's on.
+    assert [place["page"] for place in tables["sewage_overflow_pressure"]["dashboard"]] == ["River Status", "Sewerage Data"]
+    assert "risk_levels" not in tables  # its tiles are all in the tables they're worked out in
+    assert [place["page"] for place in tables["esme_risk_levels"]["dashboard"]] == ["River Status", "Land Use Data"]
 
 
 def test_the_model_has_every_link():
@@ -94,7 +128,7 @@ def test_the_model_has_every_link():
     assert {(name, "location_id", "locations", "id") for name in by_location} <= links
     assert ("locations", "catchment_ids", "catchments", "list") in links
     assert {("datasets", "table_name", name, "name") for name in data_tables} <= links
-    assert ("uploads", "table_name", "ea_scores", "name") in links
+    assert ("uploads", "uploaded_to", "location_text", "name") in links
 
 
 def test_a_mistake_in_diagram_yaml_is_reported(tmp_path):
@@ -111,7 +145,10 @@ def test_a_mistake_in_diagram_yaml_is_reported(tmp_path):
     settings.write_text(ONLY_DATA_TABLES_SECTION + "filled: {catchments: {transformation: {Downloads: it}}}\n")
     with pytest.raises(ValueError, match="a transformation that isn't a list of steps"):
         diagram.model(load_schema(), diagram_file=settings)
-    settings.write_text(ONLY_DATA_TABLES_SECTION + "dashboard: {River Status: {Risk Levels: [risk_levels, nope]}}\n")
+    settings.write_text(ONLY_DATA_TABLES_SECTION + "filled: {catchments: {inputs: WB_NAME}}\n")
+    with pytest.raises(ValueError, match="inputs that aren't a list of column names"):
+        diagram.model(load_schema(), diagram_file=settings)
+    settings.write_text(ONLY_DATA_TABLES_SECTION + "dashboard: {River Status: {Risk Levels: [esme_risk_levels, nope]}}\n")
     with pytest.raises(ValueError, match="gives River Status's Risk Levels panel the table nope, which isn't in schema.yaml"):
         diagram.model(load_schema(), diagram_file=settings)
     settings.write_text(ONLY_DATA_TABLES_SECTION + "dashboard: {River Status: [Risk Levels]}\n")

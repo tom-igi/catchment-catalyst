@@ -1,19 +1,21 @@
 """The admin page's web pages.
 
     /admin                            every table, as a diagram (see diagram.py). Click a
-                                      table to see its columns and download it. Each Excel
-                                      table also has its own "Upload data" on the left, to
-                                      upload an edited copy and see its uploads
+                                      table to see its columns and download it. Each source
+                                      file and each Excel table has its own upload on the left
     /admin#<table>                    the diagram with a table's details open
-    /admin#upload-<table>             ...or with an Excel table's upload open
+    /admin#upload-<table or input>    ...or with an Excel table's or a source file's upload open
     /admin/tables/<table>/download    any table as an Excel file
     /admin/tables/<table>/upload      upload an edited copy (Excel tables only)
+    /admin/inputs/<input>/upload      upload a source file as it came (see catalyst.importers.inputs)
     /admin/uploads/<id>               preview what an upload will change; approve or cancel
     /admin/publish                    publish the dashboards (the Publish button at the top of /admin)
 
-Every page needs a login. Every table can be downloaded, but only tables marked
-`filled_by: excel` in schema.yaml can be uploaded, and each works the same way
-(see catalyst.importers.excel). An approved upload is only on the public
+Every page needs a login. Every table can be downloaded. Two kinds can be
+uploaded: tables marked `filled_by: excel` in schema.yaml, as an edited copy of
+the table (see catalyst.importers.excel), and tables marked `filled_by: input`,
+by uploading their source file, which can fill several tables at once (see
+catalyst.importers.inputs). An approved upload is only on the public
 dashboards once someone presses Publish, which runs the publish step (see
 catalyst.publish), so several uploads can be approved, then published at once.
 """
@@ -21,6 +23,8 @@ catalyst.publish), so several uploads can be approved, then published at once.
 from __future__ import annotations
 
 import datetime
+import hashlib
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated, Any
 from zoneinfo import ZoneInfo
@@ -34,12 +38,13 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from catalyst import publish
 from catalyst.db import load_schema
-from catalyst.importers import excel
+from catalyst.importers import excel, inputs
 
 from . import diagram, passwords, uploads
 from .settings import Settings
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+MEDIA_TYPES = {".xlsx": XLSX, ".xls": "application/vnd.ms-excel", ".csv": "text/csv"}
 MAX_UPLOAD_MB = 20
 ROWS_SHOWN = 200  # per section of the preview
 PROBLEMS_SHOWN = 50
@@ -149,6 +154,8 @@ def _render_home(request: Request, status_code: int = 200, problems: dict | None
             t["download"] = _download_details(schema.metadata.tables[t["name"]])
             if t["name"] in schema.excel_tables:
                 t["update"] = _excel_details(conn, state, schema.metadata.tables[t["name"]], last.get(t["name"]))
+        for i in model["inputs"]:
+            i["update"] = _input_details(conn, state, i["name"], last.get(i["name"]))
         publishing = _publish_details(conn, schema)
     if problems:
         model["problems"] = problems
@@ -161,12 +168,11 @@ def _publish_details(conn: sa.Connection, schema) -> dict:
     if last is None:  # not since publishes were first recorded, so what's been approved since is unknown
         return {"last": None, "waiting": 0, "tables": []}
     waiting = uploads.approved_since(conn, schema, last.published_at)
-    tables = schema.metadata.tables
-    names = dict.fromkeys(u.table_name for u in waiting)  # each table once, in the order approved
+    names = dict.fromkeys(u.uploaded_to for u in waiting)  # each once, in the order approved
     return {
         "last": {"when": _when(last.published_at), "who": last.published_by},
         "waiting": len(waiting),
-        "tables": [_title(tables[n]) if n in tables else n for n in names],
+        "tables": [_uploaded_to_title(schema, n) for n in names],
     }
 
 
@@ -185,6 +191,17 @@ def _excel_details(conn: sa.Connection, state, table: sa.Table, last: sa.Row | N
         "download_url": f"/admin/tables/{table.name}/download",
         "upload_url": f"/admin/tables/{table.name}/upload",
         "key": excel.key_columns(table),
+        **_recent_uploads(conn, state, table.name, last),
+    }
+
+
+def _input_details(conn: sa.Connection, state, name: str, last: sa.Row | None) -> dict:
+    """What a source file's upload needs: where to upload it, and its recent uploads."""
+    return {"upload_url": f"/admin/inputs/{name}/upload", **_recent_uploads(conn, state, name, last)}
+
+
+def _recent_uploads(conn: sa.Connection, state, uploaded_to: str, last: sa.Row | None) -> dict:
+    return {
         "last": {"when": _when(last.approved_at), "who": last.uploaded_by} if last else None,
         "recent": [
             {
@@ -199,7 +216,7 @@ def _excel_details(conn: sa.Connection, state, table: sa.Table, last: sa.Row | N
                 "changed": u.rows_changed,
                 "removed": u.rows_removed,
             }
-            for u in uploads.recent(conn, state.schema, table.name, RECENT_UPLOADS)
+            for u in uploads.recent(conn, state.schema, uploaded_to, RECENT_UPLOADS)
         ],
     }
 
@@ -228,7 +245,7 @@ ExcelTable = Annotated[sa.Table, Depends(excel_table)]
 
 @router.get("/tables/{table_name}")
 def table_page(table: ExcelTable):  # each Excel table's own page, before the diagram had its details
-    return RedirectResponse(_upload_panel(table), 303)
+    return RedirectResponse(_upload_panel(table.name), 303)
 
 
 @router.get("/tables/{table_name}/download")
@@ -246,41 +263,61 @@ def download(request: Request, table: AnyTable):
 
 @router.post("/tables/{table_name}/upload")
 def upload(request: Request, user: User, table: ExcelTable, file: Annotated[UploadFile | None, File()] = None):
+    return _upload(request, user, table.name, file)
+
+
+def source_input(request: Request, input_name: str, user: User) -> inputs.Input:
+    if input_name not in inputs.INPUTS or input_name not in request.app.state.schema.input_tables.values():
+        raise HTTPException(404, "There's no source file by that name that can be uploaded here.")
+    return inputs.INPUTS[input_name]
+
+
+SourceInput = Annotated[inputs.Input, Depends(source_input)]
+
+
+@router.post("/inputs/{input_name}/upload")
+def upload_source_file(request: Request, user: User, source: SourceInput, file: Annotated[UploadFile | None, File()] = None):
+    return _upload(request, user, source.name, file)
+
+
+def _upload(request: Request, user: str, uploaded_to: str, file: UploadFile | None):
+    """Read an upload for a table or a source file, and keep it for its preview if it changes anything."""
     state = request.app.state
     if file is None or not file.filename:
-        return _upload_problems(request, table, None, ["Choose a file to upload."])
+        return _upload_problems(request, uploaded_to, None, ["Choose a file to upload."])
     data = file.file.read(MAX_UPLOAD_MB * 1024 * 1024 + 1)
     if len(data) > MAX_UPLOAD_MB * 1024 * 1024:
-        problems = [f"The file is bigger than {MAX_UPLOAD_MB} MB, which is too big for one table."]
-        return _upload_problems(request, table, file.filename, problems)
+        problems = [f"The file is bigger than {MAX_UPLOAD_MB} MB, which is too big to upload here."]
+        return _upload_problems(request, uploaded_to, file.filename, problems)
     try:
-        rows = excel.read_upload(table, data)
         with state.engine.begin() as conn:
-            comparison = excel.compare(conn, table, rows)
-            if not comparison.has_changes:
-                request.session["message"] = f"{file.filename} is the same as the table, so there's nothing to change."
-                return RedirectResponse(_upload_panel(table), 303)
+            changes = _changes(conn, state, uploaded_to, data, file.filename)
+            if not changes.has_changes:
+                same = "the table" if len(changes.comparisons) == 1 else "the tables it fills"
+                request.session["message"] = f"{file.filename} is the same as {same}, so there's nothing to change."
+                return RedirectResponse(_upload_panel(uploaded_to), 303)
             upload_id = uploads.create(
-                conn, state.schema, state.settings.raw_files_dir, table, file.filename, data, user, len(rows), comparison
+                conn, state.schema, state.settings.raw_files_dir, uploaded_to, file.filename, data, user,
+                changes.rows_in_file, changes.comparisons, source_file=changes.source_file,
             )
     except excel.UploadError as e:
-        return _upload_problems(request, table, file.filename, e.problems)
+        return _upload_problems(request, uploaded_to, file.filename, e.problems)
     return RedirectResponse(f"/admin/uploads/{upload_id}", 303)
 
 
-def _upload_problems(request: Request, table: sa.Table, file_name: str | None, problems: list[str]):
-    """The diagram again, with the table's upload open and the file's problems in it."""
+def _upload_problems(request: Request, uploaded_to: str, file_name: str | None, problems: list[str]):
+    """The diagram again, with the upload open (the table's or the source file's) and the file's problems in it."""
     return _render_home(request, status_code=422, problems={
-        "table": table.name,
+        "uploaded_to": uploaded_to,
         "file": file_name,
         "items": problems[:PROBLEMS_SHOWN],
         "more": max(len(problems) - PROBLEMS_SHOWN, 0),
     })
 
 
-def _upload_panel(table: sa.Table) -> str:
-    """The diagram, with the Excel table's upload open."""
-    return f"/admin#upload-{table.name}"
+def _upload_panel(uploaded_to: str) -> str:
+    """The diagram, with the Excel table's or the source file's upload open."""
+    return f"/admin#upload-{uploaded_to}"
 
 
 # --- Uploads ---------------------------------------------------------------------
@@ -290,16 +327,22 @@ def preview(request: Request, user: User, upload_id: int):
     state = request.app.state
     with state.engine.connect() as conn:
         upload = _get_upload(conn, state, upload_id)
-        table = state.schema.metadata.tables[upload.table_name]
-        comparison, problems = None, None
+        changes, problems = None, None
         if upload.status == uploads.PREVIEW:
             try:
-                comparison = _compare(conn, state, table, upload)
+                changes = _kept_changes(conn, state, upload)
             except excel.UploadError as e:  # e.g. a catchment it links to has since gone
                 problems = e.problems
+    tables = state.schema.metadata.tables
+    parts = [
+        {"table": tables[name], "comparison": comparison, "key": excel.key_columns(tables[name])}
+        for name, comparison in (changes.comparisons.items() if changes else [])
+    ]
     return _render(
-        request, "preview.html", upload=upload, table=table, comparison=comparison, problems=problems,
-        key=excel.key_columns(table), rows_shown=ROWS_SHOWN,
+        request, "preview.html", upload=upload, changes=changes, parts=parts, problems=problems,
+        uploaded_to=_uploaded_to_title(state.schema, upload.uploaded_to), back=_upload_panel(upload.uploaded_to),
+        source_file=upload.uploaded_to in inputs.INPUTS,
+        filled=_filled_titles(state.schema, upload), rows_shown=ROWS_SHOWN,
     )
 
 
@@ -313,29 +356,33 @@ def approve(request: Request, user: User, upload_id: int, check: Annotated[str, 
             if upload.status != uploads.PREVIEW:
                 request.session["message"] = f"This upload has already been {upload.status}."
                 return here
-            table = state.schema.metadata.tables[upload.table_name]
-            excel.lock(conn, table)
-            comparison = _compare(conn, state, table, upload)
-            if comparison.fingerprint != check:
+            for name in sorted(_filled(upload.uploaded_to)):  # always in the same order
+                excel.lock(conn, state.schema.metadata.tables[name])
+            changes = _kept_changes(conn, state, upload)
+            if changes.fingerprint != check:
                 request.session["message"] = (
-                    "The table has changed since this preview was shown, perhaps because someone else "
-                    "uploaded a file. Nothing has been changed yet: check the changes below again."
+                    f"{'The table has' if len(changes.comparisons) == 1 else 'The tables have'} changed since this "
+                    "preview was shown, perhaps because someone else uploaded a file. Nothing has been changed yet: "
+                    "check the changes below again."
                 )
                 return here
-            excel.replace(conn, table, comparison)
-            uploads.approve(conn, state.schema, upload_id, comparison)
+            for name, comparison in changes.comparisons.items():
+                excel.replace(conn, state.schema.metadata.tables[name], comparison)
+            uploads.approve(conn, state.schema, upload_id, changes.comparisons, source_file=changes.source_file)
     except excel.UploadError:
         request.session["message"] = "This file can no longer be used, so nothing has been changed. The problems are below."
         return here
     except sa.exc.DBAPIError as e:
         request.session["message"] = f"The database refused the changes, so nothing has been changed. It said: {e.orig}"
         return here
+    comparisons = changes.comparisons.values()
+    titles = [_title(state.schema.metadata.tables[name]) for name in changes.comparisons]
     request.session["message"] = (
-        f"Done. {_title(table)} now matches {upload.file_name}: {len(comparison.added)} added, "
-        f"{len(comparison.changed)} changed, {len(comparison.removed)} deleted. "
-        "It will be on the public dashboard once you publish."
+        f"Done. {_and(titles)} now {'matches' if len(titles) == 1 else 'match'} {upload.file_name}: "
+        f"{sum(len(c.added) for c in comparisons)} added, {sum(len(c.changed) for c in comparisons)} changed, "
+        f"{sum(len(c.removed) for c in comparisons)} deleted. It will be on the public dashboard once you publish."
     )
-    return RedirectResponse(_upload_panel(table), 303)
+    return RedirectResponse(_upload_panel(upload.uploaded_to), 303)
 
 
 @router.post("/uploads/{upload_id}/cancel")
@@ -348,7 +395,7 @@ def cancel(request: Request, user: User, upload_id: int):
             return RedirectResponse(f"/admin/uploads/{upload_id}", 303)
         uploads.cancel(conn, state.schema, upload_id)
     request.session["message"] = f"Cancelled {upload.file_name}. Nothing has been changed."
-    return RedirectResponse(_upload_panel(state.schema.metadata.tables[upload.table_name]), 303)
+    return RedirectResponse(_upload_panel(upload.uploaded_to), 303)
 
 
 @router.get("/uploads/{upload_id}/file")
@@ -359,7 +406,64 @@ def upload_file(request: Request, user: User, upload_id: int):
     path = uploads.file_path(state.settings.raw_files_dir, upload)
     if not path.is_file():
         raise HTTPException(404, f"The file for upload {upload_id} isn't there any more ({upload.stored_as}).")
-    return FileResponse(path, media_type=XLSX, filename=upload.file_name)
+    return FileResponse(path, media_type=MEDIA_TYPES.get(path.suffix.lower(), XLSX), filename=upload.file_name)
+
+
+# --- What an upload changes ----------------------------------------------------------
+
+@dataclass
+class Changes:
+    """What an upload would change: a Comparison for each table it fills, and anything a source file left out."""
+    comparisons: dict[str, excel.Comparison]
+    rows_in_file: int
+    source_file: bool = False
+    notes: list[str] = field(default_factory=list)
+
+    @property
+    def has_changes(self) -> bool:
+        return any(c.has_changes for c in self.comparisons.values())
+
+    @property
+    def fingerprint(self) -> str:
+        """Identifies exactly these changes, to every table (see Comparison.fingerprint)."""
+        parts = sorted(f"{name} {c.fingerprint}" for name, c in self.comparisons.items())
+        return hashlib.sha256("\n".join(parts).encode()).hexdigest()
+
+
+def _changes(conn: sa.Connection, state, uploaded_to: str, data: bytes, file_name: str) -> Changes:
+    """Read a file uploaded to a table or a source file, and compare it with the table(s). Raises UploadError."""
+    schema = state.schema
+    if uploaded_to in inputs.INPUTS:
+        result = inputs.INPUTS[uploaded_to].run(conn, schema, data, file_name)
+        comparisons = {name: excel.compare(conn, schema.metadata.tables[name], rows) for name, rows in result.tables.items()}
+        return Changes(comparisons, result.rows_read, source_file=True, notes=result.notes)
+    table = schema.metadata.tables[uploaded_to]
+    rows = excel.read_upload(table, data)
+    return Changes({table.name: excel.compare(conn, table, rows)}, len(rows))
+
+
+def _kept_changes(conn: sa.Connection, state, upload: sa.Row) -> Changes:
+    """Read the kept file again and compare it with the table(s) as they are now."""
+    data = uploads.file_path(state.settings.raw_files_dir, upload).read_bytes()
+    return _changes(conn, state, upload.uploaded_to, data, upload.file_name)
+
+
+def _filled(uploaded_to: str) -> list[str]:
+    """The tables an upload fills: its source file's, or its own table."""
+    return inputs.INPUTS[uploaded_to].tables if uploaded_to in inputs.INPUTS else [uploaded_to]
+
+
+def _filled_titles(schema, upload: sa.Row) -> list[str]:
+    tables = schema.metadata.tables
+    return [_title(tables[name]) for name in _filled(upload.uploaded_to) if name in tables]
+
+
+def _uploaded_to_title(schema, name: str) -> str:
+    """What an upload was for, by name: a table's title, or a source file's."""
+    if name in inputs.INPUTS:
+        return inputs.INPUTS[name].title
+    tables = schema.metadata.tables
+    return _title(tables[name]) if name in tables else name
 
 
 # --- Publishing -------------------------------------------------------------------
@@ -385,16 +489,14 @@ def publish_dashboards(request: Request, user: User):
 
 
 def _get_upload(conn: sa.Connection, state, upload_id: int, for_update: bool = False) -> sa.Row:
+    """An upload that can still be shown: to a table filled by Excel, or a source file that fills tables."""
     upload = uploads.get(conn, state.schema, upload_id, for_update=for_update)
-    if upload is None or upload.table_name not in state.schema.excel_tables:
+    if upload is None or (
+        upload.uploaded_to not in state.schema.excel_tables
+        and upload.uploaded_to not in state.schema.input_tables.values()
+    ):
         raise HTTPException(404, f"There's no upload {upload_id}.")
     return upload
-
-
-def _compare(conn: sa.Connection, state, table: sa.Table, upload: sa.Row) -> excel.Comparison:
-    """Read the kept file again and compare it with the table as it is now."""
-    data = uploads.file_path(state.settings.raw_files_dir, upload).read_bytes()
-    return excel.compare(conn, table, excel.read_upload(table, data))
 
 
 def _count(conn: sa.Connection, table: sa.Table) -> int:

@@ -20,6 +20,7 @@ from typing import Any
 from .collect import Location, slug
 
 CLASSIFICATIONS = "ea_classifications"
+ECOLOGICAL_CLASSES = "ecological_classes"  # from the Waterbody Lookup: years the EA's classifications don't have yet
 RNAGS = "ea_rnags"
 OVERFLOWS = "storm_overflows"
 OBSTACLES = "river_obstacles"
@@ -27,11 +28,15 @@ SCORES = "ea_scores"
 THRESHOLDS = "ea_thresholds"
 HABITAT = "habitat_land_use"
 RIVER_TEXT = "river_status_text"
-RISKS = "risk_levels"
 RANKINGS = "catchment_rankings"
 FARMS = "farms"
 LIVESTOCK = "livestock"
+LIVESTOCK_PRESSURE = "livestock_pressure"
+RIVER_INFO = "river_information"
+OVERFLOW_PRESSURE = "sewage_overflow_pressure"
+ESME_RISKS = "esme_risk_levels"
 PHOSPHATE = "phosphate_sources"
+PHOSPHATE_SPLIT = "phosphate_point_diffuse"
 PROPERTIES = "sewerage_properties"
 IMPROVEMENTS = "sewerage_improvements"
 LOCATION_TEXT = "location_text"
@@ -86,7 +91,8 @@ MEASURES = {
 # Best first. Statuses not listed are counted after these.
 STATUS_ORDER = ["High", "Good", "Moderate", "Poor", "Bad"]
 
-# The Risk Levels tiles: the column in Risk Levels -> the tile's name.
+# The Risk Levels tiles: each tile's name, and the table and column its level is in (the table of the
+# source file or importer it's worked out from).
 RISK_NAMES = {
     "untreated_sewage": "Untreated Sewage",
     "sewage_private": "Sewage (Private)",
@@ -96,6 +102,12 @@ RISK_NAMES = {
     "invasive_species": "Invasive Species",
     "overheating": "Overheating",
     "running_dry": "Running Dry",
+}
+RISK_COLUMNS = {
+    "untreated_sewage": (OVERFLOW_PRESSURE, "pressure"),
+    "sewage_private": (PROPERTIES, "private_sewerage_rating"),
+    "livestock": (LIVESTOCK_PRESSURE, "pressure"),
+    **{name: (ESME_RISKS, name) for name in ["runoff", "modification", "invasive_species", "overheating", "running_dry"]},
 }
 # The Sewerage Data page's Source of Phosphate groups, in order.
 DISCHARGES = ["Continuous", "Diffuse"]
@@ -107,7 +119,9 @@ DISCHARGES = ["Continuous", "Diffuse"]
 BELOW_GOOD = {"Moderate", "Moderate or less", "Poor", "Bad", "Does Not Support Good"}
 FAILING_LEVELS = {"Element", "Sub Element"}
 COMBINED = "Macrophytes and Phytobenthos Combined"
-NO_REASON = "Not applicable"  # an RNAG activity that says nothing, so isn't shown
+# RNAG activities that say nothing about the cause, so aren't listed (as on the original), ignoring case.
+NO_REASONS = {"not applicable", "unknown (pending investigation)", "other (not in list, must add details in comments)"}
+SUSPECT_DATA = "Suspect data"  # a source type: listed as e.g. "Suspect data (Fish)", as on the original
 
 
 @dataclass
@@ -205,12 +219,17 @@ class Figures:
                 key = (row["item"], row["year"])
                 if row["status"] and (key not in results or row["cycle"] > results[key]["cycle"]):
                     results[key] = row
-        # Catchment ID -> year -> ecological status
+        # Catchment ID -> year -> ecological status: the EA's, and from Ecological Classes for a
+        # year it doesn't have yet (2025), in place of the EA's, as the original dashboard did.
         self.ecological: dict[str, dict[int, str]] = {}
         for catchment_id, results in self.results.items():
             by_year = {year: row["status"] for (item, year), row in results.items() if item == ECOLOGICAL}
             if by_year:
                 self.ecological[catchment_id] = by_year
+        classes = location.dataset(ECOLOGICAL_CLASSES)
+        for catchment_id, rows in (classes.rows if classes else {}).items():
+            for row in rows:
+                self.ecological.setdefault(catchment_id, {})[row["year"]] = row["ecological_class"]
         self.years = sorted({y for by_year in self.ecological.values() for y in by_year}, reverse=True)
 
     def status(self, catchment_id: str) -> str | None:
@@ -246,7 +265,8 @@ class Figures:
         scores = self.location.dataset(SCORES)
         everywhere = [row for rows in (scores.rows.values() if scores else []) for row in rows]
         years = sorted(
-            {year for results in self.results.values() for _, year in results} | {row["year"] for row in everywhere},
+            {year for results in self.results.values() for _, year in results} | {row["year"] for row in everywhere}
+            | set(self.years),  # with a year only Ecological Classes has (2025)
             reverse=True,
         )[:SCORING_YEARS]
 
@@ -254,6 +274,10 @@ class Figures:
         for (item, year), row in self.results.get(catchment_id, {}).items():
             if item in SCORING_ITEMS and year in years:
                 statuses.setdefault(item, {})[year] = row["status"]
+        # Ecological: with a year from Ecological Classes (2025) the EA doesn't have yet, as on the original.
+        ecological = {year: status for year, status in self.ecological.get(catchment_id, {}).items() if year in years}
+        if ecological:
+            statuses[ECOLOGICAL] = ecological
         values: dict[str, dict[int, dict[str, Any]]] = {}  # measure -> year -> its row in EA Scores
         for row in scores.rows_for(catchment_id) if scores else []:
             if row["year"] in years and (row["value"] is not None or row["status"]):
@@ -289,9 +313,13 @@ class Figures:
         return Scoring(years, rows)
 
     def failing_elements(self, catchment_id: str) -> list[str]:
-        if catchment_id not in self.ecological:
+        """The elements below Good in the EA's latest year for the catchment (its elements' results are the EA's,
+        so a later year from Ecological Classes doesn't count)."""
+        results = self.results.get(catchment_id, {})
+        years = [year for item, year in results if item == ECOLOGICAL]
+        if not years:
             return []
-        year = max(self.ecological[catchment_id])
+        year = max(years)
         failing = {
             item: row for (item, y), row in self.results[catchment_id].items()
             if y == year and row["level"] in FAILING_LEVELS and row["status"] in BELOW_GOOD
@@ -301,14 +329,49 @@ class Figures:
         return sorted(failing, key=str.lower)
 
     def reasons(self, catchment_id: str) -> list[str]:
-        """The activities the EA gives as reasons for not achieving good, in its latest cycle."""
+        """The reasons the EA gives for not achieving good, in its latest cycle, listed as the original did (its
+        RNAG Activity HTML measure): each activity, except those that say nothing about the cause, and "Suspect data
+        (Fish)" for an element whose data the EA suspects. (The original also checked that a suspect data row is an
+        RNAG, not an RFD. The EA's file here doesn't keep that, and North Devon's one RFD duplicates an RNAG.)"""
         rnags = self.location.dataset(RNAGS)
         rows = rnags.rows_for(catchment_id) if rnags else []
         if not rows:
             return []
         cycle = max(row["cycle"] or 0 for row in rows)
-        found = {row["activity"] for row in rows if (row["cycle"] or 0) == cycle and row["activity"] not in (None, NO_REASON)}
+        latest = [row for row in rows if (row["cycle"] or 0) == cycle]
+        found = {row["activity"].strip() for row in latest
+                 if row["activity"] and row["activity"].strip().casefold() not in NO_REASONS}
+        found |= {f"{SUSPECT_DATA} ({row['element']})" for row in latest if row["source_type"] == SUSPECT_DATA and row["element"]}
         return sorted(found, key=str.lower)
+
+    def river_info(self, catchment: dict[str, Any]) -> dict[str, Any]:
+        """The River Information box: from River Information (the Waterbody Lookup) where it has the catchment, as on
+        the original, otherwise the EA's. The rivers up and downstream are (text, catchment ID to link to, or None)."""
+        row = self._one(RIVER_INFO, catchment["id"])
+        if row:
+            return {
+                "area_ha": row["catchment_area_ha"], "length_km": row["river_length_km"], "river_system": row["river_system"],
+                "upstream": self._named_rivers(row["upstream_rivers"]), "downstream": self._named_rivers(row["downstream_rivers"]),
+            }
+        return {
+            "area_ha": catchment["area_ha"], "length_km": catchment["river_length_km"], "river_system": None,
+            "upstream": self._river_ids(catchment["upstream_ids"]), "downstream": self._river_ids(catchment["downstream_ids"]),
+        }
+
+    def _named_rivers(self, text: str | None) -> list[tuple[str, str | None]]:
+        """Rivers typed as names separated by commas, each linked if it's one of the location's catchments."""
+        here = {" ".join(c["name"].split()).casefold(): c["id"] for c in self.location.catchments if c["name"]}
+        names = [name.strip() for name in (text or "").split(",") if name.strip()]
+        return [(name, here.get(" ".join(name.split()).casefold())) for name in names]
+
+    def _river_ids(self, ids: list[str] | None) -> list[tuple[str, str | None]]:
+        """Rivers by the EA's IDs: linked if one of the location's catchments, named if known."""
+        here = self.location.catchment_ids()
+        names = self.location.names
+        return [
+            (names[i], i) if i in here else (f"{names[i]} ({i})" if i in names else i, None)
+            for i in ids or []
+        ]
 
     def discharges(self, catchment_id: str) -> Discharges:
         overflows = self.location.dataset(OVERFLOWS)
@@ -349,12 +412,11 @@ class Figures:
         ]
 
     def habitat(self, catchment: dict[str, Any]) -> list[dict[str, Any]]:
-        """The catchment's habitat rows, each with its share of the catchment's area (%)."""
+        """The catchment's habitat rows, each with its share of the catchment's habitat areas (%), as worked out on upload."""
         habitat = self.location.dataset(HABITAT)
         if not habitat:
             return []
-        area = catchment["area_ha"]
-        return [{**row, "share": 100 * row["area_ha"] / area if area else None} for row in habitat.rows_for(catchment["id"])]
+        return [{**row, "share": row["percent_of_catchment"]} for row in habitat.rows_for(catchment["id"])]
 
     # -------------------------------------------------------------------------
     #  The hand-written analysis (River Status page)
@@ -367,10 +429,13 @@ class Figures:
     def ranking(self, catchment_id: str) -> int | None:
         return self._one(RANKINGS, catchment_id).get("ranking")
 
-    def risks(self, catchment_id: str, columns: list[str]) -> list[tuple[str, str | None]]:
-        """The Risk Levels tiles: (name, level) for each of the columns, in that order."""
-        row = self._one(RISKS, catchment_id)
-        return [(RISK_NAMES[column], row.get(column)) for column in columns]
+    def risks(self, catchment_id: str, tiles: list[str]) -> list[tuple[str, str | None]]:
+        """The Risk Levels tiles: (name, level) for each of the tiles, in that order."""
+        levels = []
+        for tile in tiles:
+            table, column = RISK_COLUMNS[tile]
+            levels.append((RISK_NAMES[tile], self._one(table, catchment_id).get(column)))
+        return levels
 
     def interventions(self, catchment_id: str) -> list[tuple[str, list[dict[str, Any]]]]:
         """The River Status page's interventions: the catchment's rows in Intervention Waterbodies, each with its
@@ -393,13 +458,9 @@ class Figures:
         return self._one(FARMS, catchment_id).get("number_of_farms")
 
     def livestock(self, catchment: dict[str, Any]) -> list[dict[str, Any]]:
-        """The catchment's livestock, each with its density per square kilometre (100 ha)."""
+        """The catchment's livestock: number (or its note, e.g. Less than 5), density per km² (100 ha) and rating."""
         dataset = self.location.dataset(LIVESTOCK)
-        area = catchment["area_ha"]
-        return [
-            {**row, "density": row["number"] / (area / 100) if area else None}
-            for row in (dataset.rows_for(catchment["id"]) if dataset else [])
-        ]
+        return dataset.rows_for(catchment["id"]) if dataset else []
 
     def phosphate(self, catchment_id: str) -> tuple[list[int], list[tuple[str, dict[int, float]]]]:
         """The years, and each source's share of the phosphate in each year (%), by source."""
@@ -411,26 +472,22 @@ class Figures:
         return sorted({row["year"] for row in rows}), sorted(sources.items(), key=lambda item: item[0].lower())
 
     def phosphate_discharges(self, catchment_id: str) -> tuple[list[int], list[tuple[str, dict[int, float]]]]:
-        """The phosphate sources added up into Continuous and Diffuse, for the Sewerage Data page."""
-        dataset = self.location.dataset(PHOSPHATE)
+        """The EA's split of the phosphate into Continuous and Diffuse, for the Sewerage Data page."""
+        dataset = self.location.dataset(PHOSPHATE_SPLIT)
         rows = dataset.rows_for(catchment_id) if dataset else []
         groups: dict[str, dict[int, float]] = {}
         for row in rows:
-            if row["discharge"] and row["discharge"].strip():
-                by_year = groups.setdefault(row["discharge"].strip().capitalize(), {})
-                by_year[row["year"]] = by_year.get(row["year"], 0) + row["percent"]
+            groups.setdefault(row["source"].strip().capitalize(), {})[row["year"]] = row["percent"]
         years = sorted({year for by_year in groups.values() for year in by_year})
         return years, sorted(groups.items(), key=lambda group: _rank(group[0], DISCHARGES))
 
     def properties(self, catchment: dict[str, Any]) -> dict[str, Any]:
         """Properties on public and private sewerage, and private sewerage per hectare of the catchment."""
         row = self._one(PROPERTIES, catchment["id"])
-        private = row.get("private_sewerage_properties")
-        area = catchment["area_ha"]
         return {
             "public": row.get("public_sewerage_properties"),
-            "private": private,
-            "private_per_ha": private / area if private is not None and area else None,
+            "private": row.get("private_sewerage_properties"),
+            "private_per_ha": row.get("private_sewerage_per_ha"),
         }
 
     def improvements(self, catchment_id: str) -> list[dict[str, Any]]:
@@ -514,15 +571,15 @@ class Figures:
         return len({(i, row["site_name"]) for i in ids for row in overflows.rows_for(i) if row["year"] == latest})
 
     def habitat_totals(self, ids: list[str]) -> tuple[list[dict[str, Any]], Total]:
-        """Each habitat's area over these catchments, and its share of the area of the catchments that have habitat figures."""
+        """Each habitat's area over these catchments, and its share of all their habitat areas added up (as the
+        original's Habitat % of Catchment did over the catchments chosen)."""
         habitat = self.location.dataset(HABITAT)
-        areas = {c["id"]: c["area_ha"] or 0 for c in self.location.catchments}
         covered = [i for i in ids if habitat and habitat.rows_for(i)]
         totals: dict[str, float] = {}
         for i in covered:
             for row in habitat.rows_for(i):
                 totals[row["habitat"]] = totals.get(row["habitat"], 0) + row["area_ha"]
-        whole = sum(areas.get(i, 0) for i in covered)
+        whole = sum(totals.values())
         rows = [{"habitat": name, "area_ha": area, "share": 100 * area / whole if whole else None} for name, area in totals.items()]
         return sorted(rows, key=lambda row: row["habitat"].lower()), Total(whole or None, len(covered), len(ids))
 

@@ -192,13 +192,18 @@ def _import_storm_overflows(engine: sa.Engine, yes: bool) -> int:
     for download in downloads:
         found = [r for r in rows if r["year"] == download.year]
         print(f"  {download.year}: {len(found):>4} overflow(s) into {len({r['catchment_id'] for r in found})} catchment(s)")
+    risks = storm_overflows.pressure(rows, catchment_ids)
+    if risks:
+        levels = [name for _, name in storm_overflows.PRESSURE] + [storm_overflows.LOWEST_PRESSURE]
+        counts = ", ".join(f"{n} {level}" for level in levels if (n := sum(r["pressure"] == level for r in risks)))
+        print(f"\nand each catchment's Untreated Sewage risk, from {risks[0]['year']}'s spill hours: {counts}.")
     if not yes and not _confirm("\nReplace them? [y/N] "):
         print("Nothing has been imported.")
         return 1
 
     raw_dir = storm_overflows.save_raw_files(downloads, Path(os.environ.get("RAW_FILES_DIR", "imports/raw")))
     with engine.begin() as conn:
-        storm_overflows.save(conn, schema, rows)
+        storm_overflows.save(conn, schema, rows, catchment_ids)
     print(f"\nDone. The downloaded files are kept in {raw_dir}")
     return 0
 

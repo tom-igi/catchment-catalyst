@@ -133,8 +133,8 @@ def test_duplicate_names_are_rejected(tmp_path):
 
 def test_which_tables_are_filled_by_excel():
     schema = load_schema()
-    assert schema.excel_tables[:3] == ["datasets", "ea_scores", "habitat_land_use"]  # in the order of schema.yaml
-    assert {"river_status_text", "intervention_waterbodies", "risk_levels", "location_text"} <= set(schema.excel_tables)
+    assert schema.excel_tables[:3] == ["datasets", "intervention_types", "intervention_waterbodies"]  # in the order of schema.yaml
+    assert {"intervention_waterbodies", "location_text"} <= set(schema.excel_tables)
     assert not {"catchments", "ea_classifications", "storm_overflows"} & set(schema.excel_tables)
     assert schema.metadata.tables["catchments"].info["filled_by"] == "api"
 
@@ -166,6 +166,44 @@ def test_tables_filled_by_excel_must_suit_an_upload():
         "tables.things.columns.tags: Excel uploads can only fill",
         "tables.things.columns.score: Excel uploads can only fill",
         "tables.keyless: tables filled by Excel need a primary key",
-        "tables.others: 'filled_by' must be one of: api, excel",
+        "tables.others: 'filled_by' must be one of: api, excel, input",
+    ]:
+        assert expected in problems
+
+
+def test_tables_worked_out_from_a_source_file_say_which():
+    schema = load_schema()
+    assert schema.input_tables == {
+        "catchment_rankings": "waterbody_lookup", "ecological_classes": "waterbody_lookup", "farms": "waterbody_lookup",
+        "livestock": "apha_livestock", "livestock_pressure": "apha_livestock", "sewerage_properties": "waterbody_lookup",
+        "esme_risk_levels": "esme", "river_information": "waterbody_lookup", "habitat_land_use": "habitat",
+        "river_status_text": "improvement_information", "phosphate_sources": "sagis_phosphate",
+        "phosphate_point_diffuse": "sagis_phosphate", "sewerage_improvements": "water_company_plans",
+        "ea_scores": "ea_classification_facts", "ea_thresholds": "ea_classification_facts",
+    }
+    assert not set(schema.input_tables) & set(schema.excel_tables)  # not uploaded 1 to 1 as well
+    with pytest.raises(SchemaError) as error:
+        make_schema("""
+            tables:
+              unnamed:
+                filled_by: input
+                columns:
+                  id: {type: integer, primary_key: true}
+              misplaced:
+                filled_by: excel
+                input: apha_livestock
+                columns:
+                  id: {type: integer, primary_key: true}
+              keyless:
+                filled_by: input
+                input: somewhere
+                columns:
+                  name: {type: text}
+        """)
+    problems = "\n".join(error.value.problems)
+    for expected in [
+        "tables.unnamed: tables with 'filled_by: input' need 'input'",
+        "tables.misplaced: 'input' is only for tables with 'filled_by: input'",
+        "tables.keyless: tables filled by Excel need a primary key",  # the same rules as an Excel upload
     ]:
         assert expected in problems

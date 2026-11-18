@@ -27,6 +27,9 @@ from catalyst.db.schema import LOCATION_COLUMN, key_column
 SIMPLIFY_DEGREES = 0.0001
 COORDINATE_DECIMALS = 5
 WORDS = {"id": "ID", "ids": "IDs", "ea": "EA", "ha": "(ha)", "km": "(km)", "url": "URL"}
+# Panels made from several tables, whose "i" text is in the Datasets table under this name instead of a
+# table's. Each is collected as a Dataset with no rows, so its "i" button works like any other.
+INFO_PANELS = {"risk_levels": "Risk Levels"}
 
 
 class PublishProblem(Exception):
@@ -110,6 +113,9 @@ def collect(conn: sa.Connection, schema: Schema, location: sa.Row) -> Location:
         datasets=[
             _dataset(conn, schema.metadata.tables[name], [location.id] if key_column(schema.metadata.tables[name]) == LOCATION_COLUMN else ids, info.get(name))
             for name in schema.data_tables
+        ] + [
+            Dataset(table=name, title=title, description=None, columns=[], rows={}, info=info.get(name))
+            for name, title in INFO_PANELS.items() if name not in schema.metadata.tables
         ],
         map=_map(conn, schema, ids),
         id=location.id,

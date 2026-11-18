@@ -7,6 +7,11 @@ discharges into, which ties it to a catchment. Overflows into waterbodies that
 aren't imported, or with no waterbody ID (mostly into estuaries and the sea),
 are left out. The table is only ever filled from here, so each import replaces
 all its rows.
+
+It also works out each catchment's Untreated Sewage risk (Sewage Overflow
+Pressure), as the original Power BI dashboard did: from the hours all its
+overflows spilled in the latest year. That's a table of its own, replaced at
+the same time.
 """
 
 from __future__ import annotations
@@ -28,6 +33,11 @@ from .common import ImportProblem, replace_rows, run_folder
 from .ea_api import EAClient, EAError, EANotFound
 
 TABLE = "storm_overflows"
+PRESSURE_TABLE = "sewage_overflow_pressure"
+# The Untreated Sewage risk, from a catchment's total spill hours in the latest year: the first it's above.
+# The original's DAX measure (Sewage Overflow Pressure) counted seconds: 5,184,000 s is 1,440 hours, and so on.
+PRESSURE = ((1440, "Very High"), (720, "High"), (240, "Medium"), (120, "Low"))
+LOWEST_PRESSURE = "Very Low"
 FIRST_YEAR = 2021  # the earliest return this has been checked against
 WORKBOOK = "all water and sewerage companies.xlsx"  # the end of the main file's name in each .zip
 WATERBODY_RE = re.compile(r"^GB\d{12}$")
@@ -202,14 +212,37 @@ def _whole(value: Any) -> int | None:
         return None
 
 
-def save(conn: sa.Connection, schema: Schema, rows: list[dict[str, Any]]) -> None:
-    """Replace every row with the new ones, and work out each outlet's latitude and longitude."""
+def pressure(rows: list[dict[str, Any]], catchment_ids: set[str]) -> list[dict[str, Any]]:
+    """Each catchment's total spill hours in the latest year of the returns, and its Untreated Sewage risk.
+
+    As in the original, a catchment with no overflows that year has 0 hours (Very Low), and an overflow
+    with no figure adds nothing. Overflows are matched to catchments by their waterbody ID (the original
+    matched by name, so it missed two whose names the water company typed differently).
+    """
+    if not rows:
+        return []
+    year = max(row["year"] for row in rows)
+    totals = {catchment_id: 0.0 for catchment_id in catchment_ids}
+    for row in rows:
+        if row["year"] == year and row["spill_hours"] is not None and row["catchment_id"] in totals:
+            totals[row["catchment_id"]] += row["spill_hours"]
+    return [
+        {"catchment_id": catchment_id, "year": year, "spill_hours": hours,
+         "pressure": next((name for above, name in PRESSURE if hours > above), LOWEST_PRESSURE)}
+        for catchment_id, hours in sorted(totals.items())
+    ]
+
+
+def save(conn: sa.Connection, schema: Schema, rows: list[dict[str, Any]], catchment_ids: set[str]) -> None:
+    """Replace every row with the new ones, work out each outlet's latitude and longitude, and replace
+    each catchment's Untreated Sewage risk."""
     table = schema.metadata.tables[TABLE]
     replace_rows(conn, table, rows)
     point = sa.func.ST_Transform(sa.func.ST_SetSRID(sa.func.ST_MakePoint(table.c.easting, table.c.northing), 27700), 4326)
     conn.execute(table.update().where(table.c.easting.is_not(None)).values(
         longitude=sa.func.ST_X(point), latitude=sa.func.ST_Y(point),
     ))
+    replace_rows(conn, schema.metadata.tables[PRESSURE_TABLE], pressure(rows, catchment_ids))
 
 
 def save_raw_files(downloads: list[Download], raw_dir: Path) -> Path:

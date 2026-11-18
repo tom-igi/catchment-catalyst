@@ -9,11 +9,12 @@
 <style>
   /* The admin page's home: a left-to-right flow diagram of every table, drawn from the model
      below (made by diagram.py and app.py), with a details panel for each table, where it can be
-     downloaded. Each Excel table also has its own source on the left, which opens its upload.
-     Between each source and its tables is its transformation: what's done to the data on the
-     way in (1 to 1 for Excel uploads, for now). Each data table's box lists where it's shown
-     on the dashboards. Above the diagram, the Publish box puts what's been approved on the
-     public dashboards. */
+     downloaded. Each source file (one of the original Power BI dashboard's) and each Excel
+     table has its own source on the left, which opens its upload. Between each source and its
+     tables is its transformation: what's done to the data on the way in (the original's
+     formulas for a source file, 1 to 1 for an Excel table). Each data table's box lists where
+     it's shown on the dashboards. Above the diagram, the Publish box puts what's been approved
+     on the public dashboards. */
   :root {
     color-scheme: light dark;
     --bg: #f3f6f7;
@@ -25,6 +26,8 @@
     --api-soft: #e3f1f3;
     --excel: #1d6b36;
     --excel-soft: #e6f4ea;
+    --input: #4b4a9e;
+    --input-soft: #ecebf8;
     --quiet: #5a6a71;
     --quiet-soft: #eef2f3;
     --catchment: #b0245a;
@@ -50,6 +53,8 @@
       --api-soft: #163339;
       --excel: #7fd497;
       --excel-soft: #16301f;
+      --input: #aeadf2;
+      --input-soft: #23223d;
       --quiet: #9aabb2;
       --quiet-soft: #1f2a2f;
       --catchment: #ff8db4;
@@ -68,6 +73,7 @@
   /* Each fill sets --f (strong) and --f-soft (tint) for whatever it's on. */
   .f-api { --f: var(--api); --f-soft: var(--api-soft); }
   .f-excel { --f: var(--excel); --f-soft: var(--excel-soft); }
+  .f-input { --f: var(--input); --f-soft: var(--input-soft); }
   .f-command, .f-admin { --f: var(--quiet); --f-soft: var(--quiet-soft); }
 
   * { box-sizing: border-box; }
@@ -192,7 +198,7 @@
     margin: 0 0 0 30px; padding: 8px 0 0 18px; border-left: 2px solid var(--f);
   }
   .group.quiet .tables { margin-left: 24px; }
-  .tables > li { position: relative; }
+  .tables > li { position: relative; display: grid; gap: 6px; }
   .tables > li::before {
     content: ""; position: absolute; left: -18px; top: 50%; width: 15px; border-top: 2px solid var(--f);
   }
@@ -229,7 +235,7 @@
 
   /* Where a data table is shown on the dashboards: each page, and its panels. Under the table's
      name, or beside it when the box is wide enough (the Data tables column is the widest). */
-  .tables { container-type: inline-size; }
+  .table-cell { container-type: inline-size; }  /* so a table's box lays out by its own width */
   .node.has-dash { flex-wrap: wrap; row-gap: 8px; }
   .node-dash {
     flex: 1 1 100%; display: grid; grid-template-columns: 10em minmax(0, 1fr); gap: 4px 10px; align-items: baseline;
@@ -350,10 +356,16 @@
     .src { grid-column: 1; grid-row: var(--row); align-self: center; }
     .xf-step { grid-column: 3; grid-row: var(--row); align-self: center; margin: 0; padding: 0; border-left: 0; }
     .xf-step::before { display: none; }
+    /* Each table beside its own transformation: the list spans the Transformation and Data tables
+       columns, and lines its boxes up with them. */
     .tables {
-      grid-column: 5; grid-row: var(--row); align-self: center;
-      margin: 0; padding: 0; border-left: 0; gap: 10px;
+      grid-column: 3 / 6; grid-row: var(--row); align-self: center;
+      grid-template-columns: subgrid; row-gap: 10px; column-gap: 0;
+      margin: 0; padding: 0; border-left: 0;
     }
+    .tables > li { display: contents; }
+    .tables > li > .xf { grid-column: 1; align-self: center; }
+    .tables > li > .table-cell { grid-column: 3; }
     .tables > li::before, .tables > li:last-child::after { display: none; }
     .group.quiet .tables { margin-left: 0; }
     .hub-col, .dash-col {
@@ -428,6 +440,21 @@
   .from ol li + li { margin-top: 5px; }
   .from .xf-for { margin-top: 14px; font-weight: 700; }
   .from .xf-for:first-child { margin-top: 0; }
+  .from .pbi, .fn .pbi { display: block; margin-top: 2px; color: var(--muted); font-size: .82rem; }
+  .io { margin-top: 18px; }
+  .io h3 { margin: 0 0 6px; font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .io > p { margin: 0; }
+  .from.io h3 { color: var(--f); }
+  .headings li.own { font-family: var(--mono); font-size: .78rem; background: var(--card); border-color: var(--f); color: var(--f); }
+  .fn { margin: 8px 0 0; padding-left: 22px; }
+  .fn > li + li { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .fn-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+  .fn-line .headings { margin: 0; }
+  .fn-from { color: var(--muted); font-size: .82rem; }
+  .fn-text { margin: 6px 0 0; }
+  .headings { display: flex; flex-wrap: wrap; gap: 4px 6px; list-style: none; margin: 6px 0 0; padding: 0; }
+  .steps .sheet-name { margin-top: 8px; font-weight: 700; }
+  .headings li { padding: 1px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); font-size: .82rem; }
   .cmd { display: flex; gap: 8px; align-items: stretch; margin-top: 8px; }
   .cmd code {
     flex: 1; min-width: 0; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
@@ -620,14 +647,15 @@
 
 const FILLS = {
   api: { word: "Downloaded", long: "API", icon: "cloud" },
+  input: { word: "Source file", long: "Source file", icon: "file" },
   excel: { word: "Excel upload", long: "Uploaded in Excel", icon: "sheet", tag: "Excel" },
   command: { word: "Database command", long: "Changed with a database command", icon: "terminal" },
   admin: { word: "Admin page", long: "Kept by the admin page", icon: "window" },
 };
 const QUIET = { command: true, admin: true };  // housekeeping: no data comes in, so no transformation
 // "#catchments" opens a table's details, "#from-catchments" where its data comes from (for an
-// Excel table, "#upload-ea_scores", its upload) and "#transform-catchments" what's done to the data
-// on the way in. Table names can't have a "-".
+// Excel table, "#upload-ea_scores", its upload; for a source file, "#upload-apha_livestock") and
+// "#transform-catchments" what's done to the data on the way in. Names can't have a "-".
 const FROM_HASH = "from-", UPLOAD_HASH = "upload-", TRANSFORM_HASH = "transform-";
 const HASH_VIEWS = [[FROM_HASH, "source"], [UPLOAD_HASH, "source"], [TRANSFORM_HASH, "transform"]];
 const canUpload = t => fillOf(t) === "excel" && !!t.update;
@@ -636,6 +664,7 @@ const fillOf = t => (FILLS[t.fill] ? t.fill : "command");
 const ICONS = {
   cloud: "M12 13v8M8 17l4 4 4-4M4.39 15.27A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.44 8.28",
   sheet: "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM3 9h18M3 15h18M9 9v12M15 9v12",
+  file: "M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6",
   terminal: "M4 17l6-6-6-6M12 19h8",
   window: "M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM3 9h18M6.5 6.5h.01M9.5 6.5h.01",
   drop: "M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z",
@@ -691,7 +720,7 @@ function link(cls, url, text) {
   if (isLocal(url)) a.setAttribute("href", url);
   return a;
 }
-function waitingUploads(t) {
+function waitingUploads(t) {  // a table's, or a source file's
   const recent = t.update && Array.isArray(t.update.recent) ? t.update.recent : [];
   return recent.filter(r => r.status === "preview");
 }
@@ -701,7 +730,6 @@ function dashboardOf(t) {
     .filter(p => p && Array.isArray(p.panels) && p.panels.length)
     .map(p => ({ page: String(p.page), panels: p.panels.map(String) }));
 }
-function stepsOf(g) { return g.members.filter(t => Array.isArray(t.transformation) && t.transformation.length); }
 function columnOf(t, name) { return (t.columns || []).find(c => c.name === name) || null; }
 function columnLabel(t, name) { const c = columnOf(t, name); return c ? (c.label || c.name) : name; }
 function columnLetters(i) {
@@ -730,20 +758,24 @@ function makePlan(model) {
   const onDash = new Set(dash.map(t => t.name));
 
   // Every other table is in a row starting from where its data comes from (its "source"), which
-  // opens how it's updated. Tables downloaded by the same command share a source; every other table
-  // has its own. The hub's source is on the left too, joined to the hub by a line.
+  // opens how it's updated. Tables downloaded by the same command share a source, as do tables
+  // worked out from the same source file; every other table has its own. The hub's source is on
+  // the left too, joined to the hub by a line.
+  const inputs = new Map(((model && model.inputs) || []).filter(i => i && typeof i.name === "string").map(i => [i.name, i]));
   const groups = [];
   const sources = new Map();  // table name -> its group
   for (const t of tables) {
     if (onDash.has(t.name)) continue;
     const fill = fillOf(t);
-    const key = fill === "api" && t.command ? "command|" + t.command : "table|" + t.name;
+    const key = fill === "api" && t.command ? "command|" + t.command
+      : fill === "input" && inputs.has(t.input) ? "input|" + t.input : "table|" + t.name;
     let g = groups.find(x => x.key === key);
     if (!g) {
       const n = groups.length, quiet = !!QUIET[fill];
       g = { key, id: "src:g" + n, order: n, fill, quiet,
-            xf: quiet ? null : "xf:g" + n,  // its transformation, between it and its tables
-            source: fill === "api" ? (t.source || null) : null, members: [], tables: [], feedsHub: false };
+            source: fill === "api" ? (t.source || null) : null,
+            input: fill === "input" ? (inputs.get(t.input) || null) : null,
+            members: [], tables: [], feedsHub: false };
       groups.push(g);
     }
     g.members.push(t);  // every table it fills
@@ -752,7 +784,7 @@ function makePlan(model) {
     sources.set(t.name, g);
   }
   const hubGroup = hub ? sources.get(hub.name) : null;
-  const rank = g => (g === hubGroup ? 0 : g.fill === "api" ? 1 : g.fill === "excel" ? 2 : g.fill === "command" ? 3 : 4);
+  const rank = g => (g === hubGroup ? 0 : g.fill === "api" ? 1 : g.fill === "input" ? 2 : g.fill === "excel" ? 3 : g.fill === "command" ? 4 : 5);
   groups.sort((a, b) => rank(a) - rank(b) || a.order - b.order);
   const main = groups.filter(g => !g.quiet);
   const house = groups.filter(g => g.quiet);
@@ -764,11 +796,20 @@ function makePlan(model) {
   // and faint others. Housekeeping has no transformation, so its lines go straight to the table.
   const wires = [];
   const addWire = (type, a, b, extra) => { wires.push(Object.assign({ id: "w" + wires.length, type, a, b }, extra || {})); };
+  // Each table has its own transformation, between its source and it (housekeeping has none).
+  const xfOf = t => (t && t.transform && !QUIET[fillOf(t)] ? "xf:" + t.name : null);
   for (const g of groups) {
-    if (g.xf) addWire("src", g.id, g.xf, { fill: g.fill });
-    for (const t of g.tables) addWire("src", g.xf || g.id, "tbl:" + t.name, { fill: g.fill });
+    for (const t of g.tables) {
+      const xf = xfOf(t);
+      if (xf) addWire("src", g.id, xf, { fill: g.fill });
+      addWire("src", xf || g.id, "tbl:" + t.name, { fill: g.fill });
+    }
   }
-  if (hubGroup) addWire("bridge", hubGroup.xf || hubGroup.id, "tbl:" + hub.name, { fill: hubGroup.fill });
+  if (hubGroup) {
+    const xf = xfOf(hub);
+    if (xf) addWire("src", hubGroup.id, xf, { fill: hubGroup.fill });
+    addWire("bridge", xf || hubGroup.id, "tbl:" + hub.name, { fill: hubGroup.fill });
+  }
   const seen = new Set();
   const hubLabels = new Map();
   const dashLabels = new Map();
@@ -793,13 +834,13 @@ function makePlan(model) {
   if (hub && !hubLabel) hubLabel = hubIdColumn ? (hubIdColumn.label || hubIdColumn.name) : "ID";
 
   return {
-    tables, byName, links, hub, dash, groups, main, house, houseRow, wires, hubGroup, sources,
+    tables, byName, links, hub, dash, groups, main, house, houseRow, wires, hubGroup, sources, inputs, xfOf,
     hubLabel, dashLabels,
     span: "2 / span " + Math.max(1, main.length),
   };
 }
 
-// Which nodes and lines light up for a key ("tbl:name", "src:g0" or its transformation, "xf:g0").
+// Which nodes and lines light up for a key ("tbl:name", "src:g0", or a table's transformation, "xf:name").
 function relations(plan, key) {
   const nodes = new Set([key]);
   const wires = new Set();
@@ -908,7 +949,9 @@ function start() {
   let model;
   try { model = JSON.parse(document.getElementById("model").textContent); } catch (e) { model = { tables: [], links: [], sections: [] }; }
   const plan = makePlan(model);
-  const problems = model.problems && plan.byName.has(model.problems.table) ? model.problems : null;
+  // An upload's problems: for an Excel table, or a source file (by its name).
+  const problems = model.problems && (plan.byName.has(model.problems.uploaded_to) || plan.inputs.has(model.problems.uploaded_to))
+    ? model.problems : null;
   const $ = id => document.getElementById(id);
   const flow = $("flow");
   const panel = $("panel"), panelBadge = $("panel-badge"), panelTitle = $("panel-title"), panelBody = $("panel-body");
@@ -928,7 +971,7 @@ function start() {
   flow.appendChild(svg);
 
   // Every column after the transformation is tables, so the headings say so.
-  const heads = [["1", "Where the data comes from"], ["2", "Transformation", "Changed to fit the table"], ["3", "Data tables", "And where each is on the dashboards"]];
+  const heads = [["1", "Where the data comes from"], ["2", "Transformation", "Each table's inputs and how they're worked out"], ["3", "Data tables", "And where each is on the dashboards"]];
   if (plan.hub) heads.push(["4", titleOf(plan.hub) + " table", "Joins them up by " + plan.hubLabel]);
   if (plan.dash.length) {
     const name = plan.dash.length === 1 ? titleOf(plan.dash[0]) + " table" : "Dashboard tables";
@@ -1005,14 +1048,15 @@ function start() {
     head.appendChild(el("span", "src-eyebrow", words.eyebrow));
     tx.append(head, el("span", "src-name", words.name));
     b.append(ic, tx);
-    // Each source opens how its tables are updated: for an Excel table, that's where it's uploaded.
+    // Each source opens how its tables are updated: for an Excel table or a source file, that's
+    // where it's uploaded.
     const first = g.members[0];
     const names = joinWords(g.members.map(titleOf));
-    if (canUpload(first)) {
+    if (canUpload(first) || g.input) {
       const action = el("span", "src-action");
-      action.append(icon("upload", 15), el("span", null, "Upload data"));
+      action.append(icon("upload", 15), el("span", null, g.input ? "Upload file" : "Upload data"));
       head.appendChild(action);
-      const waiting = waitingUploads(first).length;
+      const waiting = waitingUploads(g.input || first).length;
       if (waiting) tx.appendChild(el("span", "src-waiting", waiting + (waiting === 1 ? " upload" : " uploads") + " to approve"));
     } else if (g.fill === "api") {
       const action = el("span", "src-action ghost");
@@ -1026,13 +1070,20 @@ function start() {
     nodeEls.set(g.id, b);
     anchors.set(g.id, b);
     wrap.appendChild(b);
-    if (g.xf) wrap.appendChild(transformEl(g));
+    if (g.feedsHub && plan.xfOf(plan.hub)) {  // the hub is further along, so its transformation is beside its source
+      const step = el("div", "xf-step");
+      step.appendChild(transformEl(plan.hub));
+      wrap.appendChild(step);
+    }
 
     const ul = el("ul", "tables");
     ul.setAttribute("role", "list");
     for (const t of g.tables) {
       const li = el("li");
-      li.appendChild(tableNode(t));
+      if (plan.xfOf(t)) li.appendChild(transformEl(t));
+      const cell = el("div", "table-cell");
+      cell.appendChild(tableNode(t));
+      li.appendChild(cell);
       ul.appendChild(li);
     }
     if (g.feedsHub && plan.hub) {
@@ -1046,38 +1097,32 @@ function start() {
     return wrap;
   }
 
-  // A source's transformation: the steps for its tables in diagram.yaml, or 1 to 1 (nothing is
-  // changed on the way in) if they have none, as every Excel upload is for now.
-  function transformWords(g) {
-    if (!stepsOf(g).length) return { icon: "same", name: "1 to 1", sub: "No change, for now", same: true };
-    return { icon: "reshape", name: "Reshaped", sub: g.fill === "api" ? "By the importer" : "On upload", same: false };
-  }
-
-  function transformEl(g) {
-    const step = el("div", "xf-step");
-    const words = transformWords(g);
-    const b = el("button", "xf f-" + g.fill + (words.same ? " same" : ""));
+  // A table's transformation: its inputs and the steps that turn them into its columns (a source
+  // file's are the original Power BI dashboard's formulas; an Excel table's is 1 to 1).
+  function transformEl(t) {
+    const x = t.transform, key = plan.xfOf(t), same = x.kind === "excel";
+    const b = el("button", "xf f-" + fillOf(t) + (same ? " same" : ""));
     b.type = "button";
-    b.dataset.node = g.xf;
+    b.dataset.node = key;
     const ic = el("span", "xf-icon");
-    ic.appendChild(icon(words.icon, 16));
+    ic.appendChild(icon(same ? "same" : "reshape", 16));
     const tx = el("span", "xf-text");
     const eyebrow = el("span", "xf-eyebrow narrow-only", "Transformation");  // the column's heading says so on wide screens
     eyebrow.setAttribute("aria-hidden", "true");
-    tx.append(el("span", "visually-hidden", "Transformation: "), eyebrow, el("span", "xf-name", words.name), el("span", "xf-sub", words.sub));
-    b.append(ic, tx, el("span", "visually-hidden", " (into " + joinWords(g.members.map(titleOf)) + ")"));
+    tx.append(el("span", "visually-hidden", "Transformation: "), eyebrow, el("span", "xf-name", x.name), el("span", "xf-sub", x.sub));
+    b.append(ic, tx, el("span", "visually-hidden", " (into " + titleOf(t) + ")"));
     b.setAttribute("aria-haspopup", "dialog");
-    b.addEventListener("click", () => openPanel(g.members[0].name, "transform", b));
-    hoverable(b, g.xf);
-    nodeEls.set(g.xf, b);
-    anchors.set(g.xf, b);
-    step.appendChild(b);
-    return step;
+    b.addEventListener("click", () => openPanel(t.name, "transform", b));
+    hoverable(b, key);
+    nodeEls.set(key, b);
+    anchors.set(key, b);
+    return b;
   }
 
   function groupWords(g) {
     if (g.fill === "api") return { eyebrow: FILLS.api.long, name: g.source || "A website" };
     if (g.fill === "excel") return { eyebrow: FILLS.excel.long, name: "By you, here" };
+    if (g.fill === "input") return { eyebrow: FILLS.input.long, name: g.input ? g.input.title : "A file" };
     if (g.fill === "admin") return { eyebrow: "Housekeeping", name: "The admin page" };
     return { eyebrow: "Housekeeping", name: "A database command" };
   }
@@ -1186,9 +1231,9 @@ function start() {
   // The diagram's key for the open panel: the table, its source or its transformation.
   function currentKey() {
     if (!current) return null;
-    const g = current.view !== "table" ? plan.sources.get(current.name) : null;
-    if (!g) return "tbl:" + current.name;
-    return current.view === "transform" && g.xf ? g.xf : g.id;
+    if (current.view === "transform") return plan.xfOf(plan.byName.get(current.name)) || "tbl:" + current.name;
+    const g = current.view === "source" ? plan.sources.get(current.name) : null;
+    return g ? g.id : "tbl:" + current.name;
   }
 
   function trace() {
@@ -1241,14 +1286,18 @@ function start() {
   /* Details panel: a table's details ("table"), where its data comes from ("source"; for an Excel
      table, its upload), or what's done to it on the way in ("transform") */
   function openPanel(name, view, from, instant) {
+    if (!plan.byName.has(name) && plan.inputs.has(name)) {  // a source file: its first table's source
+      name = (plan.groups.find(x => x.input && x.input.name === name) || { members: [{}] }).members[0].name;
+    }
     const t = plan.byName.get(name);
     if (!t) return;
     const g = plan.sources.get(name);
-    if (!g || (view === "transform" && !g.xf) || (view !== "source" && view !== "transform")) view = "table";
+    if (view === "transform" ? !plan.xfOf(t) : (view !== "source" || !g)) view = "table";
     if (!current) opener = from || document.activeElement;
     current = { name, view };
     if (view === "table") renderDetails(t);
-    else if (view === "transform") renderTransform(g);
+    else if (view === "transform") renderTransform(t);
+    else if (g.input) renderInputUpload(g);
     else if (canUpload(t)) renderUpload(t, t.update);
     else renderSource(g);
     if (instant) {
@@ -1258,8 +1307,8 @@ function start() {
     panel.classList.add("open");
     document.body.classList.toggle("panel-open-narrow", !wideQuery.matches);
     panel.scrollTop = 0;
-    const prefix = view === "transform" ? TRANSFORM_HASH : view === "source" ? (canUpload(t) ? UPLOAD_HASH : FROM_HASH) : "";
-    const hash = "#" + prefix + encodeURIComponent(name);
+    const prefix = view === "transform" ? TRANSFORM_HASH : view === "source" ? (canUpload(t) || g.input ? UPLOAD_HASH : FROM_HASH) : "";
+    const hash = "#" + prefix + encodeURIComponent(view === "source" && g.input ? g.input.name : name);
     if (location.hash !== hash) history.replaceState(null, "", hash);
     trace();
     panelTitle.focus({ preventScroll: true });
@@ -1286,7 +1335,7 @@ function start() {
   });
   window.addEventListener("hashchange", () => {
     const want = fromHash();
-    if (want && plan.byName.has(want.name)) openPanel(want.name, want.view);
+    if (want && (plan.byName.has(want.name) || plan.inputs.has(want.name))) openPanel(want.name, want.view);
     else if (!want) closePanel();
   });
   function fromHash() {
@@ -1352,40 +1401,92 @@ function start() {
     return fills;
   }
 
-  // What's done to a source's data on the way into its tables: their steps from diagram.yaml, or
-  // 1 to 1 (nothing changes) if they have none.
-  function renderTransform(g) {
-    const f = g.fill, words = transformWords(g);
+  // How a table is worked out: its inputs, the function (each step: the columns it fills, from which
+  // inputs, how, and where that is in the Power BI file), and the table.
+  function renderTransform(t) {
+    const x = t.transform, f = fillOf(t), same = x.kind === "excel";
     const badge = el("span", "p-badge f-" + f);
     const bi = el("span", "b-icon");
-    bi.appendChild(icon(words.icon, 16));
+    bi.appendChild(icon(same ? "same" : "reshape", 16));
     badge.append(bi, el("span", null, "Transformation"));
     panelBadge.replaceChildren(badge);
     panelBody.className = "f-" + f;
-    panelTitle.textContent = "How the data gets into " + joinWords(g.members.map(titleOf));
+    panelTitle.textContent = "How " + titleOf(t) + " is worked out";
+    const own = new Set((t.columns || []).map(c => c.name));
+    const chip = name => el("li", own.has(name) ? "own" : null, own.has(name) ? columnLabel(t, name) : name);
 
-    const box = el("section", "from f-" + f + (words.same ? " same" : ""));
-    box.setAttribute("aria-label", "Transformation");
-    const described = stepsOf(g);
-    if (!described.length) {
-      const p = el("p");
-      p.append(el("strong", null, "1 to 1: no change, for now. "), document.createTextNode(f === "excel"
-        ? "The file you upload is already in the table's layout, so each of its rows goes into the table as it is. " +
-          "It's only checked: the column names, each value's type, and that no row is there twice."
-        : "The data goes into the table as it comes."));
-      box.append(p, el("p", "muted",
-        "This step is here for later. If data arrives in a different layout, such as a file someone has been sent, " +
-        "this is where it would be changed to fit the table, so it could be uploaded just as it was sent."));
+    const out = [];
+    const inputs = el("section", "io");
+    inputs.appendChild(el("h3", null, "Inputs"));
+    const where = el("p");
+    if (x.kind === "input") {
+      const said = (x.file || "") + " " + (x.sheet || "");  // its title in brackets, unless that's already said
+      where.append(document.createTextNode("From "), el("strong", null, x.file),
+        document.createTextNode((x.sheet ? ", the sheet " + x.sheet : "") + (said.includes(x.from) ? "" : " (" + x.from + ")") +
+          ", by the column names in row 1:"));
+    } else if (x.kind === "api") {
+      where.append(el("strong", null, x.file || x.from || "The download"), document.createTextNode(x.file && x.from ? " (" + x.from + ")" : ""),
+        document.createTextNode(x.inputs.length ? ":" : "."));
     } else {
-      box.appendChild(el("p", null, f === "api" ? "Each time it runs, the importer:" : "On the way in, it:"));
-      for (const m of described) {
-        if (g.members.length > 1) box.appendChild(el("p", "xf-for", titleOf(m)));
-        const ol = el("ol");
-        for (const step of m.transformation) ol.appendChild(el("li", null, step));
-        box.appendChild(ol);
-      }
+      where.textContent = "An Excel file in the table's own layout, uploaded here, with its columns:";
     }
-    panelBody.replaceChildren(box, fillsRow(g));
+    inputs.appendChild(where);
+    if ((x.inputs || []).length) {
+      const ul = el("ul", "headings");
+      for (const name of x.inputs) ul.appendChild(el("li", null, name));
+      inputs.appendChild(ul);
+    }
+    out.push(inputs);
+
+    const fn = el("section", "io from f-" + f + (same ? " same" : ""));
+    fn.appendChild(el("h3", null, "Function"));
+    if (x.kind === "input") fn.appendChild(el("p", "muted", "The original Power BI dashboard's own formulas and numbers, step by step."));
+    if (x.kind === "api") fn.appendChild(el("p", "muted", "Each time it runs, the importer:"));
+    const list = el("ol", "fn");
+    for (const step of x.steps || []) {
+      const li = el("li");
+      if ((step.columns || []).length && !same) {
+        const line = el("div", "fn-line");
+        const cols = el("ul", "headings fills");
+        for (const name of step.columns) cols.appendChild(el("li", "own", columnLabel(t, name)));
+        line.appendChild(cols);
+        line.appendChild(el("span", "fn-from", (step.inputs || []).length ? "from" : ""));
+        if ((step.inputs || []).length) {
+          const ins = el("ul", "headings");
+          for (const name of step.inputs) ins.appendChild(chip(name));
+          line.appendChild(ins);
+        }
+        li.appendChild(line);
+      }
+      li.appendChild(el("p", "fn-text", step.text));
+      if (step.power_bi) li.appendChild(el("span", "pbi", "In Power BI: " + step.power_bi));
+      list.appendChild(li);
+    }
+    fn.appendChild(list);
+    out.push(fn);
+
+    const table = el("section", "io");
+    table.appendChild(el("h3", null, "Table"));
+    const cols = el("ul", "headings");
+    for (const c of t.columns || []) cols.appendChild(el("li", "own", c.label || c.name));
+    const row = el("div", "link-row");
+    row.append(el("span", "via", "Fills"), jumpButton(t));
+    table.append(row, cols);
+    out.push(table);
+
+    const g = plan.sources.get(t.name);
+    if (g && g.input) {
+      const back = el("button", "jump f-input");
+      back.type = "button";
+      const bi2 = el("span", "j-icon");
+      bi2.appendChild(icon("upload", 16));
+      back.append(bi2, el("span", null, "Upload " + g.input.title));
+      back.addEventListener("click", () => openPanel(t.name, "source"));
+      const r = el("div", "link-row");
+      r.append(el("span", "via", "Its source file"), back);
+      out.push(r);
+    }
+    panelBody.replaceChildren(...out);
   }
 
   function fromBox(t, f, many) {
@@ -1461,7 +1562,7 @@ function start() {
     panelTitle.textContent = "Upload data to " + titleOf(t);
 
     const out = [];
-    if (problems && problems.table === t.name) out.push(problemsBox(problems));
+    if (problems && problems.uploaded_to === t.name) out.push(problemsBox(problems));
     const intro = el("p", "desc");
     intro.append(
       document.createTextNode("Download the "), el("strong", null, titleOf(t)),
@@ -1537,13 +1638,14 @@ function start() {
     steps.append(download, edit, upload);
     out.push(steps);
 
-    out.push(el("h3", null, "Recent uploads"));
+    out.push(...recentBlock(u, "Nothing has been uploaded to this table yet."));
+    panelBody.replaceChildren(...out);
+  }
+
+  function recentBlock(u, none) {
+    const out = [el("h3", null, "Recent uploads")];
     const recent = Array.isArray(u.recent) ? u.recent : [];
-    if (!recent.length) {
-      out.push(el("p", "none", "Nothing has been uploaded to this table yet."));
-      panelBody.replaceChildren(...out);
-      return;
-    }
+    if (!recent.length) return out.concat(el("p", "none", none));
     const list = el("ul", "uploads");
     for (const r of recent) {
       const li = el("li");
@@ -1555,7 +1657,105 @@ function start() {
       li.appendChild(what);
       list.appendChild(li);
     }
-    out.push(list, el("p", "hint", "To go back to an earlier version, download its file here and upload it again."));
+    return out.concat(list, el("p", "hint", "To go back to an earlier version, download its file here and upload it again."));
+  }
+
+  // A source file's upload, opened from its box on the left of the diagram.
+  function renderInputUpload(g) {
+    const i = g.input, u = i.update || {};
+    const tables = g.members.map(titleOf);
+    panelBadge.replaceChildren(badgeFor("input"));
+    panelBody.className = "f-input";
+    panelTitle.textContent = "Upload " + i.title;
+
+    const out = [];
+    if (problems && problems.uploaded_to === i.name) out.push(problemsBox(problems));
+    const intro = el("p", "desc");
+    const last = u.last ? "Last updated " + u.last.when + " by " + u.last.who + "." : "Not uploaded yet.";
+    intro.append(
+      document.createTextNode("Upload the file as it came, without changing it. The original Power BI dashboard read the same file, " +
+        "and its formulas work out "), el("strong", null, joinWords(tables)), document.createTextNode(" from it. " + last),
+    );
+    out.push(intro);
+
+    for (const w of waitingUploads(i)) {
+      const box = el("div", "alert waiting");
+      box.appendChild(el("strong", "a-head", "An upload is waiting to be approved"));
+      box.appendChild(el("p", null, w.file + ", uploaded by " + w.who + ", " + w.when + ". Nothing changes until someone approves it."));
+      box.appendChild(link("btn", w.url, "Check the changes →"));
+      out.push(box);
+    }
+
+    const steps = el("ol", "steps");
+    const get = el("li");
+    get.append(el("span", "step-name", "Get the latest file"));
+    const from = el("p");
+    const provider = String(i.provider || "").replace(/^The /, "the ");  // "From the EA's …", not "From The …"
+    from.append(document.createTextNode("From " + provider + ". The original read "), el("strong", null, i.file), document.createTextNode("."));
+    if (isWebPage(i.url)) {
+      const a = el("a", null, i.url.replace(/^https:\/\//, "").replace(/\/$/, ""));
+      a.setAttribute("href", i.url);
+      a.setAttribute("target", "_blank");
+      a.setAttribute("rel", "noopener noreferrer");
+      from.append(document.createTextNode(" "), a);
+    }
+    get.appendChild(from);
+    const more = Array.isArray(i.more_sheets) ? i.more_sheets : [];
+    const sheets = [{ sheet: i.sheet, headings: i.headings }].concat(more);
+    if (more.length) {
+      get.appendChild(el("p", null, "It's read from the sheets " + joinWords(sheets.map(s => s.sheet)) +
+        ", by those names and the column names in row 1 of each. Each needs these, in any order; any others are left alone:"));
+    } else {
+      get.appendChild(el("p", null, "It's read from " + (i.sheet ? "the sheet " + i.sheet + " (or the first sheet with these columns)" : "its first sheet") +
+        ", by the column names in row 1. It needs these, in any order; any others are left alone:"));
+    }
+    for (const s of sheets) {
+      if (more.length) get.appendChild(el("p", "sheet-name", s.sheet));
+      const heads = el("ul", "headings");
+      for (const h of Array.isArray(s.headings) ? s.headings : []) heads.appendChild(el("li", null, h));
+      get.appendChild(heads);
+    }
+
+    const up = el("li");
+    up.append(
+      el("span", "step-name", "Upload it"),
+      el("p", null, "You'll see what will be added, changed and deleted in " + joinWords(tables) + " before anything is saved. " +
+        "Rows for waterbodies that aren't in the Catchments table are left out, and listed."),
+    );
+    if (isLocal(u.upload_url)) {
+      const form = el("form", "upload-form");
+      form.method = "post";
+      form.enctype = "multipart/form-data";
+      form.setAttribute("action", u.upload_url);
+      const file = el("input");
+      file.type = "file";
+      file.name = "file";
+      file.required = true;
+      file.accept = ".xlsx,.xls,.csv";
+      file.setAttribute("aria-label", "The " + i.title + " file to upload");
+      const go = el("button", "btn", "Upload and preview");
+      go.type = "submit";
+      form.append(file, go);
+      up.appendChild(form);
+    }
+    steps.append(get, up);
+    out.push(steps);
+
+    const howRow = el("div", "link-row");
+    const hows = el("div", "jumps");
+    for (const m of g.members) {
+      const how = el("button", "jump f-input");
+      how.type = "button";
+      const hi = el("span", "j-icon");
+      hi.appendChild(icon("reshape", 16));
+      how.append(hi, el("span", null, "How " + titleOf(m) + " is worked out"));
+      how.addEventListener("click", () => openPanel(m.name, "transform"));
+      hows.appendChild(how);
+    }
+    howRow.append(el("span", "via", "The formulas"), hows);
+    out.push(howRow);
+
+    out.push(...recentBlock(u, "Nothing has been uploaded from this source file yet."), fillsRow(g));
     panelBody.replaceChildren(...out);
   }
 
@@ -1693,8 +1893,8 @@ function start() {
   /* Go */
   trace();
   if (problems) history.replaceState(null, "", "/admin");  // the page was the answer to an upload
-  const first = problems ? { name: problems.table, view: "source" } : fromHash();
-  if (first && plan.byName.has(first.name)) openPanel(first.name, first.view, null, true);
+  const first = problems ? { name: problems.uploaded_to, view: "source" } : fromHash();
+  if (first && (plan.byName.has(first.name) || plan.inputs.has(first.name))) openPanel(first.name, first.view, null, true);
   const message = $("message");
   if (message && current) panelBody.prepend(message);  // where it'll be seen
 }

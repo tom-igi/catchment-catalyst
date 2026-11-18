@@ -52,6 +52,8 @@
         <ul class="list">
           {% for reason in figures.reasons(catchment_id) %}
           <li>{{ reason }}</li>
+          {% else %}
+          {% if catchment %}<li>None</li>{% endif %}
           {% endfor %}
         </ul>
       </section>

@@ -5,8 +5,10 @@
 `example`), plus the sections, where each downloaded table comes from (with its
 web page and command), what's done to its data on the way in (its
 transformation), where each data table is shown on the dashboards and the extra
-links from diagram.yaml. The admin page adds the row counts and the Excel
-uploads, and templates/home.html draws the diagram from them.
+links from diagram.yaml, and each source file (catalyst.importers.inputs) with
+the tables it fills and the original Power BI dashboard's formulas it uses. The
+admin page adds the row counts and the uploads, and templates/home.html draws
+the diagram from them.
 
 It's made each time the page is opened, so it always matches the schema.yaml
 the admin page is running. When you add a table filled by an importer, add it
@@ -25,9 +27,10 @@ from geoalchemy2 import Geometry
 from sqlalchemy.dialects import postgresql
 
 from catalyst.db.schema import CATCHMENT_REFERENCE, Schema, load_schema
+from catalyst.importers import inputs
 
 DIAGRAM_FILE = Path(__file__).with_name("diagram.yaml")
-FILLS = {"api", "excel", "command", "admin"}
+FILLS = {"api", "input", "excel", "command", "admin"}
 
 MAP_SHAPES = {
     "POINT": "Map point", "MULTIPOINT": "Map points",
@@ -59,6 +62,9 @@ def model(schema: Schema | None = None, counts: dict[str, int] | None = None,
     unknown = [name for name in filled if name not in tables]
     if unknown:
         raise ValueError(f"The `filled` list in diagram.yaml has {', '.join(unknown)}, which isn't in schema.yaml")
+    problems = inputs.check(schema)
+    if problems:
+        raise ValueError(" ".join(problems))
 
     sections = _sections(schema, config)
     shown = _dashboard(schema, config.get("dashboard") or {})
@@ -68,11 +74,70 @@ def model(schema: Schema | None = None, counts: dict[str, int] | None = None,
             for s in sections
         ],
         "tables": [
-            _table(t, schema, s.title, filled.get(t.name) or {}, shown.get(t.name, []), (counts or {}).get(t.name))
+            {**_table(t, schema, s.title, filled.get(t.name) or {}, shown.get(t.name, []), (counts or {}).get(t.name)),
+             "transform": _transform(t, filled.get(t.name) or {})}
             for s in sections for t in s.tables
         ],
         "links": _links(schema, config.get("links") or []),
+        "inputs": [_input(source) for source in inputs.INPUTS.values() if source.name in schema.input_tables.values()],
     }
+
+
+def _input(source: inputs.Input) -> dict:
+    """A source file: where it comes from and what's read from it (each table's transformation is on the table)."""
+    return {
+        "name": source.name,
+        "title": source.title,
+        "provider": source.provider,
+        "url": source.url,
+        "file": source.file,
+        "sheet": source.sheet,
+        "headings": list(source.headings),
+        "more_sheets": [{"sheet": name, "headings": list(headings)} for name, headings in source.more_sheets.items()],
+        "tables": source.tables,
+    }
+
+
+def _transform(table: sa.Table, filled: dict) -> dict | None:
+    """A table's transformation, the diagram's middle column: its inputs, and the steps (the function) that turn
+    them into the table's columns. None for a table no data comes into (e.g. Uploads)."""
+    fill = table.info.get("filled_by")
+    columns = [c.name for c in table.columns]
+    if fill == "input":
+        source = inputs.INPUTS[table.info["input"]]
+        read = source.file_columns(table.name)
+        steps = [
+            {"columns": list(step.columns), "inputs": list(step.inputs), "text": step.text, "power_bi": step.power_bi}
+            for step in source.table_steps(table.name)
+        ]
+        return {
+            "kind": "input", "name": "Power BI's formulas", "sub": _counts(len(read), len(steps)),
+            "from": source.title, "input": source.name, "file": source.file, "sheet": source.table_sheet(table.name),
+            "inputs": read, "steps": steps,
+        }
+    if fill == "api":
+        read = filled.get("inputs") or []
+        steps = [{"columns": [], "inputs": [], "text": step, "power_bi": ""} for step in filled.get("transformation") or []]
+        return {
+            "kind": "api", "name": "Reshaped", "sub": _counts(len(read), len(steps)) if read else "By the importer",
+            "from": filled.get("source"), "file": filled.get("input"), "sheet": None, "inputs": read, "steps": steps,
+        }
+    if fill == "excel":
+        return {
+            "kind": "excel", "name": "1 to 1", "sub": "No change", "from": "An Excel file in the table's layout",
+            "file": None, "sheet": None, "inputs": columns,
+            "steps": [{
+                "columns": columns, "inputs": columns, "power_bi": "",
+                "text": "Each column from the file's column with the same name, as it is. The upload is only checked: "
+                        "the column names, each value's type, and that no row is there twice.",
+            }],
+        }
+    return None
+
+
+def _counts(columns: int, steps: int) -> str:
+    """e.g. 11 columns in, 5 steps."""
+    return f"{columns} column{'' if columns == 1 else 's'} in, {steps} step{'' if steps == 1 else 's'}"
 
 
 def _sections(schema: Schema, config: dict) -> list[Section]:
@@ -121,6 +186,9 @@ def _table(table: sa.Table, schema: Schema, section: str, filled: dict, dashboar
     steps = filled.get("transformation") or []
     if not isinstance(steps, list) or not all(isinstance(step, str) for step in steps):
         raise ValueError(f"The `filled` list in diagram.yaml gives {table.name} a transformation that isn't a list of steps")
+    read = filled.get("inputs") or []
+    if not isinstance(read, list) or not all(isinstance(name, str) for name in read):
+        raise ValueError(f"The `filled` list in diagram.yaml gives {table.name} inputs that aren't a list of column names")
     key = list(table.primary_key.columns)
     return {
         "name": table.name,
@@ -129,7 +197,8 @@ def _table(table: sa.Table, schema: Schema, section: str, filled: dict, dashboar
         "summary": _first_sentence(_plain(table.comment)),
         "kind": "data" if table.name in schema.data_tables else "core",
         "section": section,
-        "fill": fill,  # api, excel, command or admin
+        "fill": fill,  # api, input, excel, command or admin
+        "input": table.info.get("input"),  # for `filled_by: input`, the source file it's worked out from
         "source": filled.get("source"),
         "url": url,  # the source's web page
         "command": f"docker compose run --rm {filled['command']}" if filled.get("command") else None,

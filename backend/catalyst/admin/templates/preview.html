@@ -1,17 +1,21 @@
 {% extends "base.html" %}
 {% block title %}{{ "Check the changes" if upload.status == "preview" else "Upload " ~ upload.id }}{% endblock %}
 
+{# An upload's preview: what it will add, change and delete in each table it fills (one, for an
+   Excel table; one or more, for a source file), then Approve or Cancel. #}
+
 {% macro more(items) %}
   {% if items | length > rows_shown %}<p class="muted">Showing the first {{ rows_shown }} of {{ items | length }}.</p>{% endif %}
 {% endmacro %}
 
 {% block content %}
-<p class="crumb"><a href="/admin#upload-{{ table.name }}">← Upload data to {{ title(table) }}</a></p>
+<p class="crumb"><a href="{{ back }}">← Upload {{ "" if source_file else "data to " }}{{ uploaded_to }}</a></p>
 <h1>{{ "Check the changes" if upload.status == "preview" else "Upload " ~ upload.id }}</h1>
 <p class="lead">
   <a href="/admin/uploads/{{ upload.id }}/file">{{ upload.file_name }}</a>
-  ({{ upload.rows_in_file | rows }}), uploaded to {{ title(table) }} by {{ upload.uploaded_by }},
+  ({{ upload.rows_in_file | rows }}), uploaded to {{ uploaded_to }} by {{ upload.uploaded_by }},
   {{ upload.uploaded_at | when }}.
+  {% if filled | length > 1 or (filled and filled[0] != uploaded_to) %}It fills {{ filled | and_list }}.{% endif %}
 </p>
 
 {% if upload.status == "approved" %}
@@ -26,7 +30,7 @@
 {% elif problems %}
 <div class="problems" role="alert">
   <h2>This file can't be used any more</h2>
-  <p>The table or the tables it links to have changed since it was uploaded:</p>
+  <p>The tables it fills, or the tables they link to, have changed since it was uploaded:</p>
   <ul>{% for problem in problems[:50] %}<li>{{ problem }}</li>{% endfor %}</ul>
 </div>
 <form method="post" action="/admin/uploads/{{ upload.id }}/cancel">
@@ -34,7 +38,14 @@
 </form>
 
 {% else %}
-{% set c = comparison %}
+{% for note in changes.notes %}
+<p class="card">{{ note }}</p>
+{% endfor %}
+
+{% for part in parts %}
+{% set c = part.comparison %}
+{% set table = part.table %}
+{% if parts | length > 1 %}<h2 class="part">{{ title(table) }}</h2>{% endif %}
 <div class="stats">
   <div class="stat add"><strong>{{ c.added | length }}</strong> to add</div>
   <div class="stat change"><strong>{{ c.changed | length }}</strong> to change</div>
@@ -43,23 +54,23 @@
 </div>
 
 {% if not c.has_changes %}
-<p class="message">The file is now the same as the table, so there's nothing to change.</p>
+<p class="message">{{ "The file is now the same as the table, so there's nothing to change." if parts | length == 1 else "No change to this table." }}</p>
 {% elif c.removed and not c.changed and not c.unchanged %}
 <p class="warning" role="alert">
-  <strong>This deletes every row that's in the table now</strong> and puts the file's rows in their place.
-  If that isn't what you meant, cancel, download the table again and make your changes in that copy.
+  <strong>This deletes every row that's in {{ "the table" if parts | length == 1 else title(table) }} now</strong> and puts the file's rows in their place.
+  If that isn't what you meant, cancel{{ ", download the table again and make your changes in that copy" if not source_file else " and check the file" }}.
 </p>
 {% elif c.removed %}
 <p class="warning" role="alert">
   <strong>{{ c.removed | length | rows }} will be deleted,</strong> because {{ "it's" if c.removed | length == 1 else "they're" }}
   in the table but not in the file. If you didn't mean to delete {{ "it" if c.removed | length == 1 else "them" }},
-  cancel, download the table again and make your changes in that copy.
+  cancel{{ ", download the table again and make your changes in that copy" if not source_file else " and check the file" }}.
 </p>
 {% endif %}
 
 {% if c.removed %}
 <section class="card change-list remove">
-  <h2>To delete ({{ c.removed | length }})</h2>
+  <h3>To delete ({{ c.removed | length }})</h3>
   <div class="scroll">
     <table class="rows">
       <thead><tr>{% for column in table.columns %}<th scope="col">{{ column.name }}</th>{% endfor %}</tr></thead>
@@ -76,15 +87,15 @@
 
 {% if c.changed %}
 <section class="card change-list change">
-  <h2>To change ({{ c.changed | length }})</h2>
+  <h3>To change ({{ c.changed | length }})</h3>
   <div class="scroll">
     <table class="rows">
-      <thead><tr><th scope="col" class="num">Row</th>{% for k in key %}<th scope="col">{{ k }}</th>{% endfor %}<th scope="col">Changes</th></tr></thead>
+      <thead><tr><th scope="col" class="num">Row</th>{% for k in part.key %}<th scope="col">{{ k }}</th>{% endfor %}<th scope="col">Changes</th></tr></thead>
       <tbody>
         {% for ch in c.changed[:rows_shown] %}
         <tr>
           <td class="num">{{ ch.row.line }}</td>
-          {% for k in key %}<td>{{ ch.row.values[k] | cell }}</td>{% endfor %}
+          {% for k in part.key %}<td>{{ ch.row.values[k] | cell }}</td>{% endfor %}
           <td>
             {% for column in ch.columns %}
             <div><code>{{ column }}</code>: <span class="old">{{ ch.old[column] | cell }}</span> → <span class="new">{{ ch.row.values[column] | cell }}</span></div>
@@ -101,7 +112,7 @@
 
 {% if c.added %}
 <section class="card change-list add">
-  <h2>To add ({{ c.added | length }})</h2>
+  <h3>To add ({{ c.added | length }})</h3>
   <div class="scroll">
     <table class="rows">
       <thead><tr><th scope="col" class="num">Row</th>{% for column in table.columns %}<th scope="col">{{ column.name }}</th>{% endfor %}</tr></thead>
@@ -118,14 +129,15 @@
   {{ more(c.added) }}
 </section>
 {% endif %}
+{% endfor %}
 
-<p class="muted">"Row" is the row number in your Excel file.</p>
+<p class="muted">"Row" is the row number in your {{ "file" if source_file else "Excel file" }}{{ " that each row was worked out from" if source_file else "" }}.</p>
 
 <div class="actions">
-  {% if c.has_changes %}
+  {% if changes.has_changes %}
   <form method="post" action="/admin/uploads/{{ upload.id }}/approve">
-    <input type="hidden" name="check" value="{{ c.fingerprint }}">
-    <button class="button">Approve and update the table</button>
+    <input type="hidden" name="check" value="{{ changes.fingerprint }}">
+    <button class="button">Approve and update {{ "the table" if parts | length == 1 else "the tables" }}</button>
   </form>
   {% endif %}
   <form method="post" action="/admin/uploads/{{ upload.id }}/cancel">

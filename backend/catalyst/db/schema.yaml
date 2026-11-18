@@ -48,19 +48,28 @@
 #    example       An example value, shown on the admin page when the table
 #                  is clicked (catalyst/admin/diagram.py). Not stored in the database.
 #
-#  Table options:  title, description, filled_by, columns, indexes, renamed_from
+#  Table options:  title, description, filled_by, input, columns, indexes, renamed_from
 #    title         Friendly name, e.g. EA Scores. Shown on the admin page.
 #    filled_by     How the table gets its data:
 #                    api    an importer downloads it from an outside service
 #                           (code in backend/catalyst/importers/api/)
-#                    excel  uploaded as an Excel file in the admin page. The
-#                           table then appears there automatically, with no
-#                           code to write. Each upload replaces the table's
-#                           rows, so the table needs a primary key, and its
-#                           columns can only be text, varchar(N), integer,
-#                           bigint, smallint, double, boolean or date.
+#                    excel  uploaded as an Excel file in the admin page, in
+#                           the table's own layout (1 to 1). The table then
+#                           appears there automatically, with no code to
+#                           write. Each upload replaces the table's rows, so
+#                           the table needs a primary key, and its columns
+#                           can only be text, varchar(N), integer, bigint,
+#                           smallint, double, boolean or date.
+#                    input  worked out from a source file (one of the files
+#                           the original Power BI dashboard read), uploaded
+#                           in the admin page as it comes, with the original's
+#                           formulas. Say which with `input` (below). Same
+#                           rules as excel.
 #                  Leave it out for tables filled some other way (e.g. the
 #                  admin page's own records).
+#    input         For `filled_by: input`: the source file's code, in
+#                  backend/catalyst/importers/inputs/, e.g. apha_livestock.
+#                  One source file can fill several tables.
 #    indexes       Indexes over several columns, for example:
 #                    indexes:
 #                      - columns: [location_id, year]
@@ -216,18 +225,20 @@ tables:
     title: Datasets
     description: >-
       The text in the dashboard's "i" info buttons: one row for each data table
-      that has one. A panel's "i" button is greyed out until its table has a
-      row here. In Excel, Alt+Enter starts a new line in a cell.
+      that has one, and one for the Risk Levels panel (risk_levels), which is
+      made from several tables. A panel's "i" button is greyed out until it
+      has a row here. In Excel, Alt+Enter starts a new line in a cell.
       The text can have paragraphs, bullets, bold, links, headings and sections, written as described under Location Text.
     filled_by: excel
     columns:
       table_name:
         type: text
-        example: risk_levels
+        example: livestock
         primary_key: true
         description: >-
           The data table, by its name in the database (shown under its title
-          when you click it on the admin page), e.g. risk_levels
+          when you click it on the admin page), e.g. livestock. Or risk_levels,
+          for the Risk Levels panel
       info_text:
         type: text
         example: "Risk levels assessed by the catchment partnership in 2026. Source: …"
@@ -237,10 +248,10 @@ tables:
   uploads:
     title: Uploads
     description: >-
-      One row for each Excel file uploaded in the admin page: which table it
-      was for, who uploaded it and when, and what it changed. The file itself
-      is kept, so an earlier version of a table can be downloaded from the
-      admin page and uploaded again.
+      One row for each file uploaded in the admin page: which table or source
+      file it was for, who uploaded it and when, and what it changed. The file
+      itself is kept, so an earlier version can be downloaded from the admin
+      page and uploaded again.
     columns:
       id:
         type: integer
@@ -248,11 +259,14 @@ tables:
         primary_key: true
         identity: true
         description: Upload ID
-      table_name:
+      uploaded_to:
+        renamed_from: table_name
         type: text
         example: ea_scores
         required: true
-        description: The table the file was uploaded to
+        description: >-
+          The table the file was uploaded to, or for a source file, its code
+          (e.g. apha_livestock), as it can fill several tables
       file_name:
         type: text
         example: EA scores October.xlsx
@@ -300,6 +314,13 @@ tables:
         example: 0
         required: true
         description: Rows in the table that weren't in the file, so are deleted
+      changes:
+        type: jsonb
+        example: '{"livestock": [0, 3, 0], "livestock_pressure": [0, 1, 0]}'
+        description: >-
+          For a source file: the rows added, changed and deleted in each table
+          it fills (the three columns above are their totals). Empty for an
+          upload to one table.
       approved_at:
         type: timestamptz
         example: 2026-10-29 14:32
@@ -343,12 +364,13 @@ data_tables:
     description: >-
       The measured values behind the EA's classifications, shown on the EA
       Data page beside the EA's statuses (e.g. Fish EQR 0.36): one row per
-      catchment, measure and year. The measures the page shows are Fish (EQR),
-      Inverts NTAXA (EQR), Inverts ASPT (EQR), Macrophytes Sub Element (EQR),
-      Phytobenthos Sub Element (EQR), Ammonia (mg/l), Dissolved Oxygen (%),
-      Phosphate (mg/l), Temperature (C), pH Lower and pH Upper; any other
-      measure goes at the bottom of the page.
-    filled_by: excel
+      catchment, measure and year. Worked out from the EA's classification
+      facts, as the original Power BI dashboard did: Fish (EQR), Inverts NTAXA
+      (EQR), Inverts ASPT (EQR), Macrophytes Sub Element (EQR), Phytobenthos
+      Sub Element (EQR), Ammonia (mg/l), Dissolved Oxygen (%), Phosphate
+      (mg/l), Temperature (C), pH Lower and pH Upper.
+    filled_by: input
+    input: ea_classification_facts
     columns:
       catchment_id:
         type: text
@@ -369,9 +391,9 @@ data_tables:
         type: text
         example: Moderate
         description: >-
-          The value's status (High, Good, Moderate, Poor or Bad), which colours
-          it. Where the EA classifies the item itself (e.g. Fish), the EA's
-          status is used instead.
+          The value's status (High, Good, Moderate, Poor or Bad) from its
+          thresholds, which colours it. Where the EA classifies the item itself
+          (e.g. Fish), the dashboard uses the EA's status instead.
       value:
         type: double
         example: 0.36
@@ -379,8 +401,14 @@ data_tables:
 
   habitat_land_use:
     title: Habitat & Land Use
-    description: Area of each habitat or land use type in each catchment.
-    filled_by: excel
+    description: >-
+      Area of each habitat type in each catchment, its share of the
+      catchment's habitat areas, and its relative coverage, from Natural
+      England's habitat map, as the original Power BI dashboard worked them
+      out. Shown on the Land Use Data page, and added up on the Catchment
+      Dashboard.
+    filled_by: input
+    input: habitat
     columns:
       catchment_id:
         type: text
@@ -391,19 +419,22 @@ data_tables:
         type: text
         example: Farmland
         primary_key: true
-        description: e.g. Farmland, Woodland, Not farmed, Urban
+        description: Farmland, Not Farmed, Urban, Wetland or Woodland
       area_ha:
         type: double
-        example: 612
+        example: 1082.4
         required: true
         description: Area in hectares
+      percent_of_catchment:
+        type: double
+        example: 72.1
+        description: The habitat's share of all the catchment's habitat areas added up, in %
       relative_coverage:
         type: text
         example: High
         description: >-
-          How much of this habitat the catchment has compared with others
-          (Low, Medium or High). Typed in until the rule for working it out is
-          agreed.
+          Low, Medium or High, from the % of catchment, with bands for each
+          habitat (shown on the admin page)
 
   ea_classifications:
     title: EA Classifications
@@ -585,6 +616,36 @@ data_tables:
         example: 173
         description: Spills, counted with the 12-24h count method
 
+
+  sewage_overflow_pressure:
+    title: Sewage Overflow Pressure
+    description: >-
+      The Untreated Sewage tile in Risk Levels: each catchment's total hours
+      of storm overflow spills in the latest year of the EA's returns, and the
+      risk level they make, as the original Power BI dashboard worked it out.
+      Filled with Storm Overflows by `importer storm-overflows`.
+    filled_by: api
+    columns:
+      catchment_id:
+        type: text
+        example: GB108050014460
+        primary_key: true
+        references: catchments.id
+      year:
+        type: integer
+        example: 2025
+        required: true
+        description: The year of the returns the hours are from (the latest)
+      spill_hours:
+        type: double
+        example: 281.5
+        required: true
+        description: The hours all the catchment's storm overflows spilled that year. 0 if it has none.
+      pressure:
+        type: text
+        example: Medium
+        required: true
+        description: Very Low, Low, Medium, High or Very High, from the spill hours
   river_obstacles:
     title: River Obstacles
     description: >-
@@ -666,9 +727,12 @@ data_tables:
     title: River Status Text
     description: >-
       The hand-written text on the Waterbody Dashboard's River Status page:
-      one row per catchment. In Excel, Alt+Enter starts a new line in a cell.
-      The text can have paragraphs, bullets, bold, links, headings and sections, written as described under Location Text.
-    filled_by: excel
+      one row per catchment, from Improvement Information, each statement with
+      its bullets as a list, as the original Power BI dashboard put them
+      together. The text can have paragraphs, bullets, bold, links, headings
+      and sections, written as described under Location Text.
+    filled_by: input
+    input: improvement_information
     columns:
       catchment_id:
         type: text
@@ -692,56 +756,72 @@ data_tables:
         example: Med-High
         description: How confident the hypothesis is, shown after its heading, e.g. Low, Medium, Med-High, High
 
-  risk_levels:
-    title: Risk Levels
+  esme_risk_levels:
+    title: ESME Risk Levels
     description: >-
-      Each catchment's risk levels, shown as the coloured Risk Levels tiles on
-      the River Status, Land Use Data and Sewerage Data pages: one row per
-      catchment, one column per risk. Each level is Very Low, Low, Medium,
-      High or Very High. Typed in until the rules for working them out are
-      agreed.
-    filled_by: excel
+      Five of the Risk Levels tiles (Modification, Runoff, Running Dry,
+      Invasive Species and Overheating), each worked out from one of the
+      Ecosystem Service Map Explorer's (ESME) indicators for the river, as the
+      original Power BI dashboard did. Each level is Very Low, Low, Medium,
+      High or Very High.
+    filled_by: input
+    input: esme
     columns:
       catchment_id:
         type: text
         example: GB108050014460
         primary_key: true
         references: catchments.id
-      untreated_sewage:
-        type: text
-        example: Very High
-        description: Untreated Sewage (storm overflows)
-      sewage_private:
-        type: text
-        example: Medium
-        description: Sewage (Private), e.g. septic tanks
-      livestock:
+      habitat_quality:
+        type: integer
+        example: 3
+        description: ESME's R1 River Habitat Quality Index, 1 (very low) to 5 (very high)
+      modification:
         type: text
         example: Medium
+        description: The Modification tile, from the habitat quality
+      runoff_and_infiltration:
+        type: integer
+        example: 2
+        description: ESME's R24 Runoff and Infiltration, 1 to 5 (5 holds the most rain back)
       runoff:
         type: text
         example: High
-      modification:
-        type: text
-        example: Low
-        description: Physical modification of the river
-      invasive_species:
-        type: text
-        example: Low
-      overheating:
-        type: text
-        example: Low
+        description: The Runoff tile, from runoff and infiltration
+      abstraction_sustainability:
+        type: integer
+        example: 5
+        description: ESME's R27 Abstraction sustainability, 1 to 5 (5 is the most sustainable)
       running_dry:
         type: text
         example: Very Low
+        description: The Running Dry tile, from abstraction sustainability
+      invasive_species_found:
+        type: text
+        example: One species
+        description: ESME's R17 Invasive non-native species, e.g. No or One species
+      invasive_species:
+        type: text
+        example: High
+        description: The Invasive Species tile
+      river_shade:
+        type: text
+        example: Shaded
+        description: ESME's R10 River shade, e.g. Shaded, Medium shade or No shade
+      overheating:
+        type: text
+        example: Low
+        description: The Overheating tile, from the river shade
 
   catchment_rankings:
     title: Catchment Ranking
     description: >-
       Each catchment's ranking, shown as e.g. "Catchment Ranking: 68/92" on
       every Waterbody Dashboard page (the 92 is the location's number of river
-      waterbodies). Typed in until the rule for working it out is agreed.
-    filled_by: excel
+      waterbodies). From the Waterbody Lookup, as the original Power BI
+      dashboard had it.
+    filled_by: input
+    input: waterbody_lookup
     columns:
       catchment_id:
         type: text
@@ -753,13 +833,43 @@ data_tables:
         example: 68
         required: true
 
+  ecological_classes:
+    title: Ecological Classes
+    description: >-
+      Each catchment's ecological class for a year the EA's Catchment Data
+      Explorer doesn't have yet (2025), from the Waterbody Lookup, as the
+      original Power BI dashboard had it. The maps' colours, the class counts
+      and that year in EA Ecological Classification use it in place of the
+      EA's own.
+    filled_by: input
+    input: waterbody_lookup
+    columns:
+      catchment_id:
+        type: text
+        example: GB108050014460
+        primary_key: true
+        references: catchments.id
+      year:
+        type: integer
+        example: 2025
+        primary_key: true
+        description: The year it's the class for
+      ecological_class:
+        type: text
+        example: Moderate
+        required: true
+        description: High, Good, Moderate, Poor or Bad
+
   ea_thresholds:
     title: EA Thresholds
     description: >-
       The thresholds for each measure on the EA Data page (Poor, Moderate,
       Good and High), per catchment, as some depend on the river's type. The
-      measures are named as in EA Scores, e.g. Fish (EQR).
-    filled_by: excel
+      measures are named as in EA Scores, e.g. Fish (EQR). Fixed for biology,
+      and the waterbody's latest boundaries from the EA's classification facts
+      for physico-chemistry, as the original Power BI dashboard had them.
+    filled_by: input
+    input: ea_classification_facts
     columns:
       catchment_id:
         type: text
@@ -789,10 +899,49 @@ data_tables:
   #  (the Catchment Dashboard adds these up for the whole location)
   # ---------------------------------------------------------------------------
 
+  river_information:
+    title: River Information
+    description: >-
+      The Land Use Data page's River Information: each catchment's area,
+      river length, river system, and the rivers upstream and downstream, from
+      the Waterbody Lookup, as the original Power BI dashboard had them. A
+      catchment with no row here shows the EA's instead (from Catchments).
+    filled_by: input
+    input: waterbody_lookup
+    columns:
+      catchment_id:
+        type: text
+        example: GB108050014460
+        primary_key: true
+        references: catchments.id
+      catchment_area_ha:
+        type: double
+        example: 1698.1
+        description: The catchment's area in hectares
+      river_length_km:
+        type: double
+        example: 9.6
+        description: The river's length in km
+      river_system:
+        type: text
+        example: Taw
+        description: e.g. Taw, Torridge, Lyn or Coastal
+      upstream_rivers:
+        type: text
+        example: Hole Water, Nadrid Water
+        description: The rivers upstream, by name, separated by commas, or None
+      downstream_rivers:
+        type: text
+        example: Mole (Taw to Bray)
+        description: The rivers (or e.g. Sea) downstream, by name, separated by commas
+
   farms:
     title: Farms
-    description: The number of farms in each catchment, shown on the Land Use Data page and added up on the Catchment Dashboard.
-    filled_by: excel
+    description: >-
+      The number of farms in each catchment, shown on the Land Use Data page
+      and added up on the Catchment Dashboard. From the Waterbody Lookup.
+    filled_by: input
+    input: waterbody_lookup
     columns:
       catchment_id:
         type: text
@@ -807,10 +956,12 @@ data_tables:
   livestock:
     title: Livestock
     description: >-
-      The number of each kind of livestock in each catchment, for the Land Use
-      Data page's Livestock Pressures. The density (per square kilometre) is
-      worked out from the catchment's area.
-    filled_by: excel
+      The number of each kind of livestock in each catchment, with its density
+      and density rating, for the Land Use Data page's Livestock Pressures.
+      Worked out from APHA's livestock data, as the original Power BI
+      dashboard did.
+    filled_by: input
+    input: apha_livestock
     columns:
       catchment_id:
         type: text
@@ -821,24 +972,71 @@ data_tables:
         type: text
         example: Dairy cattle
         primary_key: true
-        description: e.g. Beef cattle, Dairy cattle, Pigs, Poultry, Sheep
+        description: Beef cattle, Dairy cattle, Pigs, Poultry or Sheep
       number:
         type: integer
         example: 1137
-        required: true
+        description: >-
+          How many there are. 0 where APHA gives none. Empty where APHA gives
+          only a range instead (see Number note).
+      number_note:
+        type: text
+        example: Less than 5
+        description: What APHA gives instead of a number, as it doesn't give small numbers, e.g. Less than 5
+      density:
+        type: double
+        example: 73.27
+        description: Number per square kilometre (100 ha), as APHA gives it. 0 where APHA gives none.
       density_rating:
         type: text
         example: Medium
-        description: Low, Medium or High. Typed in until the rule for working it out is agreed.
+        required: true
+        description: Low, Medium or High, from the density (the bands for each kind of livestock are on the admin page)
+
+  livestock_pressure:
+    title: Livestock Pressure
+    description: >-
+      The nitrogen and phosphate from each catchment's livestock (estimated
+      from their densities), and the pressure that puts on the river: the
+      Livestock tile in Risk Levels. Worked out from APHA's livestock data,
+      as the original Power BI dashboard did.
+    filled_by: input
+    input: apha_livestock
+    columns:
+      catchment_id:
+        type: text
+        example: GB108050014460
+        primary_key: true
+        references: catchments.id
+      nitrogen_load:
+        type: double
+        example: 13544.7
+        required: true
+        description: Nitrogen from livestock, in kg per year per square kilometre
+      phosphate_load:
+        type: double
+        example: 2722.3
+        required: true
+        description: Phosphate from livestock, in kg per year per square kilometre
+      nitrogen_and_phosphate_load:
+        type: double
+        example: 16267.0
+        required: true
+        description: The two added up, in kg per year per square kilometre
+      pressure:
+        type: text
+        example: Medium
+        required: true
+        description: Very Low, Low, Medium, High or Very High, from the nitrogen and phosphate load
 
   phosphate_sources:
     title: Phosphate Sources
     description: >-
-      Where each catchment's phosphate comes from (estimated), as a percentage
-      per source, for now (2025) and as projected (2030). Shown on the Land Use
-      Data page; the Sewerage Data page adds the sources up into continuous and
-      diffuse.
-    filled_by: excel
+      Where each catchment's phosphate comes from (estimated by the EA's SAGIS
+      model), as a percentage per source, at the end of AMP7 (2025) and of AMP8
+      (2030). Shown on the Land Use Data page.
+    filled_by: input
+    input: sagis_phosphate
     columns:
       catchment_id:
         type: text
@@ -854,27 +1052,56 @@ data_tables:
         type: integer
         example: 2025
         primary_key: true
-        description: The year the estimate is for, e.g. 2025 or 2030
+        description: The year the estimate is for, 2025 or 2030
       percent:
         type: double
         example: 60.9
         required: true
         description: The source's share of the catchment's phosphate, in %
-      discharge:
+
+  phosphate_point_diffuse:
+    title: Phosphate Continuous and Diffuse
+    description: >-
+      The EA's split of each catchment's phosphate into Continuous (point
+      sources, e.g. sewage treatment works) and Diffuse, from its SAGIS model,
+      at the end of AMP7 (2025) and of AMP8 (2030). It includes phosphate from
+      upstream, so it isn't always the sources added up. Shown on the Sewerage
+      Data page as Source of Phosphate.
+    filled_by: input
+    input: sagis_phosphate
+    columns:
+      catchment_id:
+        type: text
+        example: GB108050014460
+        primary_key: true
+        references: catchments.id
+      source:
         type: text
         example: Continuous
-        description: >-
-          Continuous (e.g. sewage treatment works) or Diffuse (everything
-          else), for the Sewerage Data page's Source of Phosphate
+        primary_key: true
+        description: Continuous or Diffuse
+      year:
+        type: integer
+        example: 2025
+        primary_key: true
+        description: The year the estimate is for, 2025 or 2030
+      percent:
+        type: double
+        example: 61.0
+        required: true
+        description: Its share of the catchment's phosphate, in %
 
   sewerage_properties:
     title: Sewerage Properties
     description: >-
       How many properties in each catchment are on the water company's
-      sewerage and how many on private sewerage (e.g. septic tanks). Shown on
-      the Sewerage Data page, with private sewerage per hectare worked out from
-      the catchment's area, and added up on the Catchment Dashboard.
-    filled_by: excel
+      sewerage and how many on private sewerage (e.g. septic tanks), with
+      private sewerage per hectare and its rating (the Sewage (Private) tile
+      in Risk Levels). Shown on the Sewerage Data page, and added up on the
+      Catchment Dashboard. Worked out from the Waterbody Lookup, as the
+      original Power BI dashboard did.
+    filled_by: input
+    input: waterbody_lookup
     columns:
       catchment_id:
         type: text
@@ -889,13 +1116,24 @@ data_tables:
         type: integer
         example: 467
         description: Properties on private sewerage
+      private_sewerage_per_ha:
+        type: double
+        example: 0.36
+        description: Properties on private sewerage per hectare of the catchment (its area in the Waterbody Lookup)
+      private_sewerage_rating:
+        type: text
+        example: High
+        description: Very Low, Low, Medium, High or Very High, from private sewerage per hectare
 
   sewerage_improvements:
     title: Sewerage Improvements
     description: >-
-      The water company's planned improvements to its sites in each catchment,
-      for the Sewerage Data page's Asset Improvement Plans.
-    filled_by: excel
+      The water company's planned improvements to its storm overflows in each
+      catchment, from Water UK's national storm overflows plan, for the
+      Sewerage Data page's Asset Improvement Plans: a row per overflow, named
+      with Water UK's ID where a site has several.
+    filled_by: input
+    input: water_company_plans
     columns:
       catchment_id:
         type: text

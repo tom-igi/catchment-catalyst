@@ -89,6 +89,7 @@ def test_the_side_shows_the_classification_failing_elements_and_reasons(database
     page = (folder / "sewerage" / EAST_OKEMONT / "index.html").read_text()  # no results: shown empty
     assert '<li class="status-none"><span>2022</span><strong></strong></li>' in page
     assert "<li>Fish</li>" not in page
+    assert "<li>None</li>" in page  # no RNAGs, as on the original
 
 
 def test_ea_data_shows_each_result_coloured_by_its_status(database, tmp_path):
@@ -103,15 +104,58 @@ def test_ea_data_shows_each_result_coloured_by_its_status(database, tmp_path):
 def test_land_use_shows_the_river_information_and_habitat(database, tmp_path):
     with database.begin() as conn:
         conn.execute(SCHEMA.metadata.tables["habitat_land_use"].insert(),
-                     [{"catchment_id": WEST_OKEMENT, "habitat": "Woodland", "area_ha": 500}])
-    location = gather(database)
-    area = next(c["area_ha"] for c in location.catchments if c["id"] == WEST_OKEMENT)
+                     [{"catchment_id": WEST_OKEMENT, "habitat": "Woodland", "area_ha": 500, "percent_of_catchment": 15.75}])
     page = (publish(database, tmp_path) / "land-use" / WEST_OKEMENT / "index.html").read_text()
     assert f"<td>{WEST_OKEMENT}</td>" in page
     assert "<td>Woodland</td>" in page
-    assert f"{100 * 500 / area:.1f}%" in page
+    assert ">15.8%</td>" in page  # as worked out on upload
     page = (publish(database, tmp_path) / "land-use" / EAST_OKEMONT / "index.html").read_text()
     assert "<td>Woodland</td>" not in page
+
+
+def test_river_information_is_the_waterbody_lookups_with_the_eas_otherwise(database, tmp_path):
+    east = next(c for c in gather(database).catchments if c["id"] == EAST_OKEMONT)
+    # As typed in the Waterbody Lookup: names, linked if they're one of the location's catchments.
+    insert(database, "river_information", [{
+        "catchment_id": WEST_OKEMENT, "catchment_area_ha": 3001.5, "river_length_km": 12.345, "river_system": "Torridge",
+        "upstream_rivers": "None", "downstream_rivers": f"{east['name'].upper()}, Taw / Torridge",
+    }])
+    location = gather(database)
+    numbers = figures.Figures(location)
+    info = numbers.river_info(next(c for c in location.catchments if c["id"] == WEST_OKEMENT))
+    assert (info["area_ha"], info["length_km"], info["river_system"]) == (3001.5, 12.345, "Torridge")
+    assert info["upstream"] == [("None", None)]
+    assert info["downstream"] == [(east["name"].upper(), EAST_OKEMONT), ("Taw / Torridge", None)]  # case doesn't matter
+    page = (publish(database, tmp_path) / "land-use" / WEST_OKEMENT / "index.html").read_text()
+    assert '<tr><th scope="row">River System</th><td>Torridge</td></tr>' in page
+    assert "<td>3,001.5</td>" in page and "<td>12.35</td>" in page
+    assert f'<a href="../../land-use/{EAST_OKEMONT}/">{east["name"].upper()}</a>' in page
+    # A catchment the Waterbody Lookup doesn't have: the EA's.
+    assert numbers.river_info(east)["area_ha"] == east["area_ha"] and numbers.river_info(east)["river_system"] is None
+
+
+def test_typed_river_names_link_to_the_catchments_they_name():
+    location = collect.Location("Here", "here", [{"id": "A", "name": "Hole Water"}, {"id": "B", "name": "Nadrid  Water"}],
+                                {"A": "Hole Water", "B": "Nadrid  Water"}, [], {})
+    numbers = figures.Figures(location)
+    assert numbers._named_rivers("hole water, Nadrid Water, Sea") == [("hole water", "A"), ("Nadrid Water", "B"), ("Sea", None)]
+    assert numbers._named_rivers("Taw / Torridge") == [("Taw / Torridge", None)]
+    assert numbers._named_rivers(None) == []
+
+
+def test_rnags_are_listed_as_on_the_original():
+    def rnag(activity, source_type="Diffuse source", element="Fish", cycle=3):
+        return {"cycle": cycle, "element": element, "activity": activity, "source_type": source_type}
+
+    rows = [
+        rnag("Poor nutrient management"), rnag("Poor nutrient management", element="Phosphate"),
+        rnag("Not applicable"), rnag("Unknown (pending investigation)"), rnag("OTHER (NOT IN LIST, MUST ADD DETAILS IN COMMENTS)"),
+        rnag("Not applicable", source_type="Suspect data", element="Invertebrates"),
+        rnag("Abandoned mine", cycle=2),  # an earlier cycle
+    ]
+    dataset = collect.Dataset("ea_rnags", "EA RNAGs", None, [], {"A": rows}, None)
+    numbers = figures.Figures(collect.Location("Here", "here", [], {}, [dataset], {}))
+    assert numbers.reasons("A") == ["Poor nutrient management", "Suspect data (Invertebrates)"]
 
 
 def test_info_buttons_show_the_datasets_table(database, tmp_path):
@@ -127,6 +171,17 @@ def test_info_buttons_show_the_datasets_table(database, tmp_path):
     page = (publish(database, tmp_path) / "land-use" / WEST_OKEMENT / "index.html").read_text()
     assert 'popovertarget="info-habitat_land_use"' not in page  # no datasets row yet: greyed out
     assert '<span class="info" aria-hidden="true">i</span>' in page
+
+
+def test_the_risk_levels_info_button_is_a_panels(database, tmp_path):
+    # Risk Levels is made from several tables, so its "i" text is under the panel's name, not a table's.
+    with database.begin() as conn:
+        conn.execute(sa.text("INSERT INTO datasets (table_name, info_text) VALUES ('risk_levels', '- Livestock: APHA data.')"))
+    folder = publish(database, tmp_path)
+    for page in ["river-status", "land-use", "sewerage"]:
+        text = (folder / page / WEST_OKEMENT / "index.html").read_text()
+        assert 'popovertarget="info-risk_levels"' in text and "<h3>Risk Levels</h3>" in text, page
+        assert "<li>Livestock: APHA data.</li>" in text
 
 
 def test_figures_cope_with_a_missing_table(database):
@@ -161,6 +216,23 @@ def test_status_counts_are_most_first():
     assert numbers.status_counts() == [("Poor", 2), ("Good", 1)]
     assert numbers.statuses() == ["Good", "Poor", "Bad"]
     assert numbers.classification("D") == [(2022, None), (2019, "Bad")]
+
+
+def test_a_year_the_ea_doesnt_have_comes_from_ecological_classes(database, tmp_path):
+    # The Waterbody Lookup's 2025 class, as the original dashboard had it.
+    insert(database, "ecological_classes", [{"catchment_id": WEST_OKEMENT, "year": 2025, "ecological_class": "Good"},
+                                            {"catchment_id": EAST_OKEMONT, "year": 2025, "ecological_class": "Bad"}])
+    numbers = figures.Figures(gather(database))
+    assert numbers.status(WEST_OKEMENT) == "Good"  # the map's colour
+    assert [year for year, _ in numbers.classification(WEST_OKEMENT)] == [2025, 2022, 2019]
+    assert numbers.classification(WEST_OKEMENT)[:2] == [(2025, "Good"), (2022, "Poor")]  # 2022 is still the EA's
+    assert numbers.latest_year() == 2025 and numbers.status_counts() == [("Good", 1), ("Bad", 1)]
+    assert "Fish" in numbers.failing_elements(WEST_OKEMENT)  # from the EA's latest year (2022), which has the elements
+    grid = {row.item: row for row in numbers.scoring(WEST_OKEMENT).rows}
+    assert grid["Ecological"].by_year[2025] == figures.Cell("Good", "Good")  # the EA Data page's 2025, as on the original
+    assert grid["Ecological"].by_year[2022] == figures.Cell("Poor", "Poor")
+    page = (publish(database, tmp_path) / "sewerage" / WEST_OKEMENT / "index.html").read_text()
+    assert '<li class="status-good"><span>2025</span><strong>Good</strong></li>' in page
 
 
 def test_a_year_classified_twice_uses_the_later_cycle():
@@ -354,7 +426,8 @@ def test_river_status_shows_the_text_risks_interventions_and_ranking(database, t
         "catchment_id": WEST_OKEMENT, "why_failing": "Fish are poor.\n\nThe reasons:\n- Metals\n- Mining",
         "happening_now": "<b>Surveys</b>", "intervention_hypothesis": "Treat the mine water.", "hypothesis_confidence": "Med-High",
     }])
-    insert(database, "risk_levels", [{"catchment_id": WEST_OKEMENT, "untreated_sewage": "Very High", "running_dry": "Low"}])
+    insert(database, "sewage_overflow_pressure", [{"catchment_id": WEST_OKEMENT, "year": 2025, "spill_hours": 1500.0, "pressure": "Very High"}])
+    insert(database, "esme_risk_levels", [{"catchment_id": WEST_OKEMENT, "abstraction_sustainability": 4, "running_dry": "Low"}])
     insert(database, "catchment_rankings", [{"catchment_id": WEST_OKEMENT, "ranking": 7}])
     here = location_id(database)
     insert(database, "intervention_types", [
@@ -414,35 +487,50 @@ def test_measured_values_have_at_least_two_decimal_places(value, shown):
 
 def test_land_use_shows_farms_livestock_and_phosphate(database, tmp_path):
     insert(database, "farms", [{"catchment_id": WEST_OKEMENT, "number_of_farms": 68}])
-    insert(database, "livestock", [{"catchment_id": WEST_OKEMENT, "livestock": "Sheep", "number": 5558, "density_rating": "Medium"}])
+    insert(database, "livestock", [
+        {"catchment_id": WEST_OKEMENT, "livestock": "Sheep", "number": 5558, "number_note": None, "density": 150.25,
+         "density_rating": "Medium"},
+        {"catchment_id": WEST_OKEMENT, "livestock": "Dairy cattle", "number": None, "number_note": "Less than 5", "density": 0.3,
+         "density_rating": "Low"},
+    ])
+    insert(database, "livestock_pressure", [{"catchment_id": WEST_OKEMENT, "nitrogen_load": 9000.0, "phosphate_load": 1500.0,
+                                             "nitrogen_and_phosphate_load": 10500.0, "pressure": "Medium"}])
+    insert(database, "esme_risk_levels", [{"catchment_id": WEST_OKEMENT, "runoff_and_infiltration": 2, "runoff": "High"}])
     insert(database, "habitat_land_use", [{"catchment_id": WEST_OKEMENT, "habitat": "Woodland", "area_ha": 500, "relative_coverage": "High"}])
     insert(database, "phosphate_sources", [
-        {"catchment_id": WEST_OKEMENT, "source": source, "year": year, "percent": percent, "discharge": discharge}
-        for year in (2025, 2030)
-        for source, percent, discharge in [("STW (SWW)", 60.9, "Continuous"), ("Livestock", 29.1, "Diffuse"), ("Arable", 10.0, "diffuse")]
+        {"catchment_id": WEST_OKEMENT, "source": source, "year": year, "percent": percent}
+        for year in (2025, 2030) for source, percent in [("STW (SWW)", 60.9), ("Livestock", 29.1), ("Arable", 10.0)]
+    ])
+    insert(database, "phosphate_point_diffuse", [  # the EA's own split: not the sources added up
+        {"catchment_id": WEST_OKEMENT, "source": source, "year": year, "percent": percent}
+        for year in (2025, 2030) for source, percent in [("Diffuse", 45.5), ("Continuous", 54.5)]
     ])
     location = gather(database)
-    area = next(c["area_ha"] for c in location.catchments if c["id"] == WEST_OKEMENT)
     page = (publish(database, tmp_path) / "land-use" / WEST_OKEMENT / "index.html").read_text()
     assert "Number of Farms: 68" in page
-    assert f">{5558 / (area / 100):,.1f}</td>" in page  # sheep per km²
+    assert '<td class="num" data-sort="5558">5,558</td>' in page
+    assert ">150.2</td>" in page  # sheep per km², as APHA gives it
+    assert '<td class="num" data-sort="">Less than 5</td>' in page  # APHA gives no number
+    # The Livestock tile is from Livestock Pressure, and Runoff from ESME Risk Levels.
+    assert '<li class="risk-medium"><span class="risk-name">Livestock</span><span class="risk-level">Medium</span></li>' in page
+    assert '<li class="risk-high"><span class="risk-name">Runoff</span><span class="risk-level">High</span></li>' in page
     assert "<td>High</td>" in page  # relative coverage
     assert '<th scope="col" data-type="number" class="num">2030 (%)</th>' in page
     years, groups = figures.Figures(location).phosphate_discharges(WEST_OKEMENT)
     assert years == [2025, 2030]
-    assert groups == [("Continuous", {2025: 60.9, 2030: 60.9}), ("Diffuse", {2025: 39.1, 2030: 39.1})]
+    assert groups == [("Continuous", {2025: 54.5, 2030: 54.5}), ("Diffuse", {2025: 45.5, 2030: 45.5})]  # Continuous first
 
 
 def test_sewerage_shows_the_properties_plans_and_location_text(database, tmp_path):
-    insert(database, "sewerage_properties", [{"catchment_id": WEST_OKEMENT, "public_sewerage_properties": 310, "private_sewerage_properties": 467}])
+    insert(database, "sewerage_properties", [{"catchment_id": WEST_OKEMENT, "public_sewerage_properties": 310, "private_sewerage_properties": 467,
+                                              "private_sewerage_per_ha": 0.3592, "private_sewerage_rating": "High"}])
     insert(database, "sewerage_improvements", [{"catchment_id": WEST_OKEMENT, "site_name": "HIGH BICKINGTON STW", "completion_year": 2035}])
     insert(database, "location_text", [{"location_id": location_id(database), "intermittent_discharges": "When it rains.",
                                         "about_waterbody_dashboard": "Email someone@example.org"}])
-    location = gather(database)
-    area = next(c["area_ha"] for c in location.catchments if c["id"] == WEST_OKEMENT)
     page = (publish(database, tmp_path) / "sewerage" / WEST_OKEMENT / "index.html").read_text()
     assert "<dt>Properties on Private Sewerage:</dt><dd>467</dd>" in page
-    assert f"<dd>{467 / area:.2f}</dd>" in page
+    assert "<dt>Private sewerage per ha of catchment:</dt><dd>0.36</dd>" in page  # from the Waterbody Lookup's area
+    assert '<li class="risk-high"><span class="risk-name">Sewage (Private)</span><span class="risk-level">High</span></li>' in page
     assert "<td>HIGH BICKINGTON STW</td>" in page
     assert "<p>When it rains.</p>" in page
     assert 'Email <a href="mailto:someone@example.org">someone@example.org</a>' in page  # the text under the dashboard
@@ -453,6 +541,7 @@ def test_the_catchment_dashboard_adds_up_the_location(database, tmp_path):
     insert(database, "habitat_land_use", [
         {"catchment_id": WEST_OKEMENT, "habitat": "Woodland", "area_ha": 500},
         {"catchment_id": EAST_OKEMONT, "habitat": "Woodland", "area_ha": 100},
+        {"catchment_id": EAST_OKEMONT, "habitat": "Urban", "area_ha": 200},
     ])
     insert(database, "location_text", [{"location_id": location_id(database), "why_failing": "Most rivers are failing."}])
     numbers = figures.Figures(gather(database))
@@ -462,7 +551,8 @@ def test_the_catchment_dashboard_adds_up_the_location(database, tmp_path):
     assert numbers.class_counts(ids) == [("High", None), ("Good", None), ("Moderate", None), ("Poor", 1), ("Bad", None)]
     assert numbers.total("farms", "number_of_farms", ids) == figures.Total(68, 1, 2)
     habitat, covered = numbers.habitat_totals(ids)
-    assert habitat[0]["area_ha"] == 600 and covered.known == 2
+    assert [(row["habitat"], row["area_ha"], row["share"]) for row in habitat] == [("Urban", 200, 25.0), ("Woodland", 600, 75.0)]
+    assert covered.known == 2  # each share is of all their habitat areas (800 ha), as on the original
 
     folder = publish(database, tmp_path)
     page = (folder / "catchment-dashboard" / "index.html").read_text()

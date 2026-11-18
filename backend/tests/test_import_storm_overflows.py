@@ -150,6 +150,30 @@ def test_saving_works_out_latitude_and_longitude(engine):
     with engine.begin() as conn:
         catchments.save(conn, SCHEMA, found)
         for _ in range(2):  # importing again replaces the rows
-            storm_overflows.save(conn, SCHEMA, rows)
+            storm_overflows.save(conn, SCHEMA, rows, {WEST_OKEMENT})
         saved = conn.execute(sa.text("SELECT latitude, longitude FROM storm_overflows")).all()
+        risks = conn.execute(sa.text("SELECT catchment_id, year, spill_hours, pressure FROM sewage_overflow_pressure")).all()
     assert [(round(lat, 3), round(lon, 3)) for lat, lon in saved] == [(50.964, -4.007)]  # High Bickington
+    assert risks == [(WEST_OKEMENT, 2024, 1.0, "Very Low")]  # saved with them
+
+
+def test_untreated_sewage_risk_is_from_the_latest_years_spill_hours():
+    def row(catchment_id, year, hours):
+        return {"catchment_id": catchment_id, "year": year, "spill_hours": hours}
+
+    rows = [
+        row(WEST_OKEMENT, 2024, 5000.0),  # not the latest year
+        row(WEST_OKEMENT, 2025, 600.0), row(WEST_OKEMENT, 2025, 200.5), row(WEST_OKEMENT, 2025, None),  # no figure: nothing
+        row("GB000000000000", 2025, 9999.0),  # not an imported catchment
+    ]
+    risks = {r["catchment_id"]: r for r in storm_overflows.pressure(rows, {WEST_OKEMENT, EAST_OKEMONT})}
+    assert risks[WEST_OKEMENT] == {"catchment_id": WEST_OKEMENT, "year": 2025, "spill_hours": 800.5, "pressure": "High"}
+    assert risks[EAST_OKEMONT] == {"catchment_id": EAST_OKEMONT, "year": 2025, "spill_hours": 0.0, "pressure": "Very Low"}  # no overflows
+    assert set(risks) == {WEST_OKEMENT, EAST_OKEMONT}
+    assert storm_overflows.pressure([], {WEST_OKEMENT}) == []
+
+
+@pytest.mark.parametrize("hours, pressure", [(1440, "High"), (1440.01, "Very High"), (720.5, "High"), (240, "Low"), (120, "Very Low"), (121, "Low")])
+def test_untreated_sewage_risk_is_above_its_bands(hours, pressure):
+    (risk,) = storm_overflows.pressure([{"catchment_id": WEST_OKEMENT, "year": 2025, "spill_hours": hours}], {WEST_OKEMENT})
+    assert risk["pressure"] == pressure
