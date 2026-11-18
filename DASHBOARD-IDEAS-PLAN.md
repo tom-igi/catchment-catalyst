@@ -8,16 +8,34 @@ workflows or anything else that runs several Claude agents at the same time. The
 gave each version its own agent, all running at once, and quickly used up Tom's credits. See
 "Where it's up to" just below before starting.
 
-**Where it's up to (13 November 2026).** That first attempt, on 12 November, stopped partway:
-- Step 1 (section 3) was done: `published/north-devon-ideas/shared/` has the data export,
-  `format.js`, Leaflet and a `DATA.md` describing the data. Check it against section 3 and reuse
-  it, rather than exporting again.
+**Done (18 November 2026).** All seven versions, the choosing page and the screenshots are built and
+checked, from a fresh export of that day's data: <http://localhost:8080/north-devon-ideas/>. What
+follows is how it stood before that run, kept for the record.
+
+**Where it was up to (updated 18 November 2026, before the run).** That first attempt, on 12 November, stopped partway:
+- Step 1 (section 3) was done on 12 November, but **it has to be done again.** On 18 November the
+  tables behind the dashboard were changed to be worked out from the Power BI's own source files
+  ([POWERBI-INPUTS-PLAN.md](POWERBI-INPUTS-PLAN.md)), so the old export no longer matches what
+  Publish shows (see "What changed on 18 November" in section 3). The script that made it is gone,
+  so write it again. Reuse `format.js`, the Leaflet copy, and the shape of the data described in
+  `shared/DATA.md` (keep the field names the same, so the drafts keep working), and update
+  `DATA.md` for the new fields.
 - All seven version folders were started (6 to 16 files each), but none were checked, so it isn't
-  known whether any of them is finished or works.
+  known whether any of them is finished or works. They were written against the old export, so
+  besides the usual checks, look for these in each:
+  - "2022" written into the code where it should be the latest year (now 2025): in
+    `1-map/app.js`, `2-story/front.js` and `story.css`, `3-table/rivers.js`, `5-network/common.js`,
+    `6-cause-and-effect/facts.js` and `7-timeline/index.html`. Most code reads the years from the
+    data (`latest_year`, `classification_years`) and will pick up 2025 by itself.
+  - upstream and downstream rivers made from `upstream_ids` / `downstream_ids`. Versions 1 to 6
+    do this. Show the new named lists instead (section 3), except in version 5's diagram (see
+    version 5).
+  - each phosphate source's `kind` (Continuous or Diffuse), which no longer exists:
+    `3-table/river.js` and `7-timeline/river.js`. Use `phosphate_groups` instead.
 - There's no `index.html` (the choosing page) and no screenshots.
 
-So start by opening each version and deciding, one at a time, whether to finish it or start that
-version again from scratch.
+So start by doing Step 1 again, then open each version and decide, one at a time, whether to
+finish it or start that version again from scratch.
 
 Tom will look at all seven and choose the one he likes best, or mix ideas from several. These are
 for choosing a design, not for going live.
@@ -139,21 +157,48 @@ the figures match what Publish would show:
   so money shows as "£2.04m" and "c.£387.9m" in the same way everywhere.
 - Catchment Insights questions come from
   `backend/catalyst/publish/content/north-devon/catchment-insights.yaml` (use `site.catchment_insights("north-devon")`).
-  **Note:** the last publish (15:18 on 12 November) came before this file was filled in, so
-  the published Insights page shows no questions yet. Use the YAML file. Most questions don't
-  have answers yet: answers of `"..."` are placeholders, so show those questions with "Answer to
-  follow".
+  The local publish of 18 November (15:54) includes them. Most questions don't have answers yet:
+  answers of `"..."` are placeholders, so show those questions with "Answer to follow".
 - Also include **every year** of each waterbody's ecological status from `Figures.ecological`
-  (2009 to 2022), not only the three the dashboard shows. Only the Timeline version (7) uses the
-  extra years.
-- Copy `published/north-devon/catchments.geojson` to `shared/data/catchments.geojson`. It has a
-  polygon and a river line for each waterbody, each with `id`, `name`, `layer` and `status`.
-- Copy `published/north-devon/assets/leaflet/` to `shared/leaflet/`.
+  (2009 to 2016, 2019, 2022 and 2025), not only the three the dashboard shows. Only the Timeline
+  version (7) uses the extra years.
+- Copy `published/north-devon/catchments.geojson` to `shared/data/catchments.geojson` again
+  (the 12 November copy has 2022 statuses; the current one has 2025's). It has a polygon and a
+  river line for each waterbody, each with `id`, `name`, `layer` and `status`. Publish first if
+  `published/north-devon/` is older than the last approved upload, so the copy is current.
+- The Leaflet copy in `shared/leaflet/` (from `published/north-devon/assets/leaflet/`) is
+  already there and hasn't changed.
+
+**What changed on 18 November** (and so what the new export must have that the old one didn't).
+`figures.py` has the details:
+- **The latest ecological status is 2025,** from Ecological Classes (the Waterbody Lookup), where
+  the EA's Catchment Data Explorer stops at 2022. `Figures.years` starts at 2025, the
+  classification panel shows 2025, 2022 and 2019, and the maps and status counts use 2025.
+  Failing elements and RNAGs still come from the EA's latest year (2022), so say so where
+  they appear next to a 2025 status.
+- **River information comes from `Figures.river_info(catchment)`,** not the `catchments` table:
+  area, length, a new **river system**, and upstream and downstream rivers as typed names, each
+  with the waterbody ID to link to, or none where it isn't a North Devon waterbody (30
+  waterbodies have one of those, often an estuary). Some are the word "None": show it as text.
+  Export these as `river_system`, `upstream` and `downstream` (lists of `{name, id}`). Keep
+  `upstream_ids` and `downstream_ids` (the EA's IDs) as well, for version 5's diagram.
+- **Livestock** rows can have no `number` and a `number_note` instead ("Less than 5", e.g.
+  Burcombe Stream). Density and rating now come from the table, not worked out.
+- **Phosphate Continuous / Diffuse** (`phosphate_discharges`) is the EA's own split now, which
+  includes phosphate from upstream, so it won't always match the sources added up. Each source no
+  longer has a Continuous / Diffuse `kind`: drop that field.
+- **Private sewerage per ha** comes from the table. **RNAGs** leave out "Unknown (pending
+  investigation)" and similar, and add entries like "Suspect data (Fish)".
+- **The 8 risks** each come from their own table now (`RISK_COLUMNS`); `Figures.risks()` works as
+  before. Their "i" text is still under `risk_levels`.
+- **Habitat %** is each habitat's share of the waterbody's habitat areas added up (as uploaded),
+  and the area totals add up the same way. The figures are almost the same as before.
+- Unchanged: the location text, the "i" texts, Intervention Management and Insights.
 
 A suggested shape for `north-devon.json` (adjust it if the code suggests something better):
 
 ```text
-location     id, name, slug, published date ("12 November 2026"), number of rivers (92),
+location     id, name, slug, published date (of the last publish), number of rivers (92),
              water company ("South West Water"), status order, classification years shown,
              latest year, credits (the footer text in templates/base.html)
 text         every Location Text field as HTML (about_waterbody_dashboard,
@@ -165,24 +210,28 @@ areas        North Devon plus its 3 operational catchments: kind, name, slug, pa
              waterbody ids, class counts, farms / public / private sewerage totals (with
              "known of" notes), overflow count, habitat totals
 waterbodies  one per waterbody, everything in checklist B below: id, name, operational
-             catchment, area, river length, upstream/downstream ids, classification (3 years),
+             catchment, area, river length, river system, upstream/downstream (named, with
+             IDs to link to) and upstream/downstream ids, classification (3 years),
              all ecological years, ranking, failing elements, RNAGs, river text (3 texts +
              confidence), all 8 risks, interventions (grouped), scoring (years, rows,
-             thresholds), habitat, obstacles (with lat/lon), farms, livestock, phosphate,
-             phosphate by Continuous/Diffuse, discharges (sites x years), outlets (lat/lon/name),
-             properties, improvements
+             thresholds), habitat, obstacles (with lat/lon), farms, livestock (number or note),
+             phosphate, phosphate by Continuous/Diffuse, discharges (sites x years), outlets
+             (lat/lon/name), properties, improvements
 interventions  summary parts with totals, overall total, the 12 types (all fields, progress
              HTML, waterbody tables by group heading), unit costs
 insights     the 8 focus areas in order: title, groups, questions, answer HTML or null
 ```
 
-**Check the export** against the current pages before building anything. For example:
-- North Devon has 92 waterbodies (Good 13, Moderate 63, Poor 15, Bad 1), 4,263 farms (91 of
-  92 waterbodies), 54,478 properties on SWW sewerage, 66,604 on private sewerage, and 152
+**Check the export** against the current pages before building anything. For example (figures
+as at 18 November 2026):
+- North Devon has 92 waterbodies (2025: Good 12, Moderate 65, Poor 14, Bad 1), 4,263 farms (91
+  of 92 waterbodies), 54,478 properties on SWW sewerage, 66,604 on private sewerage, and 152
   outflows. The interventions overall total is c.£387.9m, of which c.£368.8m is available.
-- Torridge (Source to Dipple Water), `GB108050014390`, ranks 52/92 and has 69 farms. Its risks are
-  Untreated Sewage Very Low, Modification Medium, Sewage (Private) Very Low, Invasive Species
-  High, Livestock Medium, Overheating Medium, Runoff Medium and Running Dry Very Low.
+- Torridge (Source to Dipple Water), `GB108050014390`, is Moderate in 2025, 2022 and 2019, ranks
+  52/92 and has 69 farms. Its risks are Untreated Sewage Very Low, Modification Medium, Sewage
+  (Private) Very Low, Invasive Species High, Livestock Medium, Overheating Medium, Runoff Medium
+  and Running Dry Very Low. Its river information is 3,837.8 ha, 20.28 km, river system Torridge,
+  upstream "None", downstream Torridge (Dipple Water to Combe Lake).
 
 If the export disagrees, check whether data has been uploaded since the last publish (the
 `uploads` and `publishes` tables) before assuming the export is wrong. Don't "fix" the database.
@@ -196,7 +245,8 @@ Compare the rankings of Good and Poor waterbodies in the export.
 
 **A. North Devon as a whole**
 1. Location name, published date, and "92 river waterbodies in the North Devon Catchment"
-2. A map of every waterbody, coloured by ecological status, with its key and the river lines
+2. A map of every waterbody, coloured by ecological status (2025), with its key and the river
+   lines
 3. Counts by status (High, Good, Moderate, Poor, Bad, Total) for North Devon and for each of the
    3 operational catchments (Hartland and Clovelly Streams, Taw and North Devon Streams, Torridge)
 4. Why is the river system failing? What is happening now? Intervention hypothesis
@@ -212,8 +262,9 @@ Compare the rankings of Good and Poor waterbodies in the export.
 **B. Each of the 92 waterbodies**
 1. Name, EA ID, operational catchment
 2. Catchment ranking (e.g. 52/92), with its "i" text
-3. EA ecological classification for 2022, 2019 and 2016
-4. Failing elements, and the EA's RNAGs (reasons for not achieving good)
+3. EA ecological classification for 2025, 2022 and 2019
+4. Failing elements, and the EA's RNAGs (reasons for not achieving good). Both are from the
+   EA's 2022 results, so say which year they're from.
 5. Why is the river failing? What is happening now? Intervention hypothesis (with its confidence)
 6. All 8 risk levels (Untreated Sewage, Modification, Sewage (Private), Invasive Species,
    Livestock, Overheating, Runoff, Running Dry), each Very Low to Very High, with the "i" text
@@ -221,13 +272,14 @@ Compare the rankings of Good and Poor waterbodies in the export.
    (with its note), size, estimated cost and lead, each linking to that intervention's details
 8. EA scoring: every classification item, the latest value and the values for 2025, 2022, 2019
    and 2016, each coloured by status, with the Poor, Moderate, Good and High thresholds
-9. River information: area (ha), river length (km), upstream and downstream rivers (as links)
+9. River information: area (ha), river length (km), river system, upstream and downstream
+   rivers (as links where they're North Devon waterbodies, plain text where they aren't)
 10. Habitat and land use: habitat, area (ha), % of catchment, relative coverage
 11. River obstacles: on a map, and as a table (EA ID, site name, obstacle type, origin)
 12. Number of farms
-13. Livestock: type, number, density per km², density rating
-14. Phosphate sources (estimated): % by source for 2025 and 2030, and the same grouped as
-    Continuous or Diffuse
+13. Livestock: type, number (or "Less than 5"), density per km², density rating
+14. Phosphate sources (estimated): % by source for 2025 and 2030, and the EA's split into
+    Continuous and Diffuse (shown as it is, not added up from the sources)
 15. The "Intermittent Discharges" and "Continuous Discharge" explanations (location text, shown
     with the sewage information)
 16. SWW intermittent sewage discharges: hours per year for each site, 2021 to 2025, with totals
@@ -296,7 +348,7 @@ and the rules in sections 1 and 2.
 **How it works:**
 - A full-screen Leaflet map of North Devon. A small block in the top left holds the name and a
   **"Colour the rivers by"** list:
-  - Ecological status 2022 (the default)
+  - Ecological status 2025 (the default)
   - Catchment ranking
   - Any one of the 8 risks
   - Storm overflow hours (2021 to 2025 total)
@@ -357,7 +409,7 @@ things in order, with a map that changes as you read.
   operational catchment, plus a small map.
 - **A river's story** (`river.html#GB…`) starts with a plain headline, for example "Torridge
   (Source to Dipple Water) is at Moderate status". Under it is a short paragraph built from the
-  ranking and the status for 2016, 2019 and 2022. Then come the chapters:
+  ranking and the status for 2019, 2022 and 2025. Then come the chapters:
   1. Why it's failing (text, failing elements, RNAGs)
   2. What's been measured (each scoring item as a dot on a Poor–Moderate–Good–High scale, with
      the full table under "See the numbers")
@@ -390,7 +442,7 @@ then you narrow it down, compare and dig in.
   show:
   - Name and operational catchment
   - Rank
-  - Status 2016, 2019 and 2022 (coloured cells)
+  - Status 2019, 2022 and 2025 (coloured cells)
   - Failing elements (a count, listed on hover)
   - The 8 risks (coloured cells marked VL, L, M, H or VH, with a key)
   - Farms and top livestock density rating
@@ -483,8 +535,9 @@ pass downstream. (Use the idea of a transport diagram, not anyone's branding: no
 Johnston-style font, no copy of the tube map.)
 
 **How it works:**
-- **Building the diagram:** use `upstream_ids` and `downstream_ids` to make each river system a
-  tree that ends at the sea. Draw a **coastline line** along the bottom, with each system
+- **Building the diagram:** use `upstream_ids` and `downstream_ids` (the EA's links) to make
+  each river system a tree that ends at the sea. In the side panel, show the named `upstream` and
+  `downstream` rivers instead, as the dashboard does. Draw a **coastline line** along the bottom, with each system
   reaching it at its own point, in geographical order (by where its last waterbody is).
   Waterbodies with no links in North Devon are short lines of their own down to the coast. Draw
   the longest path in each tree as its trunk, with tributaries branching off at 45° or 90°.
@@ -572,7 +625,8 @@ what's planned. It has a clear "Now" line.
 **How it works:**
 - **The front page** is North Devon on a timeline from 2009 to 2035, in rows sharing one year axis:
   - **Ecological status of all rivers:** a stacked bar for every classification year in the
-    data (2009 to 2022), with 2016, 2019 and 2022 marked as the years the dashboard reports
+    data (2009 to 2016, 2019, 2022 and 2025), with 2019, 2022 and 2025 marked as the years the
+    dashboard reports. Leave gaps for the missing years rather than squashing the axis.
   - **Storm overflow hours:** the total for each year, 2021 to 2025
   - **Phosphate sources:** 2025 next to the 2030 estimate
   - **Water company improvements:** the number of sites for each completion year, with the AMP8
@@ -590,7 +644,7 @@ what's planned. It has a clear "Now" line.
 - **Choosing a river:** a list of all 92, each with a small strip of its status for every year,
   sortable by name, operational catchment or ranking, next to a small map.
 - **A river's page** (`river.html#GB…`) has three parts:
-  - **Before:** its status strip for every year (2016, 2019 and 2022 marked), and each scoring
+  - **Before:** its status strip for every year (2019, 2022 and 2025 marked), and each scoring
     item as a small line chart from 2016 to 2025 over shaded Poor, Moderate, Good and High bands
     (from its thresholds), with the full scoring table below
   - **Now:** ranking, failing elements, RNAGs, why it's failing, what's happening now, the 8
@@ -642,9 +696,9 @@ Keep this page simple: it's for choosing, not one of the designs.
    - laptop size (1440×900) and phone size (390×844)
    - no console errors
    - try the main flow from start to finish
-   - open at least 3 waterbodies, including `GB108050014390`, one with no storm overflows and
-     Upper East Lyn River (no farms figure), and compare a few figures with the current
-     dashboard
+   - open at least 3 waterbodies, including `GB108050014390`, one with no storm overflows,
+     Upper East Lyn River (no farms figure) and Burcombe Stream (livestock "Less than 5"), and
+     compare a few figures with the current dashboard
    - go through checklist section 4 and confirm each item can be found
    - look again at section 2: would Tom think this looks hand-made?
    
