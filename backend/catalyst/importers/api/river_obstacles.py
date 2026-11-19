@@ -75,7 +75,9 @@ def read(pages: list[dict]) -> list[dict[str, Any]]:
 
 
 def place(conn: sa.Connection, schema: Schema, obstacles: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """The obstacles inside a catchment, each with that catchment's ID."""
+    """The obstacles inside a catchment (or on its outline), each with that catchment's ID. One in two outlines
+    (where they overlap, or on the line between them) goes to the first catchment by ID, as postcodes do, so each
+    import gives the same answer."""
     if not obstacles:
         return []
     table = schema.metadata.tables["catchments"]
@@ -84,8 +86,12 @@ def place(conn: sa.Connection, schema: Schema, obstacles: list[dict[str, Any]]) 
         sa.cast([o["longitude"] for o in obstacles], sa.ARRAY(sa.Float)),
         sa.cast([o["latitude"] for o in obstacles], sa.ARRAY(sa.Float)),
     ).table_valued("id", "lon", "lat").render_derived(name="points")
-    inside = sa.func.ST_Contains(table.c.boundary, sa.func.ST_SetSRID(sa.func.ST_MakePoint(points.c.lon, points.c.lat), 4326))
-    catchment_of = dict(conn.execute(sa.select(points.c.id, table.c.id).join(table, inside)).all())
+    inside = sa.func.ST_Intersects(table.c.boundary, sa.func.ST_SetSRID(sa.func.ST_MakePoint(points.c.lon, points.c.lat), 4326))
+    catchment_of: dict[str, str] = {}
+    for obstacle_id, catchment_id in conn.execute(
+        sa.select(points.c.id, table.c.id).join(table, inside).order_by(points.c.id, table.c.id)
+    ):
+        catchment_of.setdefault(obstacle_id, catchment_id)
     return [{**o, "catchment_id": catchment_of[o["id"]]} for o in obstacles if o["id"] in catchment_of]
 
 

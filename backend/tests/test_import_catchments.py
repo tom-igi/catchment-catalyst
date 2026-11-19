@@ -4,7 +4,10 @@ Uses real EA downloads saved in tests/fixtures/ea (EA data, Open Government
 Licence), so the tests don't depend on the EA's servers being up.
 """
 
+import http.client
+import io
 import json
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -159,3 +162,35 @@ def test_downloads_are_kept_as_they_were(tmp_path):
     run_dir = catchments.save_raw_files(found, tmp_path)
     kept = run_dir / WEST_OKEMENT / "shapefile.zip"
     assert kept.read_bytes() == (FIXTURES / f"{WEST_OKEMENT}.zip").read_bytes()
+
+
+class _Response:
+    """A download that stops part-way the first time, then arrives whole."""
+    def __init__(self, data):
+        self.data = data
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return False
+
+    def read(self):
+        if isinstance(self.data, BaseException):
+            raise self.data
+        return self.data
+
+
+@pytest.mark.parametrize("dropped", [ConnectionResetError(104, "Connection reset by peer"), http.client.IncompleteRead(b"PK")])
+def test_a_download_that_stops_part_way_is_tried_again(monkeypatch, dropped):
+    from catalyst.importers.api import ea_api
+    whole = io.BytesIO()
+    with zipfile.ZipFile(whole, "w") as files:
+        files.writestr("x.txt", "x")
+    answers = [dropped, whole.getvalue()]
+    monkeypatch.setattr(ea_api.urllib.request, "urlopen", lambda request, timeout: _Response(answers.pop(0)))
+    assert ea_api.EAClient(pause=0).storm_overflows(2025) == whole.getvalue()
+
+    answers = [dropped, dropped]
+    with pytest.raises(EAError, match="the download from the EA stopped part-way .*after 2 tries"):
+        ea_api.EAClient(pause=0, retries=2).storm_overflows(2025)

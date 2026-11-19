@@ -40,6 +40,9 @@ BULLET = re.compile(r"^([ \t]*)(?:•[ \t]*|[-–*][ \t]+)(?=\S)")
 SECTION_START = '<details class="section"{open}>\n<summary>{title}</summary>\n<div class="section-body">\n'
 SECTION_END = "</div>\n</details>\n"
 BOX_BREAK = re.compile(r"^[ \t]*---[ \t]*$", re.MULTILINE)
+# A line starting with a number and a full stop (or bracket), e.g. "2030. The plan", which Markdown would make a
+# numbered list (from 2030). Numbered lists aren't one of the marks, so the full stop is written as an entity.
+NUMBERED = re.compile(r"^([ \t]*(?:[->][ \t]+)*)(\d{1,9})([.)])(?=[ \t]|$)")
 
 
 def boxes(text: str | None) -> list[Markup]:
@@ -84,7 +87,7 @@ def formatted(text: str | None) -> Markup:
 
 
 def _prepare(text: str) -> str:
-    """Bullets as Markdown expects them ("- "), however they were typed."""
+    """Bullets as Markdown expects them ("- "), however they were typed, and no numbered lists."""
     lines = []
     for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
         line = line.replace("\t", "    ")
@@ -94,5 +97,6 @@ def _prepare(text: str) -> str:
             if words.startswith(">"):  # e.g. "• > 0.03 = Very High" is a bullet, not a grey box
                 words = "&gt;" + words[1:]
             line = bullet.group(1) + "- " + words
+        line = NUMBERED.sub(lambda m: m.group(1) + m.group(2) + ("&#46;" if m.group(3) == "." else "&#41;"), line)
         lines.append(line)
     return "\n".join(lines)

@@ -44,6 +44,7 @@ import shutil
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
@@ -53,6 +54,7 @@ from .figures import Figures, measured
 from .text import boxes, formatted
 
 HERE = Path(__file__).parent
+UK = ZoneInfo("Europe/London")  # the publish date is the UK's
 ASSETS = HERE / "static"
 # Text kept in files rather than the database, for now: a folder per location (by its web address, e.g. north-devon).
 CONTENT = HERE / "content"
@@ -106,7 +108,7 @@ def write_location(location: Location, out_dir: Path) -> Path:
     env = _environment()
     shared = {
         "location": location, "figures": figures, "text": figures.location_text(), "tabs": TABS, "views": VIEWS,
-        "show_overview": SHOW_OVERVIEW, "published": _today(), "year": datetime.date.today().year,
+        "show_overview": SHOW_OVERVIEW, "published": _today(), "year": _uk_today().year,
         "version": version(building), "postcode_search": bool(districts),
     }
     waterbody = {**shared, "view": "river-status"}
@@ -261,12 +263,14 @@ def _sort_value(value: Any) -> str:
 
 
 def _number(value: float | int | None, decimals: int | None = None) -> str:
+    """A number with thousands separators, as the original showed them (#,##0): 54,478, or 1,234.5 with decimals."""
     if value is None:
         return ""
     if decimals is not None:
         return f"{value:,.{decimals}f}"
-    text = repr(value)
-    return text[:-2] if text.endswith(".0") else text
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    return f"{value:,}"
 
 
 def _pounds(value: float | None) -> str:
@@ -305,6 +309,11 @@ def _anchor(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
 
+def _uk_today() -> datetime.date:
+    """Today in the UK (the container's clock is UTC, a day behind between midnight and 1 am in summer)."""
+    return datetime.datetime.now(UK).date()
+
+
 def _today() -> str:
-    today = datetime.date.today()
+    today = _uk_today()
     return f"{today.day} {today:%B %Y}"

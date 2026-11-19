@@ -6,6 +6,7 @@ The page itself (the diagram of every table) is tested in test_diagram.py.
 import io
 import json
 import re
+import threading
 
 import pytest
 import sqlalchemy as sa
@@ -17,6 +18,7 @@ from catalyst.admin.app import create_app
 from catalyst.admin.settings import Settings, SettingsError
 from catalyst.db import load_schema
 from catalyst.db.sync import apply_changes
+from catalyst.publish import run as publish_run
 
 from .test_excel import EAST, WEST, add_catchments, xlsx
 from .test_inputs import ABBEY_ROW, BADGWORTHY_ROW, apha_file
@@ -113,6 +115,36 @@ def test_a_wrong_password_is_refused(app):
         assert response.status_code == 401
         assert "That name and password don&#39;t match." in response.text
     assert client.get("/admin", follow_redirects=False).status_code == 303
+
+
+def test_too_many_wrong_passwords_have_to_wait(app):
+    clock = [1000.0]
+    app.state.attempts = passwords.Attempts(clock=lambda: clock[0])
+    client = TestClient(app)
+
+    def log_in(name, password):
+        return client.post("/admin/login", data={"name": name, "password": password}, follow_redirects=False)
+
+    for _ in range(passwords.Attempts.MAX):
+        assert log_in("tom", "wrong").status_code == 401
+    response = log_in("tom", PASSWORD)  # even the right password, so a guesser can't tell
+    assert response.status_code == 429
+    assert "Too many wrong passwords. Try again in 15 minutes." in response.text
+    assert log_in("alex", "wrong").status_code == 429  # from the same address
+
+    clock[0] += 14 * 60 + 1
+    assert "Try again in 1 minute." in log_in("tom", PASSWORD).text
+    clock[0] += 60
+    assert log_in("tom", PASSWORD).status_code == 303  # the first wrong one is 15 minutes old
+
+    # A name being guessed at from many addresses has to wait too, and a right password clears it.
+    attempts = passwords.Attempts(clock=lambda: clock[0])
+    for n in range(passwords.Attempts.MAX):
+        attempts.wrong("Tom ", f"10.0.0.{n}")
+    assert attempts.wait_minutes("tom", "10.0.0.99") == 15
+    assert attempts.wait_minutes("alex", "10.0.0.99") == 0
+    attempts.right("tom", "10.0.0.99")
+    assert attempts.wait_minutes("tom", "10.0.0.99") == 0
 
 
 def test_logging_out(client):
@@ -391,6 +423,30 @@ def test_publishing_puts_what_is_approved_on_the_dashboard(app, client, tmp_path
     client.post("/admin/publish")
     assert "Everything approved is on it." in publish_box(client.get("/admin").text)
     assert published_by(app) == ["tom", "tom"]
+
+
+def test_an_approval_waits_for_a_publish_and_is_timed_after_it(app, client):
+    upload(client, PLANS)
+    page = client.get("/admin/uploads/1").text
+    check = re.search(r'name="check" value="(\w+)"', page).group(1)
+    done = threading.Event()
+
+    def approving():
+        client.post("/admin/uploads/1/approve", data={"check": check})
+        done.set()
+
+    with app.state.engine.connect() as publishing:  # a publish is reading the tables
+        publishing.execute(sa.select(sa.func.pg_advisory_xact_lock(publish_run.LOCK)))
+        publishing.execute(app.state.schema.metadata.tables["publishes"].insert().values(published_at=sa.func.clock_timestamp()))
+        thread = threading.Thread(target=approving)
+        thread.start()
+        assert not done.wait(1)  # the approval waits for it
+        assert saved(app.state.engine) == []
+        publishing.commit()
+    assert done.wait(30)
+    thread.join()
+    assert saved(app.state.engine) == SAVED
+    assert "1 upload approved since the last publish, so not on it yet" in publish_box(client.get("/admin").text)
 
 
 def test_the_publish_commands_publishes_are_shown_too(app, client):

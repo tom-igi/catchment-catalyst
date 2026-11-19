@@ -46,7 +46,9 @@
         style: function (feature) { return outline(feature, false); },
         onEachFeature: function (feature, layer) {
           const status = feature.properties.status;
-          layer.bindTooltip(feature.properties.name + (status ? " (" + status + ")" : ""), { sticky: true });
+          const label = document.createElement("span");  // as plain text, as the small maps do
+          label.textContent = feature.properties.name + (status ? " (" + status + ")" : "");
+          layer.bindTooltip(label, { sticky: true });
           if (links === undefined || feature.properties.id === selected) return;
           layer.on("click", function () {
             const page = links + feature.properties.id + "/";

@@ -38,21 +38,20 @@ ID, YEAR, ITEM, FACT, CODE, SET_TYPE, VALUE = (
 YEARS = (2016, 2019, 2022, 2025)  # the years the original's EA Data page shows
 LEVELS = ("high", "good", "moderate", "poor")  # each threshold is that level's lower boundary (upper, if lower is better)
 
-# How a value's status follows from its thresholds (the original's EAColour measures):
+# How a value's status follows from its thresholds (the original's EAColour measures). One difference: the original
+# never coloured Macrophytes or Phytobenthos Bad (Poor at or below the Moderate threshold); here they use "above",
+# so a value at or below the Poor threshold is Bad, as for the other EQRs (BUG-REPORT.md, C8).
 #   at_or_above  higher is better; High at or above the high threshold, and so on, Bad below poor
 #   above        higher is better; High above the high threshold, and so on, Bad at or below poor
-#   above_no_bad as above, but never Bad: Poor at or below moderate
 #   below        lower is better; High below the high threshold, and so on, Bad at or above poor
 RULES: dict[str, Callable[[float, dict], str | None]] = {
     "at_or_above": lambda v, t: next((name.capitalize() for name in LEVELS if v >= t[name]), "Bad"),
     "above": lambda v, t: next((name.capitalize() for name in LEVELS if v > t[name]), "Bad"),
-    "above_no_bad": lambda v, t: next((name.capitalize() for name in LEVELS[:3] if v > t[name]), "Poor"),
     "below": lambda v, t: next((name.capitalize() for name in LEVELS if v < t[name]), "Bad"),
 }
 RULE_WORDS = {
     "at_or_above": "High at or above the High threshold, Good at or above Good, and so on, Bad below Poor",
     "above": "High above the High threshold, Good above Good, and so on, Bad at or below Poor",
-    "above_no_bad": "High above the High threshold, Good above Good, Moderate above Moderate, otherwise Poor",
     "below": "lower is better: High below the High threshold, Good below Good, and so on, Bad at or above Poor",
 }
 
@@ -94,10 +93,10 @@ MEASURES = (
             (0.97, 0.86, 0.72, 0.59), words="the average of the year's sites' ASPT_EQR facts for Invertebrates",
             power_bi="InvertsASPTValue2016 …", reads=(ITEM, CODE, SET_TYPE)),
     Measure("Macrophytes Sub Element (EQR)", _biology("Macrophytes Sub Element", **{CODE: "MEAN_EQR_SITE"}), "average", 3,
-            "above_no_bad", (0.8, 0.6, 0.4, 0.2), words="the average of the year's MEAN_EQR_SITE facts for Macrophytes Sub Element",
+            "above", (0.8, 0.6, 0.4, 0.2), words="the average of the year's MEAN_EQR_SITE facts for Macrophytes Sub Element",
             power_bi="MacrophytesValue2016 …", reads=(ITEM, CODE)),
     Measure("Phytobenthos Sub Element (EQR)", _biology("Phytobenthos Sub Element", **{CODE: "MEAN_EQR_SITE"}), "average", 3,
-            "above_no_bad", (0.8, 0.6, 0.4, 0.2), words="the average of the year's MEAN_EQR_SITE facts for Phytobenthos Sub Element",
+            "above", (0.8, 0.6, 0.4, 0.2), words="the average of the year's MEAN_EQR_SITE facts for Phytobenthos Sub Element",
             power_bi="PhytobenthosValue2016 …", reads=(ITEM, CODE)),
     Measure("Ammonia (mg/l)", _reading("Ammonia (PhysChem)"), "median", 3, "below", boundary=("Ammonia (Phys-Chem)", "mg/l"),
             words="the median of the year's Ammonia (PhysChem) facts", power_bi="AmmoniaValue2016 …", reads=(FACT,)),
@@ -140,7 +139,10 @@ def work_out(rows: list[SourceRow], problems: list[str], notes: list[str]) -> di
         year = row.cells.get(YEAR)
         if number is None or year is None:
             continue
-        year = int(year)
+        if (as_number := _number(year)) is None or not as_number.is_integer():
+            problems.append(f"{row.where}, {YEAR}: {year!r} isn't a year.")
+            continue
+        year = int(as_number)
         key = (row.catchment_id, str(row.cells.get(ITEM) or "").casefold(), str(row.cells.get(FACT) or "").casefold())
         bounds.setdefault(key, {}).setdefault(year, []).append(number)
         if year in YEARS:

@@ -15,6 +15,7 @@ credit line wherever it's used (the dashboard's footer).
 from __future__ import annotations
 
 import csv
+import http.client
 import io
 import re
 import time
@@ -57,6 +58,9 @@ def fetch(retries: int = 3, timeout: float = 300, pause: float = 3.0) -> bytes:
             continue
         except (urllib.error.URLError, TimeoutError) as e:
             problem = f"could not reach Ordnance Survey ({getattr(e, 'reason', e)})"
+            continue
+        except (OSError, http.client.HTTPException) as e:  # e.g. the connection dropped part-way through
+            problem = f"the download from Ordnance Survey stopped part-way ({type(e).__name__})"
             continue
         if zipfile.is_zipfile(io.BytesIO(data)):
             return data

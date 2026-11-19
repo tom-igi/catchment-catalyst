@@ -112,13 +112,15 @@ RISK_COLUMNS = {
 # The Sewerage Data page's Source of Phosphate groups, in order.
 DISCHARGES = ["Continuous", "Diffuse"]
 
-# Failing elements: elements (and sub elements) below Good in the catchment's
-# latest classification year. "Fail" is left out: it's the chemicals' status,
-# which the original dashboard doesn't list. When a sub element is failing, the
-# combined element above it is left out, as on the original.
-BELOW_GOOD = {"Moderate", "Moderate or less", "Poor", "Bad", "Does Not Support Good"}
-FAILING_LEVELS = {"Element", "Sub Element"}
-COMBINED = "Macrophytes and Phytobenthos Combined"
+# Failing elements: the original's ten items (its "Failing Parameters" measures), when Moderate, Poor or Bad in the
+# catchment's latest classification year. Matched ignoring case, as Power BI does (the EA writes e.g. "Dissolved
+# oxygen" and "Phytobenthos Sub Element"). Anything else the EA classifies (e.g. Hydrological Regime, a single
+# chemical, "Moderate or less") isn't listed, as on the original.
+FAILING_ITEMS = {item.casefold() for item in (
+    "Fish", "Invertebrates", "Macrophytes sub element", "Phytobenthos sub element", "Ammonia (Phys-Chem)",
+    "Dissolved Oxygen", "Phosphate", "pH", "Specific pollutants", "Temperature",
+)}
+FAILING_STATUSES = {"Moderate", "Poor", "Bad"}
 # RNAG activities that say nothing about the cause, so aren't listed (as on the original), ignoring case.
 NO_REASONS = {"not applicable", "unknown (pending investigation)", "other (not in list, must add details in comments)"}
 SUSPECT_DATA = "Suspect data"  # a source type: listed as e.g. "Suspect data (Fish)", as on the original
@@ -313,19 +315,17 @@ class Figures:
         return Scoring(years, rows)
 
     def failing_elements(self, catchment_id: str) -> list[str]:
-        """The elements below Good in the EA's latest year for the catchment (its elements' results are the EA's,
-        so a later year from Ecological Classes doesn't count)."""
+        """The original's ten items that are Moderate, Poor or Bad in the EA's latest year for the catchment (its
+        elements' results are the EA's, so a later year from Ecological Classes doesn't count)."""
         results = self.results.get(catchment_id, {})
         years = [year for item, year in results if item == ECOLOGICAL]
         if not years:
             return []
         year = max(years)
-        failing = {
-            item: row for (item, y), row in self.results[catchment_id].items()
-            if y == year and row["level"] in FAILING_LEVELS and row["status"] in BELOW_GOOD
-        }
-        if any(row["level"] == "Sub Element" for row in failing.values()):
-            failing.pop(COMBINED, None)
+        failing = [
+            item for (item, y), row in results.items()
+            if y == year and item.casefold() in FAILING_ITEMS and row["status"] in FAILING_STATUSES
+        ]
         return sorted(failing, key=str.lower)
 
     def reasons(self, catchment_id: str) -> list[str]:
@@ -373,6 +373,25 @@ class Figures:
             for i in ids or []
         ]
 
+    def overflows(self, catchment_id: str) -> dict[str, list[dict[str, Any]]]:
+        """The catchment's storm overflows' rows (every year), by the name the Sewerage Data page gives each: its
+        site name, or where the return has one name for outlets in different places in a year (e.g. MIDDLE MARWOOD
+        STW_SSO_MARWOOD, two storm tanks 10 m apart), the name and the outlet's grid reference, e.g. MIDDLE MARWOOD
+        STW_SSO_MARWOOD (SS 5331 3739). The return's IDs can't be used: there are none before 2023, and they changed
+        in 2024. Rows with the same name and place in a year can't be told apart, so they're one overflow (as the
+        original's table, which grouped by site name, had everything)."""
+        dataset = self.location.dataset(OVERFLOWS)
+        rows = dataset.rows_for(catchment_id) if dataset else []
+        places: dict[tuple[str, int], set[str]] = {}
+        for row in rows:
+            places.setdefault((row["site_name"] or "", row["year"]), set()).add(_place(row.get("grid_reference")))
+        several = {name for (name, _), found in places.items() if len(found) > 1}
+        named: dict[str, list[dict[str, Any]]] = {}
+        for row in rows:
+            name, place = row["site_name"] or "", _place(row.get("grid_reference"))
+            named.setdefault(f"{name} ({place})" if name in several and place else name, []).append(row)
+        return named
+
     def discharges(self, catchment_id: str) -> Discharges:
         overflows = self.location.dataset(OVERFLOWS)
         if not overflows:
@@ -381,23 +400,24 @@ class Figures:
         years = sorted({row["year"] for row in everywhere})[-OVERFLOW_YEARS:]
         companies = {row["company"] for row in everywhere if row["company"]}
         sites: dict[str, dict[int, float]] = {}
-        for row in overflows.rows_for(catchment_id):
-            # Blank hours mean no figure (e.g. no monitor yet): such overflows are left out, as on the original.
-            if row["year"] in years and row["spill_hours"] is not None:
-                by_year = sites.setdefault(row["site_name"] or "", {})
-                by_year[row["year"]] = by_year.get(row["year"], 0) + row["spill_hours"]
+        for name, rows in self.overflows(catchment_id).items():
+            for row in rows:
+                # Blank hours mean no figure (e.g. no monitor yet): such overflows are left out, as on the original.
+                if row["year"] in years and row["spill_hours"] is not None:
+                    by_year = sites.setdefault(name, {})
+                    by_year[row["year"]] = by_year.get(row["year"], 0) + row["spill_hours"]
         return Discharges(years, sorted(sites.items()), companies.pop() if len(companies) == 1 else None)
 
     def outlets(self, catchment_id: str) -> list[tuple[float, float, str]]:
         """Where the overflows in the discharges table are, from their latest year: (latitude, longitude, name)."""
-        overflows = self.location.dataset(OVERFLOWS)
         shown = {site for site, _ in self.discharges(catchment_id).sites}
-        latest: dict[str, dict[str, Any]] = {}
-        for row in overflows.rows_for(catchment_id) if overflows else []:
-            if row["site_name"] in shown and row["latitude"] is not None:
-                if row["site_name"] not in latest or row["year"] > latest[row["site_name"]]["year"]:
-                    latest[row["site_name"]] = row
-        return [(row["latitude"], row["longitude"], site) for site, row in sorted(latest.items())]
+        points = []
+        for name, rows in sorted(self.overflows(catchment_id).items()):
+            placed = [row for row in rows if row["latitude"] is not None]
+            if name in shown and placed:
+                latest = max(placed, key=lambda row: row["year"])
+                points.append((latest["latitude"], latest["longitude"], name))
+        return points
 
     def obstacles(self, catchment_id: str) -> list[dict[str, Any]]:
         obstacles = self.location.dataset(OBSTACLES)
@@ -568,7 +588,7 @@ class Figures:
         if not overflows or not overflows.rows:
             return None
         latest = max(row["year"] for rows in overflows.rows.values() for row in rows)
-        return len({(i, row["site_name"]) for i in ids for row in overflows.rows_for(i) if row["year"] == latest})
+        return sum(1 for i in ids for rows in self.overflows(i).values() if any(row["year"] == latest for row in rows))
 
     def habitat_totals(self, ids: list[str]) -> tuple[list[dict[str, Any]], Total]:
         """Each habitat's area over these catchments, and its share of all their habitat areas added up (as the
@@ -648,3 +668,15 @@ def _rank(name: str, order: list[str]) -> tuple[int, str]:
     lowered = [o.lower() for o in order]
     key = name.strip().lower()
     return (lowered.index(key), "") if key in lowered else (len(order), key)
+
+
+def _place(grid_reference: str | None) -> str:
+    """A grid reference written one way, so the same place matches across years: SS53313739 and SS 5331 3739 are
+    both SS 5331 3739. Empty if there isn't one."""
+    text = "".join((grid_reference or "").split()).upper()
+    match = re.fullmatch(r"([A-Z]{2})(\d+)", text)
+    if not match or len(match.group(2)) % 2:
+        return text
+    letters, digits = match.groups()
+    half = len(digits) // 2
+    return f"{letters} {digits[:half]} {digits[half:]}"

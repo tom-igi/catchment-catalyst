@@ -21,6 +21,8 @@ from catalyst.db import load_schema
 from .collect import PublishProblem
 from .run import publish_all
 
+MAP_FILE = "catchments.geojson"  # in every location's folder the publish step writes
+
 
 def main(argv: list[str] | None = None) -> int:
     argparse.ArgumentParser(prog="publish", description="Publish every location's dashboard as web pages.").parse_args(argv)
@@ -52,9 +54,11 @@ def main(argv: list[str] | None = None) -> int:
             about = "about the location" if dataset.key == "location_id" else f"for {len(dataset.rows)} of the catchments"
             print(f"  {dataset.title}: {count} row(s), {about}")
 
+    # A dashboard this wrote for a location that's gone or renamed. Other folders (e.g. north-devon-ideas, the
+    # design ideas, written by hand) aren't the publish step's, so aren't mentioned.
     current = {l.slug for l in gathered}
     for folder in sorted(out_dir.iterdir()):
-        if folder.is_dir() and not folder.name.startswith(".") and folder.name not in current:
+        if folder.is_dir() and not folder.name.startswith(".") and folder.name not in current and (folder / MAP_FILE).is_file():
             print(f"\nNote: {folder} isn't a current location's folder. Delete it if it's no longer needed.")
     return 0
 

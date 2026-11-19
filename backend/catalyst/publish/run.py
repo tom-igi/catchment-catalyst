@@ -18,8 +18,19 @@ from .collect import Location, PublishProblem
 # Only one publish runs at a time, whether from the admin page or the command,
 # because two at once would write the same folders. Each publish holds this
 # PostgreSQL lock (any fixed number will do) until it ends; a second one waits
-# for it, then publishes again.
+# for it, then publishes again. Approving an upload holds it too (see lock), so a
+# publish never reads a table part-way through an approval.
 LOCK = 7_316_001
+
+
+def lock(conn: sa.Connection) -> None:
+    """Wait for any publish or approval to finish, then stop another starting until this transaction ends.
+
+    Approvals and publishes record their time once they have the lock (clock_timestamp(), not now(),
+    which is when the transaction started), so an upload approved before a publish has an earlier time
+    than it and is on it, and one approved after has a later time and isn't.
+    """
+    conn.execute(sa.select(sa.func.pg_advisory_xact_lock(LOCK)))
 
 
 def publish_all(engine: sa.Engine, schema: Schema, out_dir: Path, published_by: str | None = None) -> list[Location]:
@@ -31,14 +42,14 @@ def publish_all(engine: sa.Engine, schema: Schema, out_dir: Path, published_by: 
     pressed Publish, or None for the publish command.
     """
     with engine.begin() as conn:
-        conn.execute(sa.select(sa.func.pg_advisory_xact_lock(LOCK)))
+        lock(conn)
         locations = [collect.collect(conn, schema, row) for row in collect.locations(conn, schema)]
         if not locations:
             raise PublishProblem("There are no locations to publish yet. Add one first: see README.md, 'Publishing the dashboard'.")
         # Recorded before any page is written, so a database problem stops the publish first. If
         # writing the pages fails, the record is undone with the rest of the transaction.
         publishes = schema.metadata.tables["publishes"]
-        conn.execute(publishes.insert().values(published_by=published_by))
+        conn.execute(publishes.insert().values(published_by=published_by, published_at=sa.func.clock_timestamp()))
         out_dir.mkdir(parents=True, exist_ok=True)
         for location in locations:
             site.write_location(location, out_dir)

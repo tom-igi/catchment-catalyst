@@ -91,10 +91,12 @@ def approved_since(conn: sa.Connection, schema: Schema, since: datetime.datetime
 
 
 def approve(conn: sa.Connection, schema: Schema, upload_id: int, comparisons: dict[str, Comparison], source_file: bool = False) -> None:
+    """Record the approval. The caller holds the publish lock (catalyst.publish.run.lock), so the time is now,
+    not when the transaction started, and so it's in the right order with the publishes' times."""
     uploads = _table(schema)
     conn.execute(
         uploads.update().where(uploads.c.id == upload_id)
-        .values(status=APPROVED, approved_at=sa.func.now(), **_counts(comparisons, source_file))
+        .values(status=APPROVED, approved_at=sa.func.clock_timestamp(), **_counts(comparisons, source_file))
     )
 
 

@@ -78,6 +78,9 @@ class Input:
     work_out: Callable[[list[SourceRow], list[str], list[str]], dict[str, list[FileRow]]]
     url: str | None = None  # the provider's web page, if any
     by_id: bool = False  # rows are matched by the waterbody's ID (the EA's), not its name
+    # A column with each row's EA management catchment (e.g. North Devon), for a file covering more than one, where
+    # waterbody names repeat: a row only matches a catchment in the same management catchment.
+    area_heading: str | None = None
     one_row_each: bool = True  # each waterbody has one row; False for several (e.g. a row per habitat)
     # More sheets it reads, by their exact names -> their columns (each with the waterbody column too). With
     # these, `sheet` must be there by its name as well, and each row says which sheet it's on.
@@ -91,10 +94,12 @@ class Input:
     @property
     def match_step(self) -> Step:
         """How each row's catchment_id is found: the first step for every table."""
+        area = (f" and its {self.area_heading} (as waterbody names repeat across England; the original matched by "
+                "name alone)") if self.area_heading else ""
         return Step(
-            ("catchment_id",), (self.waterbody_heading,),
-            f"Matched to a catchment by its waterbody {'ID' if self.by_id else 'name'}. Rows for anywhere else are "
-            "left out, and the preview lists them.",
+            ("catchment_id",), (self.waterbody_heading, *([self.area_heading] if self.area_heading else [])),
+            f"Matched to a catchment by its waterbody {'ID' if self.by_id else 'name'}{area}. Rows for anywhere else "
+            "are left out, and the preview lists them.",
             self.match,
         )
 
@@ -118,7 +123,8 @@ class Input:
         sheets = [(self.sheet, self.headings), *self.more_sheets.items()]
         rows = [row for found in read_sheets(data, file_name, sheets, by_name=bool(self.more_sheets)) for row in found]
         notes, problems = [], []
-        matched = _match(conn, schema, self.waterbody_heading, self.by_id, self.one_row_each, rows, notes, problems)
+        matched = _match(conn, schema, self.waterbody_heading, self.by_id, self.one_row_each, rows, notes, problems,
+                         area_heading=self.area_heading)
         tables = self.work_out(matched, problems, notes) if not problems else {}
         for name, table_rows in tables.items():
             problems.extend(_missing_values(schema.metadata.tables[name], table_rows))
@@ -244,19 +250,32 @@ def _clean(value: Any) -> Any:
 # --- Matching rows to catchments ----------------------------------------------------
 
 def _match(conn, schema: Schema, heading: str, by_id: bool, one_row_each: bool, rows: list[SourceRow],
-           notes: list[str], problems: list[str]) -> list[SourceRow]:
-    """The rows for a catchment in the Catchments table, each with its ID. Notes say what was left out."""
+           notes: list[str], problems: list[str], area_heading: str | None = None) -> list[SourceRow]:
+    """The rows for a catchment in the Catchments table, each with its ID. Notes say what was left out.
+
+    With area_heading, a row only matches a catchment in the management catchment that column names (or one
+    whose management catchment isn't known)."""
     catchments = schema.metadata.tables["catchments"]
     by_name: dict[str, list[tuple[str, str]]] = {}  # by its name, or with by_id, its ID
-    for catchment_id, name in conn.execute(sa.select(catchments.c.id, catchments.c.name).order_by(catchments.c.name)):
+    areas: dict[str, str | None] = {}  # each catchment's management catchment
+    for catchment_id, name, area in conn.execute(
+        sa.select(catchments.c.id, catchments.c.name, catchments.c.management_catchment).order_by(catchments.c.name)
+    ):
         by_name.setdefault(heading_key(catchment_id if by_id else name), []).append((catchment_id, name))
+        areas[catchment_id] = area
 
-    matched, left_out, first_line = [], [], {}
+    matched, left_out, elsewhere, first_line = [], [], [], {}
     for row in rows:
         name = row.cells.get(heading)
         if name is None:
             continue
         found = by_name.get(heading_key(name), [])
+        if found and area_heading:
+            here = [f for f in found if areas[f[0]] is None or heading_key(areas[f[0]]) == heading_key(row.cells.get(area_heading))]
+            if not here:
+                elsewhere.append(f"{name} ({row.cells.get(area_heading) or f'no {area_heading}'})")
+                continue
+            found = here
         if not found:
             left_out.append(str(name))
             continue
@@ -280,6 +299,12 @@ def _match(conn, schema: Schema, heading: str, by_id: bool, one_row_each: bool, 
         notes.append(
             f"{_count(len(left_out), 'row')} {'isn' if len(left_out) == 1 else 'aren'}'t for a catchment in the Catchments "
             f"table, so {'it is' if len(left_out) == 1 else 'they are'} left out: {_listed(left_out)}."
+        )
+    if elsewhere:
+        notes.append(
+            f"{_count(len(elsewhere), 'row')} {'has' if len(elsewhere) == 1 else 'have'} the name of a catchment in the "
+            f"Catchments table but {'is' if len(elsewhere) == 1 else 'are'} in another {area_heading}, so "
+            f"{'it is' if len(elsewhere) == 1 else 'they are'} left out: {_listed(elsewhere)}."
         )
     without = [name for found in by_name.values() for catchment_id, name in found if catchment_id not in first_line]
     if without and matched:

@@ -80,6 +80,9 @@ def write_table(table: sa.Table, rows: Iterable[Mapping[str, Any]]) -> bytes:
     sheet.append([c.name for c in columns])
     for row in rows:
         sheet.append([_cell_value(row[c.name]) for c in columns])
+        for cell in sheet[sheet.max_row]:
+            if cell.data_type == "f":  # text starting with "=" is text, not a formula for Excel to run
+                cell.data_type, cell.quotePrefix = "s", True
 
     for i, column in enumerate(columns, start=1):
         letter = get_column_letter(i)

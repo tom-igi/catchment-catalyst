@@ -69,6 +69,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.engine = sa.create_engine(settings.database_url, pool_pre_ping=True)
     app.state.templates = _templates()
     app.state.screenshots_dir = SCREENSHOTS_DIR
+    app.state.attempts = passwords.Attempts()  # wrong passwords, so someone can't keep guessing
     app.add_middleware(
         SessionMiddleware,
         secret_key=settings.secret_key,
@@ -115,9 +116,18 @@ def login_page(request: Request):
 
 @router.post("/login")
 def log_in(request: Request, name: Annotated[str, Form()] = "", password: Annotated[str, Form()] = ""):
+    attempts: passwords.Attempts = request.app.state.attempts
+    address = request.client.host if request.client else ""
+    wait = attempts.wait_minutes(name, address)
+    if wait:
+        return _render(request, "login.html", name=name, status_code=429, error=(
+            f"Too many wrong passwords. Try again in {wait} minute{'' if wait == 1 else 's'}."
+        ))
     user = passwords.log_in(request.app.state.settings.users, name, password)
     if user is None:
+        attempts.wrong(name, address)
         return _render(request, "login.html", name=name, error="That name and password don't match.", status_code=401)
+    attempts.right(name, address)
     request.session.clear()
     request.session["user"] = user
     return RedirectResponse("/admin", 303)
@@ -414,6 +424,9 @@ def approve(request: Request, user: User, upload_id: int, check: Annotated[str, 
     here = RedirectResponse(f"/admin/uploads/{upload_id}", 303)
     try:
         with state.engine.begin() as conn:
+            # Not while a publish is reading the tables, and no publish until this is saved, so the Publish box's
+            # "Everything approved is on it" is right (see catalyst.publish.run.lock).
+            publish.run.lock(conn)
             upload = _get_upload(conn, state, upload_id, for_update=True)
             if upload.status != uploads.PREVIEW:
                 request.session["message"] = f"This upload has already been {upload.status}."

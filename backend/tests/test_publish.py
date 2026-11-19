@@ -240,23 +240,29 @@ def test_a_year_classified_twice_uses_the_later_cycle():
     assert numbers.status("A") == "Poor"
 
 
-def test_failing_elements_are_those_below_good_in_the_latest_year():
+def test_failing_elements_are_the_originals_ten_items_below_good_in_the_latest_year():
     numbers = with_results({"A": [
         result("Ecological", 2022, "Moderate", level="Ecological, chemical or quantitative status"),
         result("Fish", 2022, "Moderate"),
         result("Invertebrates", 2022, "Good"),
         result("Phosphate", 2019, "Poor"),  # an earlier year
         result("Mercury and Its Compounds", 2022, "Fail"),  # a chemical
-        result("Macrophytes and Phytobenthos Combined", 2022, "Moderate"),  # left out for its sub element
-        result("Phytobenthos Sub Element", 2022, "Moderate", level="Sub Element"),
+        result("Macrophytes and Phytobenthos Combined", 2022, "Moderate"),  # not one of the ten
+        result("Phytobenthos Sub Element", 2022, "Moderate", level="Sub Element"),  # "sub element" ignoring case
         result("Biological quality elements", 2022, "Moderate", level="Component"),
+        result("Specific pollutants", 2022, "Moderate", level="Component"),  # listed, not its single chemicals
+        result("Zinc", 2022, "Moderate"),
+        result("Hydrological Regime", 2022, "Does Not Support Good"),  # not one of the ten
+        result("Mitigation Measures Assessment", 2022, "Moderate or less"),
+        result("Dissolved oxygen", 2022, "Moderate or less"),  # not Moderate, Poor or Bad
+        result("Temperature", 2022, "Bad"),
     ]})
-    assert numbers.failing_elements("A") == ["Fish", "Phytobenthos Sub Element"]
+    assert numbers.failing_elements("A") == ["Fish", "Phytobenthos Sub Element", "Specific pollutants", "Temperature"]
 
 
-def overflow(year, site, hours, latitude=50.96, longitude=-4.0):
+def overflow(year, site, hours, latitude=50.96, longitude=-4.0, grid_reference=None):
     return {"catchment_id": WEST_OKEMENT, "year": year, "company": "South West Water", "site_name": site,
-            "spill_hours": hours, "latitude": latitude, "longitude": longitude}
+            "spill_hours": hours, "latitude": latitude, "longitude": longitude, "grid_reference": grid_reference}
 
 
 def test_sewerage_shows_each_overflows_hours_a_year(database, tmp_path):
@@ -279,6 +285,38 @@ def test_sewerage_shows_each_overflows_hours_a_year(database, tmp_path):
     assert 'data-points=\'[[50.97, -4.0, "HIGH BICKINGTON"], [50.96, -4.0, "YARNSCOMBE"]]\'' in page  # the latest place
     page = (folder / "sewerage" / EAST_OKEMONT / "index.html").read_text()
     assert "HIGH BICKINGTON" not in page
+
+
+def test_overflows_with_one_name_in_different_places_are_shown_and_counted_separately(database):
+    marwood = "MIDDLE MARWOOD STW_SSO_MARWOOD"
+    with database.begin() as conn:
+        conn.execute(SCHEMA.metadata.tables["storm_overflows"].insert(), [
+            overflow(2024, marwood, 32.32, grid_reference="SS53323739", latitude=50.1),
+            overflow(2024, marwood, 2284.33, grid_reference="SS53313739", latitude=50.2),
+            overflow(2023, marwood, 2636.56, grid_reference="SS 5331 3739", latitude=50.3),  # written another way
+            overflow(2023, marwood, 0, grid_reference="SS 5332 3739", latitude=50.4),
+            overflow(2025, marwood, 744.19, grid_reference="SS53313739", latitude=50.5),
+            overflow(2023, "WEST STREET", 5.84, grid_reference="SS 7093 2567"),  # the same name and place: can't be told apart
+            overflow(2023, "WEST STREET", 11.14, grid_reference="SS 7093 2567"),
+            overflow(2024, "WEST STREET", 40.68, grid_reference="SS70932567"),
+            overflow(2023, "HIGH BICKINGTON", 1.0, grid_reference="SS 1 1"),  # moved, but never two in a year: one row
+            overflow(2025, "HIGH BICKINGTON", 2.0, grid_reference="SS 2 2"),
+        ])
+    numbers = figures.Figures(gather(database))
+    assert numbers.discharges(WEST_OKEMENT).sites == [
+        ("HIGH BICKINGTON", {2023: 1.0, 2025: 2.0}),
+        (f"{marwood} (SS 5331 3739)", {2023: 2636.56, 2024: 2284.33, 2025: 744.19}),
+        (f"{marwood} (SS 5332 3739)", {2023: 0, 2024: 32.32}),
+        ("WEST STREET", {2023: pytest.approx(16.98), 2024: 40.68}),
+    ]
+    assert [name for _, _, name in numbers.outlets(WEST_OKEMENT)] == [
+        "HIGH BICKINGTON", f"{marwood} (SS 5331 3739)", f"{marwood} (SS 5332 3739)", "WEST STREET"]
+    assert numbers.outlets(WEST_OKEMENT)[1][0] == 50.5  # its latest place
+    assert numbers.overflow_count([WEST_OKEMENT]) == 2  # in 2025: High Bickington and one Marwood outlet
+    with database.begin() as conn:
+        conn.execute(SCHEMA.metadata.tables["storm_overflows"].insert(),
+                     [overflow(2025, marwood, 1.0, grid_reference="SS 5332 3739")])
+    assert figures.Figures(gather(database)).overflow_count([WEST_OKEMENT]) == 3
 
 
 def test_land_use_shows_the_river_obstacles(database, tmp_path):
@@ -327,8 +365,13 @@ def test_catchments_that_arent_imported_stop_the_publish(database, tmp_path):
 def test_the_command_publishes_every_location(database, tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("DATABASE_URL", database.url.render_as_string(hide_password=False))
     monkeypatch.setenv("PUBLISHED_DIR", str(tmp_path))
+    (tmp_path / "north-devon-ideas").mkdir()  # someone's own folder: not mentioned
+    (tmp_path / "old-name").mkdir()  # a location's old folder: mentioned
+    (tmp_path / "old-name" / "catchments.geojson").write_text("{}")
     assert main([]) == 0
-    assert "North Devon: 2 catchment(s)" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "North Devon: 2 catchment(s)" in out
+    assert "old-name isn't a current location's folder" in out and "north-devon-ideas" not in out
     assert '<a href="north-devon/">North Devon</a>' in (tmp_path / "index.html").read_text()
     assert [p.published_by for p in publishes(database)] == [None]  # recorded, as the command
 
@@ -522,13 +565,14 @@ def test_land_use_shows_farms_livestock_and_phosphate(database, tmp_path):
 
 
 def test_sewerage_shows_the_properties_plans_and_location_text(database, tmp_path):
-    insert(database, "sewerage_properties", [{"catchment_id": WEST_OKEMENT, "public_sewerage_properties": 310, "private_sewerage_properties": 467,
+    insert(database, "sewerage_properties", [{"catchment_id": WEST_OKEMENT, "public_sewerage_properties": 54478, "private_sewerage_properties": 467,
                                               "private_sewerage_per_ha": 0.3592, "private_sewerage_rating": "High"}])
     insert(database, "sewerage_improvements", [{"catchment_id": WEST_OKEMENT, "site_name": "HIGH BICKINGTON STW", "completion_year": 2035}])
     insert(database, "location_text", [{"location_id": location_id(database), "intermittent_discharges": "When it rains.",
                                         "about_waterbody_dashboard": "Email someone@example.org"}])
     page = (publish(database, tmp_path) / "sewerage" / WEST_OKEMENT / "index.html").read_text()
     assert "<dt>Properties on Private Sewerage:</dt><dd>467</dd>" in page
+    assert "<dd>54,478</dd>" in page  # with a thousands separator, as on the original
     assert "<dt>Private sewerage per ha of catchment:</dt><dd>0.36</dd>" in page  # from the Waterbody Lookup's area
     assert '<li class="risk-high"><span class="risk-name">Sewage (Private)</span><span class="risk-level">High</span></li>' in page
     assert "<td>HIGH BICKINGTON STW</td>" in page
@@ -689,6 +733,8 @@ def location_id_of(engine, name):
     ("a < b <b>c</b>", "<p>a &lt; b &lt;b&gt;c&lt;/b&gt;</p>"),  # typed HTML is shown as typed
     ("[x](javascript:alert(1))", "<p>[x](javascript:alert(1))</p>"),  # a link that would run a script isn't made
     ("C:\\Data\\File_Name_2025.xlsx\n    indented\n---", "<p>C:\\Data\\File_Name_2025.xlsx<br>\nindented<br>\n---</p>"),  # no other Markdown
+    ("2030. The plan\n1) Next", "<p>2030. The plan<br>\n1) Next</p>"),  # not a numbered list
+    ("- 1. In a bullet", "<ul>\n<li>1. In a bullet</li>\n</ul>"),
     (None, ""),
 ])
 def test_hand_written_text_becomes_paragraphs_and_lists(text, html):

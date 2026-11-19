@@ -12,6 +12,7 @@ import zipfile
 import pytest
 import sqlalchemy as sa
 from openpyxl import Workbook
+from openpyxl.utils.datetime import from_excel
 
 from catalyst.db import load_schema
 from catalyst.db.sync import apply_changes
@@ -123,8 +124,15 @@ def test_downloads_every_year_until_one_isnt_published():
 @pytest.mark.parametrize("value, expected", [
     (684.88, 684.88),
     (datetime.timedelta(hours=4, minutes=36, seconds=36), 4.61),
-    (datetime.datetime(1900, 1, 1, 6, 0), 54.0),  # 2 days and 6 hours after Excel's start date
+    (datetime.datetime(1900, 1, 1, 6, 0), 30.0),  # Excel's 1.25 days (openpyxl's date for it)
+    (from_excel(1.5), 36.0),
+    (from_excel(75.25), 1806.0),  # after Excel's 29 February 1900
     (datetime.time(2, 30), 2.5),
+    ("02:30:00", 2.5),  # typed as text, as some companies do
+    (" 123:45:00 ", 123.75),
+    ("0:15:30", 0.25 + 30 / 3600),
+    ("12.5", 12.5),
+    ("2:30", None),  # not hh:mm:ss
     ("#N/A", None),
     (None, None),
 ])

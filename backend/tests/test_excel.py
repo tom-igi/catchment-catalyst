@@ -142,6 +142,7 @@ def test_a_download_reads_back_exactly():
     rows = [
         {"catchment_id": WEST, "measure": "Fish", "year": 2025, "status": "Poor", "value": 0.16},
         {"catchment_id": WEST, "measure": "Phosphate", "year": 2025, "status": None, "value": 0.013},
+        {"catchment_id": WEST, "measure": "=1+1", "year": 2025, "status": None, "value": None},  # text, not a formula
     ]
     data = excel.write_table(EA_SCORES, rows)
     assert [r.values for r in excel.read_upload(EA_SCORES, data)] == rows
@@ -149,6 +150,7 @@ def test_a_download_reads_back_exactly():
     sheet = load_workbook(io.BytesIO(data)).active
     assert [c.value for c in sheet[1]] == list(HEADINGS)
     assert sheet["A2"].number_format == "@"  # catchment IDs stay as text
+    assert (sheet["B4"].data_type, sheet["B4"].quotePrefix) == ("s", True)
 
 
 def test_any_table_can_be_downloaded():

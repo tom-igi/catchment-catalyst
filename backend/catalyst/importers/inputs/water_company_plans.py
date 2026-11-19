@@ -5,7 +5,9 @@ from water.org.uk/overflows-plan): a row per storm overflow in England, with
 the water company's planned improvements, the year they're due and the spills
 a year expected afterwards. The original Power BI dashboard read it as the
 "Water Company Asset Plans" query, matched it to waterbodies by name, and
-showed each site's improvements list, predicted spills and year.
+showed each site's improvements list, predicted spills and year. Waterbody
+names repeat across England, so here a row must also be in the waterbody's
+management catchment.
 
 In this file two headings are the wrong way round: "Spill improvements
 planned?" holds the delivery year, and "Rainfall Improvement Target Delivery
@@ -25,7 +27,7 @@ from catalyst.importers.excel import FileRow
 from .common import Input, SourceRow, Step, count
 
 SHEET = "Water Company Asset Plans"
-ID, SITE, WATER_BODY = "Unique ID", "EA site name", "Water Body"
+ID, SITE, WATER_BODY, AREA = "Unique ID", "EA site name", "Water Body", "Management Catchment"
 IMPROVEMENTS = "Improvements List"
 PLANNED, DELIVERY = "Spill improvements planned?", "Rainfall Improvement Target Delivery Year"
 SPILLS = "Predicted average annual spill frequency following scheme implementation where applicable"
@@ -75,8 +77,9 @@ WATER_COMPANY_PLANS = Input(
     provider="Water UK's national storm overflows plan, a row per storm overflow in England",
     file="National Plan Data - updated.xlsx",
     sheet=SHEET,
-    headings=(WATER_BODY, ID, SITE, IMPROVEMENTS, PLANNED, DELIVERY, SPILLS),
+    headings=(WATER_BODY, AREA, ID, SITE, IMPROVEMENTS, PLANNED, DELIVERY, SPILLS),
     waterbody_heading=WATER_BODY,
+    area_heading=AREA,
     one_row_each=False,
     query=SHEET,
     match=f"Relationship {SHEET}[Water Body] to Waterbody Lookup[water_body_name]",

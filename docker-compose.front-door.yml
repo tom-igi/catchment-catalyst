@@ -21,6 +21,11 @@ services:
       # Visitors reach the admin page over HTTPS now, so the login cookie is
       # only ever sent over HTTPS.
       ADMIN_HTTPS_ONLY: "true"
+      # Take the visitor's address from the front door's X-Forwarded-For, so
+      # the limit on wrong passwords is per visitor, not one for everyone.
+      # Safe because only the front door can reach this container (no port of
+      # its own), and Caddy replaces any X-Forwarded-For a visitor sends.
+      FORWARDED_ALLOW_IPS: "*"
     # No port of its own: the front door reaches it over the front-door network.
     ports: !reset []
     networks:

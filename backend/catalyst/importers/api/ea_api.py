@@ -9,6 +9,7 @@ response is checked and failed downloads are retried.
 
 from __future__ import annotations
 
+import http.client
 import io
 import json
 import time
@@ -104,6 +105,9 @@ class EAClient:
                 continue
             except (urllib.error.URLError, TimeoutError) as e:
                 problem = f"could not reach the EA ({getattr(e, 'reason', e)})"
+                continue
+            except (OSError, http.client.HTTPException) as e:  # e.g. the connection dropped part-way through
+                problem = f"the download from the EA stopped part-way ({type(e).__name__})"
                 continue
             if looks_right(data):
                 return data

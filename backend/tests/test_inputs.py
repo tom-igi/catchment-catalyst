@@ -215,6 +215,22 @@ def test_waterbody_lookup_works_out_the_originals_figures(database):
     assert result.notes == ["1 row isn't for a catchment in the Catchments table, so it is left out: GB000000000000."]
 
 
+def test_waterbody_lookup_lists_text_in_its_figures_and_refuses_an_unknown_class():
+    def row(line, **cells):
+        return inputs.common.SourceRow(line, {"Shape_Area": 1e6, **cells}, catchment_id=f"GB{line}")
+
+    problems, notes = [], []
+    tables = waterbody_lookup.work_out([
+        row(2, **{"FARMS": "N/A", "Biosphere Ranking": "6 8", "ecological_class": " moderate "}),
+        row(3, **{"ecological_class": "Moderat"}),
+    ], problems, notes)
+    assert notes == ["Row 2, Biosphere Ranking: '6 8' isn't a number, so it's left empty.",
+                     "Row 2, FARMS: 'N/A' isn't a number, so it's left empty."]
+    assert tables["farms"] == [] and tables["catchment_rankings"] == []
+    assert [r.values["ecological_class"] for r in tables["ecological_classes"]] == ["Moderate"]  # written as the EA does
+    assert problems == ["Row 3, ecological_class: 'Moderat' isn't one of High, Good, Moderate, Poor or Bad."]
+
+
 @pytest.mark.parametrize("per_ha, rating", [(0.0, "Very Low"), (0.1, "Low"), (0.149, "Low"), (0.15, "Medium"), (0.99, "High"), (1.0, "Very High")])
 def test_private_sewerage_rating_is_below_its_bands(per_ha, rating):
     assert waterbody_lookup.private_rating(per_ha) == rating
@@ -422,7 +438,10 @@ def test_water_company_plans_keep_a_row_per_overflow(database):
         ("SWW0001", "South West Water", "HIGH BICKINGTON STW", "North Devon", "Abbey River", "Y", 2030, "Storage", None),  # the right way round
         ("SWW0002", "South West Water", "HARTLAND STW", "North Devon", "Not part of a river WB catchment", 2035, "Y", "Storage", 10),
         ("ANH0001", "Anglian Water", "SOMEWHERE STW", "Welland", "Tove (US Greens Norton)", 2040, None, "Storage", 10),
+        ("TW0001", "Thames Water", "ELSEWHERE STW", "Kennet", "Abbey River", 2040, None, "Storage", 10),  # another Abbey River
     ]))
+    with database.begin() as conn:
+        conn.execute(sa.text("UPDATE catchments SET management_catchment = 'North Devon'"))
     result = run(database, data, "National Plan Data - updated.xlsx", source=PLANS)
     rows = {r.values["site_name"]: r.values for r in result.tables["sewerage_improvements"]}
     assert rows["OKEHAMPTON STW (SWW0562)"] == {"catchment_id": ABBEY, "site_name": "OKEHAMPTON STW (SWW0562)",
@@ -431,8 +450,12 @@ def test_water_company_plans_keep_a_row_per_overflow(database):
     assert rows["OKEHAMPTON STW (SWW0563)"]["predicted_spills_per_year"] == 10  # its own row, not added to the other
     assert rows["HIGH BICKINGTON STW"]["completion_year"] == 2030  # one overflow: no ID; the year under its own heading
     assert set(rows) == {"OKEHAMPTON STW (SWW0562)", "OKEHAMPTON STW (SWW0563)", "HIGH BICKINGTON STW"}
-    assert result.notes[0] == ("2 rows aren't for a catchment in the Catchments table, so they are left out: "
-                               "Not part of a river WB catchment, Tove (US Greens Norton).")
+    assert result.notes[:2] == [
+        "2 rows aren't for a catchment in the Catchments table, so they are left out: "
+        "Not part of a river WB catchment, Tove (US Greens Norton).",
+        "1 row has the name of a catchment in the Catchments table but is in another Management Catchment, so it is "
+        "left out: Abbey River (Kennet).",
+    ]
 
 
 # --- The EA's classification facts --------------------------------------------------
@@ -481,14 +504,34 @@ def test_classification_facts_work_out_the_values_and_thresholds(database):
     assert (BADGWORTHY, "Phosphate (mg/l)") not in thresholds  # it has no boundaries
 
 
+def test_classification_facts_list_a_year_that_isnt_one(database):
+    data = workbook(("Classification Data", [
+        FACT_HEADINGS, fact(ABBEY, "2022", "Fish", "EQR", "0.5"), fact(ABBEY, "twenty", "Fish", "EQR", "0.5"),
+    ]))
+    assert "Row 3, CAL_YEAR: 'twenty' isn't a year." in problems_with(
+        lambda: run(database, data, "North Devon WB Classification Facts Data.xlsx", source=FACTS))
+
+
 @pytest.mark.parametrize("rule, value, status", [
     ("at_or_above", 0.4, "Good"), ("at_or_above", 0.0299, "Bad"),  # higher is better: Fish
     ("above", 0.4, "Moderate"), ("above", 0.03, "Bad"),
-    ("above_no_bad", 0.01, "Poor"), ("above_no_bad", 0.21, "Moderate"),
+    ("below", 0.03, "Good"), ("below", 0.5, "Bad"),  # lower is better: phosphate
 ])
 def test_a_values_status_follows_the_originals_colours(rule, value, status):
     limits = {"high": 0.7, "good": 0.4, "moderate": 0.2, "poor": 0.03}
+    if rule == "below":
+        limits = {"high": 0.02, "good": 0.04, "moderate": 0.1, "poor": 0.5}
     assert ea_classification_facts.RULES[rule](value, limits) == status
+
+
+def test_macrophytes_and_phytobenthos_can_be_bad():
+    # The original's colour rule never showed them Bad (POWERBI-BUG-REPORT.md P11, BUG-REPORT.md C8).
+    measures = {m.name: m for m in ea_classification_facts.MEASURES}
+    for name in ("Macrophytes Sub Element (EQR)", "Phytobenthos Sub Element (EQR)"):
+        measure = measures[name]
+        limits = dict(zip(ea_classification_facts.LEVELS, measure.fixed))
+        rule = ea_classification_facts.RULES[measure.rule]
+        assert (rule(0.15, limits), rule(0.2, limits), rule(0.21, limits), rule(0.41, limits)) == ("Bad", "Bad", "Poor", "Moderate")
 
 
 @pytest.mark.parametrize("value, status", [(0.01, "High"), (0.04, "Moderate"), (0.3, "Poor"), (0.5, "Bad")])

@@ -3,7 +3,7 @@
 Where the build is up to, the decisions made along the way, and what's next.
 For the overall design, see [PLAN.md](PLAN.md). For commands, see [README.md](README.md).
 
-**Last updated:** 18 November 2026 (numbered screenshots)
+**Last updated:** 19 November 2026 (BUG-REPORT.md's C1 to C15 fixed or decided)
 
 ---
 
@@ -15,7 +15,7 @@ Tom to run things himself, 29 October 2026).
 ```bash
 docker compose up -d                      # start the local database, admin page and dashboard preview
 docker compose run --rm schema plan       # should say "The database already matches schema.yaml."
-docker compose run --rm test              # run the tests (264 passing at the last update)
+docker compose run --rm test              # run the tests (283 passing at the last update)
 docker compose run --rm publish           # rebuild the dashboard pages (or the admin page's Publish button)
 ```
 
@@ -42,7 +42,7 @@ and optional extras are kept self-contained so they're easy to remove.
 | **Schema tool** | `backend/catalyst/db/` | `schema plan` previews changes, `schema apply` makes them. All-or-nothing, refuses to delete data unless told to, handles renames and changes of primary key. |
 | **Catchments importer** | `backend/catalyst/importers/api/`, `imports/` | Fills the catchments table from the EA's Catchment Data Explorer, for the management catchments (all their rivers) and IDs in `imports/catchments.json`. Preview first, safe to re-run, keeps the downloaded files. |
 | **EA, River Obstacles and postcode importers** | `backend/catalyst/importers/api/` | For every imported catchment: the EA's classifications and RNAGs (`importer classifications`), storm overflow spills from the EA's yearly returns, and from them each catchment's Untreated Sewage risk (`importer storm-overflows`), obstacles from River Obstacles (`importer river-obstacles`), and the postcodes inside it from Ordnance Survey's Code-Point Open (`importer postcodes`). Each replaces its table, with a preview first, and keeps the downloads. |
-| **Source files** (18 November 2026) | `backend/catalyst/importers/inputs/`, [POWERBI-INPUTS-PLAN.md](POWERBI-INPUTS-PLAN.md) | The files the original Power BI dashboard read, uploaded as they came, with its formulas working out the tables (`filled_by: input` in `schema.yaml`). One file can fill several tables; the preview shows each table's changes, and approving changes them all at once. So far APHA's livestock data (Livestock and Livestock Pressure) the Waterbody Lookup (Catchment Ranking, Farms, Sewerage Properties, Ecological Classes) and ESME (ESME Risk Levels); the plan lists the rest. |
+| **Source files** (18 November 2026) | `backend/catalyst/importers/inputs/`, [POWERBI-INPUTS-PLAN.md](POWERBI-INPUTS-PLAN.md) | The files the original Power BI dashboard read, uploaded as they came, with its formulas working out the tables (`filled_by: input` in `schema.yaml`). One file can fill several tables; the preview shows each table's changes, and approving changes them all at once. All eight are built: APHA's livestock data (Livestock, Livestock Pressure), the Waterbody Lookup (Catchment Ranking, Farms, Sewerage Properties, Ecological Classes, River Information), ESME (ESME Risk Levels), Natural England's habitats (Habitat & Land Use), Improvement Information (River Status Text), SAGIS (Phosphate Sources, Phosphate Point / Diffuse), Water UK's plans (Sewerage Improvements) and the EA's classification facts (EA Scores, EA Thresholds). |
 | **Excel uploads** | `backend/catalyst/importers/excel/` | For every table marked `filled_by: excel`: download it as Excel, upload an edited copy, see what will be added, changed and deleted, then approve. No code per table. |
 | **Admin page** | `backend/catalyst/admin/` | One page behind a login (one name and password per person): a diagram of every table (`diagram.py`, `diagram.yaml`) showing where its data comes from (downloaded or Excel), how the tables join up by Catchment ID, and each table's columns when clicked. Any table can be downloaded as Excel from there; each Excel table has its own **Upload data** box on the left, and the upload's preview is its own page. Made from `schema.yaml` each time it's opened. A **Publish** button at the top rebuilds the dashboards, and says how many uploads have been approved since the last publish. Runs with `docker compose up -d`. |
 | **Publish step and dashboard** | `backend/catalyst/publish/`, `published/` | Writes each location's dashboard as plain web pages, laid out like the original (`Reference/ReferenceImages`), with four views chosen by cards across the top of every page. **Waterbody Dashboard:** River Status, EA Data, Land Use Data and Sewerage Data, one waterbody at a time (the Overview tab is built but switched off). **Catchment Dashboard:** the whole location on one big map, with its panels over it, and a page per operational catchment. **Intervention Management:** its five focus areas as on the North Devon Biosphere's pages (Critical Path, Unit Cost of Interventions, Intervention Summary, Interventions Detail with a page per intervention, Community Action). **Catchment Insights:** its eight focus areas' questions, as on the North Devon Biosphere's pages, from a file (`publish/content/north-devon/catchment-insights.yaml`) rather than the database. Every panel now has a table. Previewed at <http://localhost:8080>. |
@@ -155,8 +155,8 @@ The scripts that built and uploaded the files were one-offs, kept outside the pr
   for each table, whose panel shows its inputs, the function (a step for each column: from which inputs, how,
   and where in the Power BI file) and the table. A test checks every column of every source file's tables is
   explained.
-- **Each table says how it's filled** with `filled_by` in the master file: `api` (an importer, in `importers/api/`) or `excel` (the admin page, using the shared code in `importers/excel/`). Only `excel` tables can be downloaded and uploaded in the admin page, and its diagram shows which is which.
-- **An upload is an exact copy of the table.** Same column names (any order), first sheet. No column mapping screen and no code per table, which answers the old "mapping screen or importers?" question for now.
+- **Each table says how it's filled** with `filled_by` in the master file: `api` (an importer, in `importers/api/`), `excel` (the admin page, using the shared code in `importers/excel/`) or `input` (a source file uploaded as it came, with its own code in `importers/inputs/`). Only `excel` tables can be uploaded as an edited copy, and source files have their own uploads; every table can be downloaded. The diagram shows which is which.
+- **An Excel table's upload is an exact copy of the table.** Same column names (any order), first sheet. No column mapping screen and no code per table. (Source files are the exception: see the first point above.)
 - **Each upload replaces the whole table**, rather than only adding rows. One process covers adding, correcting and deleting, so no editing screen is needed. The workflow is: download, edit, upload.
 - **The preview is the safety net.** It lists every row to be added, changed and deleted, and warns about deletions (strongly if it would empty the table). Nothing changes until someone approves.
 - **Approval re-checks the preview.** If the table changed in between (e.g. the other person uploaded), approval is refused and the fresh preview is shown. This catches someone uploading from an out-of-date download.
@@ -169,6 +169,12 @@ The scripts that built and uploaded the files were one-offs, kept outside the pr
 - **One name and password per person, checked by the Python app,** not a shared login. Uploads then record who made them, and one person can be removed without affecting the other.
 - **Only password hashes are stored,** in `ADMIN_USERS` in `.env` (made with `docker compose run --rm admin hash-password <name>`). The login cookie is signed with `ADMIN_SECRET_KEY`, lasts 12 hours, and is never sent with requests from other sites.
 - **Microsoft accounts (Entra ID) later,** only if many more people need access.
+- **A limit on wrong passwords** (19 November 2026, BUG-REPORT.md C3): after 5 wrong passwords from one address, or
+  for one name, in 15 minutes, that address or name waits until the first is 15 minutes old ("Too many wrong
+  passwords. Try again in N minutes."), and even the right password is refused meanwhile. Kept in the admin
+  container's memory (`passwords.Attempts`). Behind the front door, the visitor's address comes from Caddy's
+  X-Forwarded-For (`FORWARDED_ALLOW_IPS` in `docker-compose.front-door.yml`); without that, everyone would share
+  one address. Someone guessing at `tom` also makes Tom wait: accepted, as better than unlimited guessing.
 
 **The dashboard**
 - **Plain web pages, not a JavaScript app.** The dashboard only shows data (tables and a simple map), so the publish step writes the data straight into the pages, as the admin page does with its diagram. There are no API calls and no build step. React and TypeScript were considered: they'd only pay off for a much more interactive dashboard.
@@ -176,7 +182,7 @@ The scripts that built and uploaded the files were one-offs, kept outside the pr
 - **The pages copy the original dashboard's five tabs and colours** (29 October 2026). Each tab except the Overview has a page per catchment (`<tab>/<catchment ID>/`) and one before a catchment is chosen (`<tab>/`). Clicking the map stays on the same tab, as in the original.
 - **The Overview is switched off for now** (Tom, 29 October 2026; he'll bring it back later). It's still built and tested: `SHOW_OVERVIEW = True` in `site.py` brings it back as the front page. Until then the front page is River Status before a catchment is chosen.
 - **A panel is shown empty while its table has no rows for the catchment,** with its headings (and table headings) only. Every panel now has a table (5 November 2026), except the Overview's photo and the logo.
-- **Calculations are in `figures.py`:** each catchment's latest ecological status (for the map colours and the Overview counts), the EA scoring grid, failing elements, RNAGs, each habitat's % of the catchment, the storm overflow table, and (5 November 2026) livestock densities, the phosphate split, sewerage per ha and the Catchment Dashboard's totals. Ranking and "Relative Coverage" are typed in until their rules are agreed (PLAN.md §9.3).
+- **Calculations are in `figures.py`:** each catchment's latest ecological status (for the map colours and the Overview counts), the EA scoring grid, failing elements, RNAGs, each habitat's % of the catchment, the storm overflow table, and the Catchment Dashboard's totals. Livestock densities, the phosphate split, sewerage per ha, ranking and relative coverage used to be here or typed in; since 18 November 2026 they're worked out when their source file is uploaded (`importers/inputs/`, POWERBI-INPUTS-PLAN.md).
 - **A new data table no longer appears by itself:** it needs a place on a page. The original layout has no space for a generic table.
 - **The "i" buttons show the table's text from Datasets,** with the table's title as the heading, and are greyed out until it has a row. The text is split into paragraphs and lists like the other hand-written text. A web address in it is shown as plain text, not a link.
 - **Tables are sortable** by clicking a heading (a small script, `static/sort.js`). Numbers sort as numbers, and empty cells always go last.
@@ -190,10 +196,19 @@ The scripts that built and uploaded the files were one-offs, kept outside the pr
 - **The latest classification year is 2022.** The Catchment Data Explorer doesn't have 2025 yet (the EA publishes it separately on data.gov.uk), so the side panel shows 2022, 2019 and 2016.
 - **Where a year was classified in two cycles** (2019 in cycles 2 and 3), the later cycle is used.
 - **The EA Data grid shows the items on the original dashboard** (Ecological, Fish, Phosphate and so on, plus Specific pollutants and Chemical), not the EA's 60-odd single chemicals.
-- **Failing elements: elements and sub elements below Good** (Moderate, Poor, Bad, etc.) in the catchment's latest year. Chemicals ("Fail") are left out, and so is "Macrophytes and Phytobenthos Combined" when one of its sub elements is failing. This reproduces the original exactly for Langham Lake (Fish, Phosphate, Phytobenthos Sub Element).
+- **Failing elements: the original's ten items** (Fish, Invertebrates, Macrophytes and Phytobenthos sub elements, Ammonia, Dissolved Oxygen, Phosphate, pH, Specific pollutants and Temperature) when Moderate, Poor or Bad in the catchment's latest year, or "None" (Tom, 19 November 2026, BUG-REPORT.md C1). Before, it listed every element below Good, which differed from the original for Venn, Coney Gut, Taw Estuary and West Okement; it now follows the original's 2022 rule for every waterbody.
 - **EA RNAGs: the activities the EA gives in its latest cycle,** leaving out "Not applicable". Also matches the original for Langham Lake.
 - **Storm overflows are tied to a catchment by the WFD waterbody ID in the EA's return,** not by location. This reproduces the original's figures exactly for Langham Lake. About a third of South West Water's overflows have no waterbody ID (mostly into estuaries and the sea) and are left out; a few on North Devon streams are among them (e.g. Fremington).
-- **Storm overflow hours are rounded with halves up** (1462.5 → 1463), as on the original. Blank or "#N/A" hours mean no figure (e.g. no monitor yet), not zero, and an overflow with no figures at all is left out, as on the original. The map shows where each overflow was in its latest year (some moved slightly).
+- **Storm overflow hours are rounded with halves up** (1462.5 → 1463), as on the original. Durations typed as
+  text ("02:30:00", "123:45:00") are read too, as the original did (BUG-REPORT.md C4: 1,450 of Anglian Water's
+  2025 cells; none of South West Water's), and a duration in a date-time cell no longer comes out 24 hours high (C5).
+- **One name for outlets in different places** (BUG-REPORT.md C9, 19 November 2026): where the return gives two
+  outlets in one year the same site name, the Sewerage Data table has a row for each, named with its grid reference,
+  e.g. MIDDLE MARWOOD STW_SSO_MARWOOD (SS 5331 3739), and they count as two. The return's IDs can't link the years
+  (none before 2023, a new format in 2024), so the grid reference does. Rows with the same name and place in a year
+  (WEST STREET SPS_PSCSOEO_SOUTH MOLTON, 2021 and 2022) can't be told apart, so they're still added together, as on
+  the original. In 2021 the two are identical (34.98 hours each, 24 spills each), so may be the same overflow listed
+  twice in the return: worth asking the EA or South West Water. Blank or "#N/A" hours mean no figure (e.g. no monitor yet), not zero, and an overflow with no figures at all is left out, as on the original. The map shows where each overflow was in its latest year (some moved slightly).
 - **The storm overflow returns are read for every water company,** by their column headings, so other locations work too. The years read start at 2021; the dashboard shows the latest five.
 - **River obstacles come from River Obstacles** (the EA and The Rivers Trust), via its public map service, and are tied to the catchment whose outline they're inside. Obstacle 39245 in Langham Lake matches the original.
 - **Licences:** the EA data is Open Government Licence; River Obstacles is CC BY-SA 4.0. Both are credited in the dashboard's footer. Offering River Obstacles as a download would bring in CC BY-SA's "share alike" condition.
@@ -240,8 +255,11 @@ The scripts that built and uploaded the files were one-offs, kept outside the pr
   nothing is stored twice. When only some waterbodies have figures, the total says so, e.g.
   "(2 of 92 waterbodies)". Habitat % is of the area of the waterbodies with habitat figures.
 - **"SWW sewage outflows (CSO & STW)" is counted from the storm overflow returns**: the overflows
-  into the location's waterbodies in the latest year (152 for North Devon, against 167 on the
-  original, because overflows with no waterbody ID are left out; see Open questions).
+  into the location's waterbodies in the latest year (152 for North Devon). The original shows 167
+  because it counts every site name in all five years' returns (POWERBI-BUG-REPORT.md, P6); its
+  2025 count would be 150. Overflows with no waterbody ID are left out (see Open questions).
+  Where the return has one name for outlets in different places in a year, each outlet counts
+  (BUG-REPORT.md, C9; none in 2025).
 - **The water company's name comes from the storm overflow data** ("South West Water"), so the
   labels say "Properties on South West Water sewerage" rather than "SWW".
 - **Intervention Management and Catchment Insights are placeholders:** the focus-area buttons
@@ -256,13 +274,12 @@ The scripts that built and uploaded the files were one-offs, kept outside the pr
 - **Tables about a whole location have a `location_id` instead of a `catchment_id`** (the rule
   in the master file now allows either, but not both). `location_text` is the first. In its
   Excel file, North Devon is location 1. The admin diagram joins it to Locations.
-- **Worked out, not stored:** livestock density (number per 100 ha of the catchment), % of
-  catchment, private sewerage per ha, the Continuous / Diffuse split of phosphate (adding up the
-  sources by their `discharge` column), and the Catchment Dashboard's totals.
-- **Typed in until their rules are agreed:** ranking, risk levels, relative coverage and
-  density rating (PLAN.md §9.3). Each could be replaced by a calculation later.
-- **Risk levels are one column per risk** (eight), rather than a row per risk, so the Excel file
-  is one row per waterbody and the risk names can't be mistyped.
+- **Since replaced (18 November 2026, by the source files):** livestock density, % of catchment,
+  private sewerage per ha, ranking, relative coverage and density rating are now worked out when
+  their source file is uploaded, with the Power BI's formulas, and stored; the Continuous / Diffuse
+  split is the EA's own (SAGIS). Risk Levels has gone: each tile is in the table it's worked out in
+  (Sewage Overflow Pressure, Sewerage Properties, Livestock Pressure, ESME Risk Levels). Only the
+  Catchment Dashboard's totals are still worked out when publishing.
 - **Hand-written text is in Excel cells:** Alt+Enter starts a new line, a blank line a new
   paragraph, and lines starting with "- ", "* " or "•" become a list. It's always shown as typed,
   never as HTML.
@@ -453,6 +470,14 @@ database the same, so literally just adding the data")
 ---
 
 ## Suggested next steps
+
+- **[BUG-REPORT.md](BUG-REPORT.md) (our code): done** (19 November 2026). C1 to C15 are fixed, except C7, which
+  waits for the North Devon Biosphere to say whether the EA has corrected Lower River Lew's and Upper River Mere's
+  phosphate. Not committed yet, and not published locally (press Publish to see C1, C9 and C13 on the dashboard).
+  **To put it on the test VM:** pull, `docker compose up -d --build` (the admin page, for the login limit and its
+  `FORWARDED_ALLOW_IPS`), then Publish. No `schema apply` is needed, and no file needs uploading again.
+- **Work through [POWERBI-BUG-REPORT.md](POWERBI-BUG-REPORT.md)** (the original Power BI: 4 High, 6 Medium, 8 Low,
+  1 Nit), each saying whether our dashboard copies it, one item at a time.
 
 0. **Source files: all nine steps built** (18 November 2026; [POWERBI-INPUTS-PLAN.md](POWERBI-INPUTS-PLAN.md),
    with its open points at the end). Every Power BI source file the dashboard needs is now a "Source file" on the

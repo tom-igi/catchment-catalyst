@@ -44,6 +44,8 @@
         <ul class="list">
           {% for item in figures.failing_elements(catchment_id) %}
           <li>{{ item }}</li>
+          {% else %}
+          {% if catchment %}<li>None</li>{% endif %}
           {% endfor %}
         </ul>
       </section>

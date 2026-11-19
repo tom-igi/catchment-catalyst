@@ -12,8 +12,12 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import math
 import os
 import re
+import threading
+import time
+from collections import deque
 
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,39}$")
 HASH_RE = re.compile(r"^scrypt\.[0-9a-f]{32}\.[0-9a-f]{64}$")
@@ -40,6 +44,56 @@ def log_in(users: dict[str, str], name: str, password: str) -> str | None:
     name = name.strip().lower()
     right = check_password(password, users.get(name, _NOBODY))
     return name if right and name in users else None
+
+
+class Attempts:
+    """Wrong passwords, so someone can't keep guessing: after MAX wrong passwords from one address, or for one
+    name, in MINUTES, that address or name has to wait until the first of them is MINUTES old. While it waits,
+    even the right password is refused, so a guesser can't tell when they've found it.
+
+    Kept in memory: there's one admin container, and a restart only gives a guesser a fresh start. On the live
+    server the address is the visitor's, passed on by the front door (FORWARDED_ALLOW_IPS in
+    docker-compose.front-door.yml). Someone guessing at a name also makes its owner wait: a nuisance, but
+    better than letting the guessing go on.
+    """
+
+    MAX = 5
+    MINUTES = 15
+
+    def __init__(self, clock=time.monotonic):
+        self._clock = clock
+        self._wrong: dict[tuple[str, str], deque[float]] = {}
+        self._lock = threading.Lock()
+
+    def wait_minutes(self, name: str, address: str) -> int:
+        """How many minutes before this name and address can try again: 0 if they can now."""
+        now = self._clock()
+        with self._lock:
+            self._forget_old(now)
+            full = [times[0] for key in self._keys(name, address) if len(times := self._wrong.get(key, ())) >= self.MAX]
+        return math.ceil((min(full) + self.MINUTES * 60 - now) / 60) if full else 0
+
+    def wrong(self, name: str, address: str) -> None:
+        now = self._clock()
+        with self._lock:
+            self._forget_old(now)
+            for key in self._keys(name, address):
+                self._wrong.setdefault(key, deque()).append(now)
+
+    def right(self, name: str, address: str) -> None:
+        with self._lock:
+            for key in self._keys(name, address):
+                self._wrong.pop(key, None)
+
+    def _keys(self, name: str, address: str) -> list[tuple[str, str]]:
+        return [("name", name.strip().lower()), ("address", address)]
+
+    def _forget_old(self, now: float) -> None:
+        for key, times in list(self._wrong.items()):
+            while times and times[0] <= now - self.MINUTES * 60:
+                times.popleft()
+            if not times:
+                del self._wrong[key]
 
 
 def parse_users(text: str) -> dict[str, str]:

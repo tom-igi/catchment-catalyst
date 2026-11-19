@@ -30,8 +30,9 @@ sections:
 
   - title: Uploads
     description: >-
-      A record of every Excel file uploaded here: who uploaded it, when, and
-      what it changed. The files themselves are kept too.
+      A record of every file uploaded here (Excel tables and source files):
+      who uploaded it, when, and what it changed. The files themselves are
+      kept too.
     tables: [uploads]
 
   - title: Publishes
@@ -150,7 +151,7 @@ filled:
     note: Changed with a database command for now (see OPERATING.md).
   uploads:
     how: admin
-    note: The admin page adds a row each time someone uploads an Excel file.
+    note: The admin page adds a row each time someone uploads a file (an Excel table or a source file).
   publishes:
     how: admin
     note: The admin page adds a row each time someone presses Publish. The publish command adds one too.

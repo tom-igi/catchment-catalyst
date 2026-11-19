@@ -25,6 +25,7 @@ ID, AREA, RANKING, CLASS = "WBID", "Shape_Area", "Biosphere Ranking", "ecologica
 FARMS, PUBLIC, PRIVATE = "FARMS", "SWW Sewerage", "Private Sewerage"
 LENGTH, SYSTEM, UPSTREAM, DOWNSTREAM = "River Length (m)", "River System", "Upstream Rivers", "Downstream Rivers"
 CLASS_YEAR = 2025  # the year of its ecological class: the EA's cycle 4 classification
+CLASSES = ("High", "Good", "Moderate", "Poor", "Bad")  # the ecological classes it can be (any case)
 # Private sewerage rating, from private sewerage per hectare: the first it's below.
 PRIVATE_RATING = ((0.1, "Very Low"), (0.15, "Low"), (0.3, "Medium"), (1.0, "High"))
 HIGHEST_RATING = "Very High"
@@ -38,15 +39,15 @@ def work_out(rows: list[SourceRow], problems: list[str], notes: list[str]) -> di
     rankings, farms, properties, classes, rivers = [], [], [], [], []
     for row in rows:
         catchment = {"catchment_id": row.catchment_id}
-        ranking, _ = count(row, RANKING, problems, blank=None)
+        ranking = _whole(row, RANKING, problems, notes)
         if ranking is not None:
             rankings.append(FileRow(row.line, {**catchment, "ranking": ranking}))
-        how_many, _ = count(row, FARMS, problems, blank=None)
+        how_many = _whole(row, FARMS, problems, notes)
         if how_many is not None:
             farms.append(FileRow(row.line, {**catchment, "number_of_farms": how_many}))
 
-        public, _ = count(row, PUBLIC, problems, blank=None)
-        private, _ = count(row, PRIVATE, problems, blank=None)
+        public = _whole(row, PUBLIC, problems, notes)
+        private = _whole(row, PRIVATE, problems, notes)
         area_m2 = number(row, AREA, problems)
         area_ha = area_m2 / 10_000 if area_m2 else None  # Power Query: Catchment Area (ha)
         per_ha = private / area_ha if private is not None and area_ha else None  # DIVIDE(): blank if no area
@@ -62,7 +63,13 @@ def work_out(rows: list[SourceRow], problems: list[str], notes: list[str]) -> di
 
         status = row.cells.get(CLASS)
         if status is not None:
-            classes.append(FileRow(row.line, {**catchment, "year": CLASS_YEAR, "ecological_class": str(status)}))
+            # One of the EA's five, written as the dashboard's colours and counts expect (a typo would colour the
+            # map grey and count as a class of its own).
+            known = {name.casefold(): name for name in CLASSES}.get(str(status).strip().casefold())
+            if known is None:
+                problems.append(f"{row.where}, {CLASS}: {status!r} isn't one of {', '.join(CLASSES[:-1])} or {CLASSES[-1]}.")
+            else:
+                classes.append(FileRow(row.line, {**catchment, "year": CLASS_YEAR, "ecological_class": known}))
 
         length_m = number(row, LENGTH, problems)
         rivers.append(FileRow(row.line, {
@@ -84,6 +91,15 @@ def work_out(rows: list[SourceRow], problems: list[str], notes: list[str]) -> di
 
 def _text(value) -> str | None:
     return str(value) if value is not None else None
+
+
+def _whole(row: SourceRow, heading: str, problems: list[str], notes: list[str]) -> int | None:
+    """A whole number, or None if it's blank. Text (e.g. N/A) is left empty too, with a note in the preview, so a
+    waterbody doesn't lose its figure without anyone seeing why."""
+    value, text = count(row, heading, problems, blank=None)
+    if text is not None:
+        notes.append(f"{row.where}, {heading}: {text!r} isn't a number, so it's left empty.")
+    return value
 
 
 # --- In words, for the admin page --------------------------------------------------------

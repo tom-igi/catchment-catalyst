@@ -1,5 +1,6 @@
 """The postcodes importer (Ordnance Survey's Code-Point Open)."""
 
+import http.client
 import io
 import zipfile
 
@@ -104,3 +105,14 @@ def test_keeps_the_download(tmp_path):
     folder = postcodes.save_raw_files(b"PK...", tmp_path)
     assert folder.parent == tmp_path / "postcodes"
     assert (folder / "codepo_gb.zip").read_bytes() == b"PK..."
+
+
+def test_a_download_that_stops_part_way_is_tried_again(monkeypatch):
+    answers = [ConnectionResetError(104, "Connection reset by peer"), http.client.IncompleteRead(b"PK")]
+
+    def urlopen(request, timeout):
+        raise answers.pop(0)
+
+    monkeypatch.setattr(postcodes.urllib.request, "urlopen", urlopen)
+    with pytest.raises(ImportProblem, match="the download from Ordnance Survey stopped part-way \\(IncompleteRead\\), after 2 tries"):
+        postcodes.fetch(retries=2, pause=0)

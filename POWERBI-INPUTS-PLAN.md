@@ -193,7 +193,9 @@ from the same numbers.
   High/Good … Poor/Bad Boundary facts.
 - Each value's status from its thresholds, by the Power BI's colour rules (EAColour…): Fish "at or above";
   the invertebrate EQRs, DO and pH Lower "above"; macrophytes and phytobenthos "above", never Bad; ammonia,
-  phosphate, temperature and pH Upper "below" (lower is better).
+  phosphate, temperature and pH Upper "below" (lower is better). **Changed 19 November 2026** (BUG-REPORT.md,
+  C8): macrophytes and phytobenthos are now plain "above", so they can be Bad, as the other EQRs can. No value
+  in today's data is low enough for this to change anything.
 - Checked against the data before (from the Power BI's own exports): the same 1,704 values, 1,012 thresholds
   and every status, except 10 values 0.001 apart, all exact halves the earlier load rounded down (e.g. East
   Okemont River's 2025 Fish EQR, 0.4805: 0.481 now, as Power BI shows 0.0465 as 0.047).

@@ -26,6 +26,7 @@ from typing import Any, Callable
 
 import sqlalchemy as sa
 from openpyxl import load_workbook
+from openpyxl.utils.datetime import to_excel
 
 from catalyst.db import Schema
 
@@ -160,21 +161,34 @@ def _read_sheet(sheet, year: int, catchment_ids: set[str]) -> list[dict[str, Any
     return rows
 
 
+# A duration typed as text, e.g. "02:30:00" or "123:45:00" (any number of hours), as some companies fill in the
+# hh:mm:ss column. Read as the original dashboard's "Annual Spill Duration (seconds)" column does.
+TYPED_DURATION = re.compile(r"(\d+):(\d{1,2}):(\d{1,2}(?:\.\d*)?)")
+
+
 def hours(value: Any) -> float | None:
-    """A spill duration in hours: a number of hours (to 2023), or an hh:mm:ss cell (from 2024).
-    Blanks and '#N/A' mean there's no figure (e.g. no monitor yet), not zero."""
+    """A spill duration in hours: a number of hours (to 2023), or an hh:mm:ss cell (from 2024), which may be a
+    time, a duration, a date and time (over 24 hours) or text. Blanks and '#N/A' mean there's no figure (e.g. no
+    monitor yet), not zero."""
     if isinstance(value, bool) or value is None:
         return None
     if isinstance(value, (int, float)):
         return float(value)
     if isinstance(value, datetime.timedelta):
         return value.total_seconds() / 3600
-    if isinstance(value, datetime.datetime):  # over 24 hours, stored as days since Excel's start date
-        return (value - datetime.datetime(1899, 12, 30)).total_seconds() / 3600
+    if isinstance(value, datetime.datetime):
+        # Over 24 hours in a cell formatted as a date: Excel's number of days, which openpyxl turned into a date in
+        # 1900. to_excel turns it back, undoing openpyxl's allowance for Excel's 29 February 1900 (subtracting
+        # 30 December 1899 would give a day too many for 1 to 60 days).
+        return to_excel(value) * 24
     if isinstance(value, datetime.time):
         return value.hour + value.minute / 60 + value.second / 3600
+    text = str(value).strip()
+    if typed := TYPED_DURATION.fullmatch(text):
+        hh, mm, ss = typed.groups()
+        return int(hh) + int(mm) / 60 + float(ss) / 3600
     try:
-        return float(str(value).strip())
+        return float(text)
     except ValueError:
         return None
 

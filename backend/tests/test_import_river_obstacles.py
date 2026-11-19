@@ -83,3 +83,18 @@ def test_keeps_the_obstacles_inside_a_catchment(database):
         for _ in range(2):  # importing again replaces the rows
             river_obstacles.save(conn, SCHEMA, rows)
         assert conn.scalar(sa.text("SELECT count(*) FROM river_obstacles")) == 1
+
+
+def test_an_obstacle_in_two_outlines_goes_to_the_first_by_id_and_one_on_an_outline_is_kept(database):
+    with database.begin() as conn:
+        lon, lat, edge_lon, edge_lat = conn.execute(sa.text(
+            "SELECT ST_X(p), ST_Y(p), ST_X(e), ST_Y(e) FROM (SELECT ST_PointOnSurface(boundary) AS p, "
+            "ST_PointN(ST_ExteriorRing(ST_GeometryN(boundary, 1)), 1) AS e FROM catchments WHERE id = :id) x"
+        ), {"id": WEST_OKEMENT}).one()
+        conn.execute(sa.text("UPDATE catchments SET boundary = (SELECT boundary FROM catchments WHERE id = :west) "
+                             "WHERE id = :east"), {"west": WEST_OKEMENT, "east": EAST_OKEMONT})  # overlapping
+        rows = river_obstacles.place(conn, SCHEMA, river_obstacles.read([page(
+            obstacle("both", 1, lon, lat), obstacle("edge", 2, edge_lon, edge_lat),
+        )]))
+    first = min(WEST_OKEMENT, EAST_OKEMONT)
+    assert sorted((r["id"], r["catchment_id"]) for r in rows) == [("both", first), ("edge", first)]
