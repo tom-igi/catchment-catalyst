@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Dashboard screenshots{% endblock %}
+{% block head %}
+<style>
+  /* Numbered screenshots of the dashboards: each number is a table, with the same number as its box
+     on the admin page's diagram. The numbers' colour matches theirs (home.html's --number). */
+  :root { --number: #c2006b; }
+  @media (prefers-color-scheme: dark) { :root { --number: #d6007a; } }
+  main { max-width: 1560px; }
+  .visually-hidden {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  .crumb { margin-bottom: 10px; }
+  .lead { max-width: 60em; }
+  .tnum {
+    flex: none; display: inline-grid; place-items: center; min-width: 30px; height: 30px; padding: 0 7px; border-radius: 15px;
+    background: var(--number); color: #ffffff; font-weight: 800; font-size: .92rem; line-height: 1; font-variant-numeric: tabular-nums;
+  }
+  .shot-nav ul { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 24px; padding: 0; list-style: none; }
+  .shot-nav a {
+    display: inline-block; padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--card); color: var(--text); font-size: .92rem; text-decoration: none;
+  }
+  .shot-nav a:hover { border-color: var(--accent); color: var(--accent); }
+  .shot { scroll-margin-top: 16px; }
+  .shot h2 { font-size: 1.35rem; }
+  .shot-image { display: block; margin: 12px 0 4px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .shot-image img { display: block; width: 100%; height: auto; }
+  .hint { margin: 0 0 18px; font-size: .88rem; color: var(--muted); }
+  .key { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px 16px; margin: 0; padding: 0; list-style: none; }
+  .key > li { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; }
+  .key-table { font-weight: 700; }
+  .key-what { margin: 4px 0 6px; padding-left: 18px; font-size: .9rem; color: var(--muted); }
+  .key-update { font-size: .9rem; font-weight: 600; }
+  .key-update::after { content: " →"; }
+</style>
+{% endblock %}
+{% block content %}
+<p class="crumb"><a href="/admin">← Your data</a></p>
+<h1>Where each part of the dashboard comes from</h1>
+<p class="lead">
+  Each number on these screenshots is a table in the database. The table's box on <a href="/admin">Your data</a> has the
+  same number (in the Data tables column, or on the right for 1, Catchments, and 28, Locations): follow its row to the
+  left to see where its data comes from and how to update it. Or choose a table in the list under each screenshot.
+</p>
+
+{% if out_of_date %}
+<div class="warning" role="alert">
+  <strong>These screenshots are out of date.</strong>
+  Number{{ "" if out_of_date | length == 1 else "s" }} {{ out_of_date | join(", ") }} on them
+  {{ "isn't that table's number" if out_of_date | length == 1 else "aren't those tables' numbers" }} any more, so take them again
+  (see <code>backend/catalyst/admin/screenshots/README.md</code>).
+</div>
+{% endif %}
+
+{% if not shots %}
+<div class="card">
+  <p>There are no screenshots yet. Take them with <code>node backend/catalyst/admin/screenshots/take.mjs</code>
+  (see <code>backend/catalyst/admin/screenshots/README.md</code>).</p>
+</div>
+{% else %}
+<nav class="shot-nav" aria-label="Screenshots">
+  <ul>
+    {% for shot in shots %}<li><a href="#{{ shot.id }}">{{ shot.title }}</a></li>{% endfor %}
+  </ul>
+</nav>
+
+{% for shot in shots %}
+<section class="card shot" id="{{ shot.id }}" aria-labelledby="{{ shot.id }}-title">
+  <h2 id="{{ shot.id }}-title">{{ shot.title }}</h2>
+  {% if shot.note %}<p class="muted">{{ shot.note }}</p>{% endif %}
+  <a class="shot-image" href="/admin/screenshots/{{ shot.file }}" target="_blank" rel="noopener">
+    <img src="/admin/screenshots/{{ shot.file }}" width="{{ shot.width }}" height="{{ shot.height }}" loading="lazy"
+         alt="{{ shot.title }}, with a number on each part of it: the number of the table its data comes from">
+  </a>
+  <p class="hint">Choose the screenshot to open it full size, in a new tab.</p>
+  {% if shot.numbers %}
+  <ol class="key" aria-label="The numbers on this screenshot">
+    {% for n in shot.numbers %}
+    <li>
+      <span class="tnum" aria-hidden="true">{{ n.number }}</span>
+      <div>
+        <a class="key-table" href="/admin#{{ n.table }}"><span class="visually-hidden">Table {{ n.number }}: </span>{{ n.title }}</a>
+        <ul class="key-what">
+          {% for what in n.what %}<li>{{ what }}</li>{% endfor %}
+        </ul>
+        {% if n.how %}<a class="key-update" href="{{ n.how.link }}">{{ n.how.text }}</a>{% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+  {% endif %}
+</section>
+{% endfor %}
+
+<section class="card">
+  <h2>Not numbered</h2>
+  <p>
+    These aren't from the database, so they're changed in the code rather than here: the four cards at the top of every
+    page, the text in the footer (its date is when the dashboard was last published), and Catchment Insights' questions.
+  </p>
+  <p class="muted">
+    Taken {{ taken_on }} from {{ taken.dashboard }}{% if taken.waterbody.name %}, showing {{ taken.waterbody.name }}{% endif %}.
+    When a panel is added, moved or renamed on the dashboard, or a table is given a number, take them again
+    (see <code>backend/catalyst/admin/screenshots/README.md</code>).
+  </p>
+</section>
+{% endif %}
+{% endblock %}

@@ -98,7 +98,8 @@ def uploads_table(app) -> list[tuple]:
 
 def test_every_page_needs_a_login(app):
     client = TestClient(app)
-    for path in ["/admin", f"/admin/tables/{TABLE}", "/admin/tables/catchments/download", "/admin/uploads/1"]:
+    for path in ["/admin", f"/admin/tables/{TABLE}", "/admin/tables/catchments/download", "/admin/uploads/1",
+                 "/admin/screenshots", "/admin/screenshots/1-river-status.webp"]:
         response = client.get(path, follow_redirects=False)
         assert (response.status_code, response.headers["location"]) == (303, "/admin/login")
     assert upload(client, PLANS).headers["location"] == "/admin/login"

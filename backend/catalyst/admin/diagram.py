@@ -5,8 +5,9 @@
 `example`), plus the sections, where each downloaded table comes from (with its
 web page and command), what's done to its data on the way in (its
 transformation), where each data table is shown on the dashboards and the extra
-links from diagram.yaml, and each source file (catalyst.importers.inputs) with
-the tables it fills and the original Power BI dashboard's formulas it uses. The
+links from diagram.yaml, each table's number (as on the numbered screenshots of
+the dashboards), and each source file (catalyst.importers.inputs) with the
+tables it fills and the original Power BI dashboard's formulas it uses. The
 admin page adds the row counts and the uploads, and templates/home.html draws
 the diagram from them.
 
@@ -68,6 +69,7 @@ def model(schema: Schema | None = None, counts: dict[str, int] | None = None,
 
     sections = _sections(schema, config)
     shown = _dashboard(schema, config.get("dashboard") or {})
+    numbers = _numbers(schema, config.get("numbers") or {}, shown)
     return {
         "sections": [
             {"title": s.title, "description": s.description, "data": s.data, "tables": [t.name for t in s.tables]}
@@ -75,7 +77,7 @@ def model(schema: Schema | None = None, counts: dict[str, int] | None = None,
         ],
         "tables": [
             {**_table(t, schema, s.title, filled.get(t.name) or {}, shown.get(t.name, []), (counts or {}).get(t.name)),
-             "transform": _transform(t, filled.get(t.name) or {})}
+             "number": numbers.get(t.name), "transform": _transform(t, filled.get(t.name) or {})}
             for s in sections for t in s.tables
         ],
         "links": _links(schema, config.get("links") or []),
@@ -174,6 +176,28 @@ def _dashboard(schema: Schema, pages) -> dict[str, list[dict]]:
                     )
                 shown.setdefault(name, {}).setdefault(str(page), []).append(str(panel))
     return {name: [{"page": page, "panels": panels} for page, panels in by_page.items()] for name, by_page in shown.items()}
+
+
+def _numbers(schema: Schema, numbers, shown: dict[str, list[dict]]) -> dict[str, int]:
+    """Each table's number from diagram.yaml (as on the numbered screenshots): table name -> number."""
+    if not isinstance(numbers, dict):
+        raise ValueError("The `numbers` list in diagram.yaml should give each table its number, e.g. catchments: 1")
+    seen: dict[int, str] = {}
+    for name, number in numbers.items():
+        if name not in schema.metadata.tables:
+            raise ValueError(f"The `numbers` list in diagram.yaml has {name}, which isn't in schema.yaml")
+        if isinstance(number, bool) or not isinstance(number, int) or number < 1:
+            raise ValueError(f"The `numbers` list in diagram.yaml gives {name} the number {number}, which isn't a whole number from 1 up")
+        if number in seen:
+            raise ValueError(f"The `numbers` list in diagram.yaml gives {seen[number]} and {name} the same number, {number}")
+        seen[number] = name
+    missing = [name for name in shown if name not in numbers]
+    if missing:
+        raise ValueError(
+            f"The `numbers` list in diagram.yaml has no number for {', '.join(missing)}, which is on the dashboards: "
+            "give it the next number up"
+        )
+    return dict(numbers)
 
 
 def _table(table: sa.Table, schema: Schema, section: str, filled: dict, dashboard: list[dict], rows: int | None) -> dict:

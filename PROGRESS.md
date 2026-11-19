@@ -3,7 +3,7 @@
 Where the build is up to, the decisions made along the way, and what's next.
 For the overall design, see [PLAN.md](PLAN.md). For commands, see [README.md](README.md).
 
-**Last updated:** 18 November 2026
+**Last updated:** 18 November 2026 (numbered screenshots)
 
 ---
 
@@ -15,14 +15,15 @@ Tom to run things himself, 29 October 2026).
 ```bash
 docker compose up -d                      # start the local database, admin page and dashboard preview
 docker compose run --rm schema plan       # should say "The database already matches schema.yaml."
-docker compose run --rm test              # run the tests (260 passing at the last update)
+docker compose run --rm test              # run the tests (264 passing at the last update)
 docker compose run --rm publish           # rebuild the dashboard pages (or the admin page's Publish button)
 ```
 
 - Admin page: <http://localhost:8000/admin> (name `admin`, password `admin`, or Tom's own login; both are
   in `.env`'s `ADMIN_USERS`): a diagram of every table; click any table to download it, a source file's
   **Upload file** or an Excel table's **Upload data** (on the left) to upload it, and **Publish** (at the
-  top) to put what's approved on the dashboard
+  top) to put what's approved on the dashboard. Each table has a number, as on the **numbered screenshots** of
+  the dashboard (<http://localhost:8000/admin/screenshots>, linked under the Publish box)
 - Dashboard: <http://localhost:8080> (open North Devon; every waterbody has real data in every panel once it's published)
 
 The local database is on `localhost:5434` (database, user and password are all `catalyst`),
@@ -45,6 +46,7 @@ and optional extras are kept self-contained so they're easy to remove.
 | **Excel uploads** | `backend/catalyst/importers/excel/` | For every table marked `filled_by: excel`: download it as Excel, upload an edited copy, see what will be added, changed and deleted, then approve. No code per table. |
 | **Admin page** | `backend/catalyst/admin/` | One page behind a login (one name and password per person): a diagram of every table (`diagram.py`, `diagram.yaml`) showing where its data comes from (downloaded or Excel), how the tables join up by Catchment ID, and each table's columns when clicked. Any table can be downloaded as Excel from there; each Excel table has its own **Upload data** box on the left, and the upload's preview is its own page. Made from `schema.yaml` each time it's opened. A **Publish** button at the top rebuilds the dashboards, and says how many uploads have been approved since the last publish. Runs with `docker compose up -d`. |
 | **Publish step and dashboard** | `backend/catalyst/publish/`, `published/` | Writes each location's dashboard as plain web pages, laid out like the original (`Reference/ReferenceImages`), with four views chosen by cards across the top of every page. **Waterbody Dashboard:** River Status, EA Data, Land Use Data and Sewerage Data, one waterbody at a time (the Overview tab is built but switched off). **Catchment Dashboard:** the whole location on one big map, with its panels over it, and a page per operational catchment. **Intervention Management:** its five focus areas as on the North Devon Biosphere's pages (Critical Path, Unit Cost of Interventions, Intervention Summary, Interventions Detail with a page per intervention, Community Action). **Catchment Insights:** its eight focus areas' questions, as on the North Devon Biosphere's pages, from a file (`publish/content/north-devon/catchment-insights.yaml`) rather than the database. Every panel now has a table. Previewed at <http://localhost:8080>. |
+| **Numbered screenshots** (18 November 2026) | `backend/catalyst/admin/screenshots/`, `diagram.yaml` (`numbers`) | Every table on the dashboards has a number (1 Catchments to 28 Locations, in the diagram's order, top to bottom), on its box on the admin page. Screenshots of each dashboard page (the four Waterbody Dashboard tabs, the Catchment Dashboard, Intervention Management's five focus areas and Catchment Insights) have each part numbered with its table's number, at <http://localhost:8000/admin/screenshots>; under each, every number's table and how it's updated (with links to its upload). Taken by `take.mjs` (Node and a headless Chromium, outside Docker: see its README), which reads the numbers from the admin page. A test fails if a number in `diagram.yaml` no longer matches the screenshots. |
 | **Seven dashboard ideas** (18 November 2026) | `published/north-devon-ideas/`, [DASHBOARD-IDEAS-PLAN.md](DASHBOARD-IDEAS-PLAN.md) | Seven differently designed versions of the North Devon dashboard, for choosing a design: a map, a story, a league table, questions, a river network diagram, cause and effect, and a timeline, with a page for choosing between them at <http://localhost:8080/north-devon-ideas/>. Static pages reading one shared data file (`shared/data/north-devon.json`), exported read-only with the publish step's own code and frozen to 18 November 2026. Not made by the publish step and not in git (`published/` isn't tracked), so Publish doesn't change or remove them. |
 | **Dev and live setup** | `docker-compose*.yml`, `.env*.example` | The same commands on your machine and on the live server. Only the settings differ. |
 | **Tests** | `backend/tests/` | Cover the schema tool, the importers, the Excel uploads, the admin page (and its diagram) and the publish step. |
@@ -141,6 +143,14 @@ The scripts that built and uploaded the files were one-offs, kept outside the pr
   rather than refusing the file.
 - **The formulas' numbers are in the code, not a table,** and the admin page shows them in words made from
   the same numbers, with where each is in the Power BI file.
+- **Each table on the dashboards has a number** (Tom, 18 November 2026: "say I am looking at the dashboard and I think
+  I want to update a specific table, I then look at the screenshot and see which number is pointing at it, I then
+  find this number in the admin portal"). The numbers are fixed in `diagram.yaml` (a new table gets the next one up),
+  so old screenshots stay right; they follow the diagram's order today. Catchments (1) and Locations (28) are
+  numbered too, as the waterbodies' names, outlines and the list come from them. The screenshots are taken of
+  Lower Little River Dart (GB108050014340), which has something in every panel, at 1600 pixels wide (narrower, the
+  EA Data table scrolls). Where a part's data comes from two tables (e.g. the map: outlines from Catchments, colours
+  from Ecological Classes), it has both numbers, and the list under the screenshot says which is which.
 - **One transformation per table** (Tom, 18 November 2026): the admin page's Transformation column has a box
   for each table, whose panel shows its inputs, the function (a step for each column: from which inputs, how,
   and where in the Power BI file) and the table. A test checks every column of every source file's tables is

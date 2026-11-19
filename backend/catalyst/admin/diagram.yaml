@@ -217,6 +217,44 @@ dashboard:
     Interventions Detail: [intervention_types, intervention_waterbodies]
     Community Action: location_text
 
+# Each table's number, so someone looking at the dashboard can find where its data comes from:
+# the numbered screenshots of the dashboards (/admin/screenshots, made by screenshots/take.mjs) show
+# each table's number on the panels it's in, and its box in the diagram has the same number.
+#
+# Every table on the dashboards has one (every table in `dashboard` above, and Catchments and
+# Locations: the waterbodies' names and outlines, and which are on each dashboard). They're in the
+# diagram's order, top to bottom. Once given, a number stays with its table: give a new table the
+# next number up, then take the screenshots again (screenshots/README.md).
+numbers:
+  catchments: 1
+  ea_classifications: 2
+  ea_rnags: 3
+  storm_overflows: 4
+  sewage_overflow_pressure: 5
+  river_obstacles: 6
+  postcodes: 7
+  ea_scores: 8
+  ea_thresholds: 9
+  habitat_land_use: 10
+  river_status_text: 11
+  esme_risk_levels: 12
+  catchment_rankings: 13
+  ecological_classes: 14
+  river_information: 15
+  farms: 16
+  sewerage_properties: 17
+  livestock: 18
+  livestock_pressure: 19
+  phosphate_sources: 20
+  phosphate_point_diffuse: 21
+  sewerage_improvements: 22
+  datasets: 23
+  intervention_types: 24
+  intervention_waterbodies: 25
+  intervention_unit_costs: 26
+  location_text: 27
+  locations: 28
+
 # Links the database can't check, so they aren't in schema.yaml as `references`:
 # a list of IDs, or a table's name. `to: data tables` means every data table, and
 # `to: excel tables` every table filled by Excel upload.

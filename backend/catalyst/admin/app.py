@@ -10,6 +10,8 @@
     /admin/inputs/<input>/upload      upload a source file as it came (see catalyst.importers.inputs)
     /admin/uploads/<id>               preview what an upload will change; approve or cancel
     /admin/publish                    publish the dashboards (the Publish button at the top of /admin)
+    /admin/screenshots                numbered screenshots of the dashboards: each part's table, by its
+                                      number in the diagram (taken by screenshots/take.mjs)
 
 Every page needs a login. Every table can be downloaded. Two kinds can be
 uploaded: tables marked `filled_by: excel` in schema.yaml, as an edited copy of
@@ -24,6 +26,8 @@ from __future__ import annotations
 
 import datetime
 import hashlib
+import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated, Any
@@ -51,6 +55,8 @@ PROBLEMS_SHOWN = 50
 RECENT_UPLOADS = 10  # per table
 LOGIN_HOURS = 12
 UK = ZoneInfo("Europe/London")
+SCREENSHOTS_DIR = Path(__file__).with_name("screenshots")  # the numbered screenshots, and screenshots.json
+SCREENSHOT_NAME = re.compile(r"[\w-]+\.webp")
 
 router = APIRouter(prefix="/admin")
 
@@ -62,6 +68,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.schema = load_schema()
     app.state.engine = sa.create_engine(settings.database_url, pool_pre_ping=True)
     app.state.templates = _templates()
+    app.state.screenshots_dir = SCREENSHOTS_DIR
     app.add_middleware(
         SessionMiddleware,
         secret_key=settings.secret_key,
@@ -160,6 +167,61 @@ def _render_home(request: Request, status_code: int = 200, problems: dict | None
     if problems:
         model["problems"] = problems
     return _render(request, "home.html", model=model, publishing=publishing, status_code=status_code)
+
+
+# --- The numbered screenshots of the dashboards --------------------------------------
+
+@router.get("/screenshots")
+def screenshots_page(request: Request, user: User):
+    """Each screenshot, and under it each number on it: its table, what it is on the screenshot, and how it's updated."""
+    try:
+        model = diagram.model(request.app.state.schema)
+    except ValueError as e:
+        raise HTTPException(500, f"The page couldn't be made: {e}") from e
+    return _render(request, "screenshots.html", **_screenshots(request.app.state.screenshots_dir, model))
+
+
+@router.get("/screenshots/{name}")
+def screenshot(request: Request, name: str, user: User):
+    path = request.app.state.screenshots_dir / name
+    if not SCREENSHOT_NAME.fullmatch(name) or not path.is_file():
+        raise HTTPException(404, "There's no screenshot with that name.")
+    return FileResponse(path, media_type="image/webp")
+
+
+def _screenshots(folder: Path, model: dict) -> dict:
+    """screenshots.json (written by screenshots/take.mjs), with each number's table and how it's updated, and any
+    number that isn't its table's number any more (diagram.yaml changed since they were taken)."""
+    try:
+        taken = json.loads((folder / "screenshots.json").read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {"taken": None, "taken_on": None, "shots": [], "out_of_date": []}
+    tables = {t["name"]: t for t in model["tables"]}
+    files = {i["name"]: i["title"] for i in model["inputs"]}
+    shots, out_of_date = [], set()
+    for shot in taken["shots"]:
+        numbers = []
+        for n in shot["numbers"]:
+            t = tables.get(n["table"])
+            if t is None or t["number"] != n["number"]:
+                out_of_date.add(n["number"])
+            numbers.append({**n, "title": t["title"] if t else n["table"], "how": _how_updated(t, files) if t else None})
+        shots.append({**shot, "id": shot["file"].rsplit(".", 1)[0], "numbers": numbers})
+    day = datetime.date.fromisoformat(taken["taken"])
+    return {"taken": taken, "taken_on": f"{day.day} {day:%B %Y}", "shots": shots, "out_of_date": sorted(out_of_date)}
+
+
+def _how_updated(t: dict, files: dict[str, str]) -> dict:
+    """How a table's data is changed, and the link that opens it on the diagram."""
+    name = t["name"]
+    if t["fill"] == "input":
+        return {"text": f"Upload file: {files.get(t['input'], t['input'])}", "link": f"/admin#upload-{t['input']}"}
+    if t["fill"] == "excel":
+        return {"text": "Upload data (in Excel)", "link": f"/admin#upload-{name}"}
+    if t["fill"] == "api":
+        return {"text": f"Downloaded from {t['source']}", "link": f"/admin#from-{name}"}
+    return {"text": "Changed with a database command" if t["fill"] == "command" else "Changed by the admin page",
+            "link": f"/admin#{name}"}
 
 
 def _publish_details(conn: sa.Connection, schema) -> dict:

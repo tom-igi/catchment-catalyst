@@ -32,6 +32,7 @@
     --quiet-soft: #eef2f3;
     --catchment: #b0245a;
     --catchment-soft: #fbe9f0;
+    --number: #c2006b;  /* each table's number, as on the numbered screenshots of the dashboards */
     --warn: #8a5a00;
     --warn-soft: #fdf3dc;
     --bad: #b3261e;
@@ -59,6 +60,7 @@
       --quiet-soft: #1f2a2f;
       --catchment: #ff8db4;
       --catchment-soft: #3a1b27;
+      --number: #d6007a;
       --warn: #f0c063;
       --warn-soft: #33280f;
       --bad: #ff8a80;
@@ -232,6 +234,18 @@
   .node-meta .fw { color: var(--f); font-weight: 650; }
   .node-meta .fw svg { vertical-align: -3px; margin-right: 3px; }
   .group.quiet .node { min-height: 50px; box-shadow: none; }
+
+  /* A table's number, on its box's corner like the numbers on the screenshots of the dashboards
+     (/admin/screenshots), so a number seen there can be found here. */
+  .tnum {
+    position: absolute; top: -10px; left: -11px; z-index: 2;
+    display: grid; place-items: center; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 13px;
+    background: var(--number); color: #ffffff; font-size: .82rem; font-weight: 800; line-height: 1;
+    font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--bg);
+  }
+  .p-badge.p-number { padding: 5px 12px; background: var(--number); color: #ffffff; }
+  .shots-link { display: flex; align-items: center; gap: 8px; max-width: 760px; margin: -14px 0 26px; font-size: .92rem; color: var(--muted); }
+  .shots-link .tnum { position: static; flex: none; box-shadow: none; }
 
   /* Where a data table is shown on the dashboards: each page, and its panels. Under the table's
      name, or beside it when the box is wide enough (the Data tables column is the widest). */
@@ -616,6 +630,11 @@
       <button class="publish-button">Publish</button>
     </form>
   </section>
+
+  <p class="shots-link">
+    <span class="tnum" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 17-5-5-9 8"/></svg></span>
+    <span>Looking at the dashboard? The <a href="/admin/screenshots">numbered screenshots</a> show which table each part of it comes from. Each table below has the same number.</span>
+  </p>
 
   <section class="flow" id="flow" aria-labelledby="flow-title">
     <h2 class="visually-hidden" id="flow-title">The tables, from where their data comes from to the dashboards</h2>
@@ -1141,6 +1160,10 @@ function start() {
     const b = el("button", "node f-" + fillOf(t) + (extraClass ? " " + extraClass : ""));
     b.type = "button";
     b.dataset.node = "tbl:" + t.name;
+    if (Number.isInteger(t.number)) {  // as on the numbered screenshots of the dashboards
+      b.appendChild(el("span", "tnum", String(t.number))).setAttribute("aria-hidden", "true");
+      b.appendChild(el("span", "visually-hidden", "Table " + t.number + ": "));
+    }
     b.setAttribute("aria-haspopup", "dialog");
     b.addEventListener("click", () => openPanel(t.name, "table", b));
     hoverable(b, "tbl:" + t.name);
@@ -1369,7 +1392,7 @@ function start() {
 
   // A table: what it is, its download and its columns. Where its data comes from is on its source.
   function renderDetails(t) {
-    panelBadge.replaceChildren();
+    panelBadge.replaceChildren(...(Number.isInteger(t.number) ? [el("span", "p-badge p-number", "Table " + t.number)] : []));
     panelBody.className = "f-" + fillOf(t);
     panelTitle.textContent = titleOf(t);
 

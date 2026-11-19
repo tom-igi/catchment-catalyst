@@ -1,0 +1,687 @@
+{
+  "taken": "2026-11-18",
+  "dashboard": "http://localhost:8080/north-devon/",
+  "waterbody": {
+    "id": "GB108050014340",
+    "name": "Lower Little River Dart"
+  },
+  "shots": [
+    {
+      "file": "1-river-status.webp",
+      "title": "Waterbody Dashboard: River Status",
+      "url": "river-status/GB108050014340/",
+      "note": null,
+      "width": 2160,
+      "height": 1569,
+      "numbers": [
+        {
+          "number": 1,
+          "table": "catchments",
+          "what": [
+            "Map: each waterbody's outline and river",
+            "The list of waterbodies (names, and the areas they're listed by)",
+            "The waterbody's name"
+          ]
+        },
+        {
+          "number": 2,
+          "table": "ea_classifications",
+          "what": [
+            "Map colours, for a waterbody with no 2025 class",
+            "EA Ecological Classification: the years before 2025",
+            "Failing Elements"
+          ]
+        },
+        {
+          "number": 3,
+          "table": "ea_rnags",
+          "what": [
+            "EA RNAGs"
+          ]
+        },
+        {
+          "number": 5,
+          "table": "sewage_overflow_pressure",
+          "what": [
+            "Risk Levels: Untreated Sewage"
+          ]
+        },
+        {
+          "number": 7,
+          "table": "postcodes",
+          "what": [
+            "The postcode search"
+          ]
+        },
+        {
+          "number": 11,
+          "table": "river_status_text",
+          "what": [
+            "Why is the river failing?",
+            "What is happening now?",
+            "Intervention hypothesis, and its confidence"
+          ]
+        },
+        {
+          "number": 12,
+          "table": "esme_risk_levels",
+          "what": [
+            "Risk Levels: Modification",
+            "Risk Levels: Invasive Species",
+            "Risk Levels: Overheating",
+            "Risk Levels: Runoff",
+            "Risk Levels: Running Dry"
+          ]
+        },
+        {
+          "number": 13,
+          "table": "catchment_rankings",
+          "what": [
+            "Catchment Ranking"
+          ]
+        },
+        {
+          "number": 14,
+          "table": "ecological_classes",
+          "what": [
+            "Map colours: each waterbody's 2025 ecological class",
+            "EA Ecological Classification: 2025"
+          ]
+        },
+        {
+          "number": 17,
+          "table": "sewerage_properties",
+          "what": [
+            "Risk Levels: Sewage (Private)"
+          ]
+        },
+        {
+          "number": 19,
+          "table": "livestock_pressure",
+          "what": [
+            "Risk Levels: Livestock"
+          ]
+        },
+        {
+          "number": 23,
+          "table": "datasets",
+          "what": [
+            "The text in each \"i\" button"
+          ]
+        },
+        {
+          "number": 24,
+          "table": "intervention_types",
+          "what": [
+            "Interventions: each intervention's name, and the group it's in"
+          ]
+        },
+        {
+          "number": 25,
+          "table": "intervention_waterbodies",
+          "what": [
+            "Interventions: which this waterbody needs, with their size, cost and lead"
+          ]
+        },
+        {
+          "number": 27,
+          "table": "location_text",
+          "what": [
+            "The text under the dashboard"
+          ]
+        },
+        {
+          "number": 28,
+          "table": "locations",
+          "what": [
+            "Which waterbodies are on this dashboard"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "2-ea-data.webp",
+      "title": "Waterbody Dashboard: EA Data",
+      "url": "ea-data/GB108050014340/",
+      "note": null,
+      "width": 2160,
+      "height": 1688,
+      "numbers": [
+        {
+          "number": 1,
+          "table": "catchments",
+          "what": [
+            "Map: each waterbody's outline and river",
+            "The list of waterbodies (names, and the areas they're listed by)",
+            "The waterbody's name"
+          ]
+        },
+        {
+          "number": 2,
+          "table": "ea_classifications",
+          "what": [
+            "Map colours, for a waterbody with no 2025 class",
+            "EA Ecological Classification: the years before 2025",
+            "Failing Elements",
+            "Environment Agency Scoring: the statuses (e.g. Moderate, High) and their colours"
+          ]
+        },
+        {
+          "number": 3,
+          "table": "ea_rnags",
+          "what": [
+            "EA RNAGs"
+          ]
+        },
+        {
+          "number": 7,
+          "table": "postcodes",
+          "what": [
+            "The postcode search"
+          ]
+        },
+        {
+          "number": 8,
+          "table": "ea_scores",
+          "what": [
+            "Environment Agency Scoring: the measured values (e.g. 0.744)"
+          ]
+        },
+        {
+          "number": 9,
+          "table": "ea_thresholds",
+          "what": [
+            "Environment Agency Scoring: the thresholds"
+          ]
+        },
+        {
+          "number": 13,
+          "table": "catchment_rankings",
+          "what": [
+            "Catchment Ranking"
+          ]
+        },
+        {
+          "number": 14,
+          "table": "ecological_classes",
+          "what": [
+            "Map colours: each waterbody's 2025 ecological class",
+            "EA Ecological Classification: 2025",
+            "Environment Agency Scoring: Ecological in 2025"
+          ]
+        },
+        {
+          "number": 23,
+          "table": "datasets",
+          "what": [
+            "The text in each \"i\" button"
+          ]
+        },
+        {
+          "number": 27,
+          "table": "location_text",
+          "what": [
+            "The text under the dashboard"
+          ]
+        },
+        {
+          "number": 28,
+          "table": "locations",
+          "what": [
+            "Which waterbodies are on this dashboard"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "3-land-use-data.webp",
+      "title": "Waterbody Dashboard: Land Use Data",
+      "url": "land-use/GB108050014340/",
+      "note": null,
+      "width": 2160,
+      "height": 1588,
+      "numbers": [
+        {
+          "number": 1,
+          "table": "catchments",
+          "what": [
+            "Map: each waterbody's outline and river",
+            "The list of waterbodies (names, and the areas they're listed by)",
+            "The waterbody's name",
+            "River Information: Catchment ID"
+          ]
+        },
+        {
+          "number": 2,
+          "table": "ea_classifications",
+          "what": [
+            "Map colours, for a waterbody with no 2025 class",
+            "EA Ecological Classification: the years before 2025",
+            "Failing Elements"
+          ]
+        },
+        {
+          "number": 3,
+          "table": "ea_rnags",
+          "what": [
+            "EA RNAGs"
+          ]
+        },
+        {
+          "number": 6,
+          "table": "river_obstacles",
+          "what": [
+            "River Obstacles (the map and the table)"
+          ]
+        },
+        {
+          "number": 7,
+          "table": "postcodes",
+          "what": [
+            "The postcode search"
+          ]
+        },
+        {
+          "number": 10,
+          "table": "habitat_land_use",
+          "what": [
+            "Habitat and Land Usage"
+          ]
+        },
+        {
+          "number": 12,
+          "table": "esme_risk_levels",
+          "what": [
+            "Risk Levels: Modification",
+            "Risk Levels: Invasive Species",
+            "Risk Levels: Overheating",
+            "Risk Levels: Runoff",
+            "Risk Levels: Running Dry"
+          ]
+        },
+        {
+          "number": 13,
+          "table": "catchment_rankings",
+          "what": [
+            "Catchment Ranking"
+          ]
+        },
+        {
+          "number": 14,
+          "table": "ecological_classes",
+          "what": [
+            "Map colours: each waterbody's 2025 ecological class",
+            "EA Ecological Classification: 2025"
+          ]
+        },
+        {
+          "number": 15,
+          "table": "river_information",
+          "what": [
+            "River Information: area, length, river system, upstream and downstream rivers"
+          ]
+        },
+        {
+          "number": 16,
+          "table": "farms",
+          "what": [
+            "Number of Farms"
+          ]
+        },
+        {
+          "number": 18,
+          "table": "livestock",
+          "what": [
+            "Livestock Pressures"
+          ]
+        },
+        {
+          "number": 19,
+          "table": "livestock_pressure",
+          "what": [
+            "Risk Levels: Livestock"
+          ]
+        },
+        {
+          "number": 20,
+          "table": "phosphate_sources",
+          "what": [
+            "Phosphate source (estimated)"
+          ]
+        },
+        {
+          "number": 23,
+          "table": "datasets",
+          "what": [
+            "The text in each \"i\" button"
+          ]
+        },
+        {
+          "number": 27,
+          "table": "location_text",
+          "what": [
+            "The text under the dashboard"
+          ]
+        },
+        {
+          "number": 28,
+          "table": "locations",
+          "what": [
+            "Which waterbodies are on this dashboard"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "4-sewerage-data.webp",
+      "title": "Waterbody Dashboard: Sewerage Data",
+      "url": "sewerage/GB108050014340/",
+      "note": null,
+      "width": 2160,
+      "height": 1612,
+      "numbers": [
+        {
+          "number": 1,
+          "table": "catchments",
+          "what": [
+            "Map: each waterbody's outline and river",
+            "The list of waterbodies (names, and the areas they're listed by)",
+            "The waterbody's name"
+          ]
+        },
+        {
+          "number": 2,
+          "table": "ea_classifications",
+          "what": [
+            "Map colours, for a waterbody with no 2025 class",
+            "EA Ecological Classification: the years before 2025",
+            "Failing Elements"
+          ]
+        },
+        {
+          "number": 3,
+          "table": "ea_rnags",
+          "what": [
+            "EA RNAGs"
+          ]
+        },
+        {
+          "number": 4,
+          "table": "storm_overflows",
+          "what": [
+            "Intermittent Sewage Discharges (hrs per year)",
+            "Outlet Locations"
+          ]
+        },
+        {
+          "number": 5,
+          "table": "sewage_overflow_pressure",
+          "what": [
+            "Risk Levels: Untreated Sewage"
+          ]
+        },
+        {
+          "number": 7,
+          "table": "postcodes",
+          "what": [
+            "The postcode search"
+          ]
+        },
+        {
+          "number": 13,
+          "table": "catchment_rankings",
+          "what": [
+            "Catchment Ranking"
+          ]
+        },
+        {
+          "number": 14,
+          "table": "ecological_classes",
+          "what": [
+            "Map colours: each waterbody's 2025 ecological class",
+            "EA Ecological Classification: 2025"
+          ]
+        },
+        {
+          "number": 17,
+          "table": "sewerage_properties",
+          "what": [
+            "Properties on public and private sewerage",
+            "Risk Levels: Sewage (Private)"
+          ]
+        },
+        {
+          "number": 21,
+          "table": "phosphate_point_diffuse",
+          "what": [
+            "Source of Phosphate"
+          ]
+        },
+        {
+          "number": 22,
+          "table": "sewerage_improvements",
+          "what": [
+            "Asset Improvement Plans"
+          ]
+        },
+        {
+          "number": 23,
+          "table": "datasets",
+          "what": [
+            "The text in each \"i\" button"
+          ]
+        },
+        {
+          "number": 27,
+          "table": "location_text",
+          "what": [
+            "Intermittent Discharges (the explanation)",
+            "Continuous Discharge (the explanation)",
+            "The text under the dashboard"
+          ]
+        },
+        {
+          "number": 28,
+          "table": "locations",
+          "what": [
+            "Which waterbodies are on this dashboard"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "5-catchment-dashboard.webp",
+      "title": "Catchment Dashboard",
+      "url": "catchment-dashboard/",
+      "note": "Each operational catchment's page (the buttons on the left) is the same, for its waterbodies only.",
+      "width": 2160,
+      "height": 1411,
+      "numbers": [
+        {
+          "number": 1,
+          "table": "catchments",
+          "what": [
+            "Map: each waterbody's outline and river",
+            "The management and operational catchments (each waterbody's, from the EA)"
+          ]
+        },
+        {
+          "number": 2,
+          "table": "ea_classifications",
+          "what": [
+            "Map colours, for a waterbody with no 2025 class",
+            "Ecological Class counts, for a waterbody with no 2025 class"
+          ]
+        },
+        {
+          "number": 4,
+          "table": "storm_overflows",
+          "what": [
+            "Sewage outflows (CSO & STW): how many"
+          ]
+        },
+        {
+          "number": 10,
+          "table": "habitat_land_use",
+          "what": [
+            "Habitat and Land Usage (added up)"
+          ]
+        },
+        {
+          "number": 14,
+          "table": "ecological_classes",
+          "what": [
+            "Map colours: each waterbody's 2025 ecological class",
+            "Ecological Class 2025 counts"
+          ]
+        },
+        {
+          "number": 16,
+          "table": "farms",
+          "what": [
+            "Number of Farms (added up)"
+          ]
+        },
+        {
+          "number": 17,
+          "table": "sewerage_properties",
+          "what": [
+            "Properties on public and private sewerage (added up)"
+          ]
+        },
+        {
+          "number": 23,
+          "table": "datasets",
+          "what": [
+            "The text in each \"i\" button"
+          ]
+        },
+        {
+          "number": 27,
+          "table": "location_text",
+          "what": [
+            "Why is the river system failing?, What is happening now? and Intervention hypothesis (a button each)",
+            "The text under the dashboard"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "6-critical-path.webp",
+      "title": "Intervention Management: Critical Path",
+      "url": "intervention-management/",
+      "note": null,
+      "width": 2160,
+      "height": 1688,
+      "numbers": [
+        {
+          "number": 27,
+          "table": "location_text",
+          "what": [
+            "Critical Path"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "7-unit-cost.webp",
+      "title": "Intervention Management: Unit Cost of Interventions",
+      "url": "intervention-management/",
+      "note": null,
+      "width": 2160,
+      "height": 1688,
+      "numbers": [
+        {
+          "number": 26,
+          "table": "intervention_unit_costs",
+          "what": [
+            "Unit Cost of Interventions: each intervention's costs"
+          ]
+        },
+        {
+          "number": 27,
+          "table": "location_text",
+          "what": [
+            "Unit Cost of Interventions: the Purpose"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "8-intervention-summary.webp",
+      "title": "Intervention Management: Intervention Summary",
+      "url": "intervention-management/",
+      "note": null,
+      "width": 2160,
+      "height": 1590,
+      "numbers": [
+        {
+          "number": 24,
+          "table": "intervention_types",
+          "what": [
+            "Intervention Summary: the table (a row for each intervention)"
+          ]
+        },
+        {
+          "number": 27,
+          "table": "location_text",
+          "what": [
+            "Intervention Summary: the text above the table"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "9-interventions-detail.webp",
+      "title": "Intervention Management: Interventions Detail",
+      "url": "intervention-management/",
+      "note": "Intervention 8 is shown: each of the others has the same layout.",
+      "width": 2160,
+      "height": 2284,
+      "numbers": [
+        {
+          "number": 24,
+          "table": "intervention_types",
+          "what": [
+            "Interventions Detail: the buttons (each intervention's short name)",
+            "Interventions Detail: each intervention's title, overview and progress",
+            "Interventions Detail: the headings over the waterbodies"
+          ]
+        },
+        {
+          "number": 25,
+          "table": "intervention_waterbodies",
+          "what": [
+            "Interventions Detail: the waterbodies that need it, with size, cost, funding, delivery and lead"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "10-community-action.webp",
+      "title": "Intervention Management: Community Action",
+      "url": "intervention-management/",
+      "note": null,
+      "width": 2160,
+      "height": 979,
+      "numbers": [
+        {
+          "number": 27,
+          "table": "location_text",
+          "what": [
+            "Community Action"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "11-catchment-insights.webp",
+      "title": "Catchment Insights",
+      "url": "catchment-insights/",
+      "note": "Not from the database: its questions and answers are written in the code, in backend/catalyst/publish/content/north-devon/catchment-insights.yaml.",
+      "width": 2160,
+      "height": 1688,
+      "numbers": []
+    }
+  ]
+}
