@@ -336,6 +336,14 @@ tables:
         description: >-
           For a source file worked out again (with the formulas as they are
           now) rather than uploaded again: the earlier upload whose file it is
+      examples:
+        type: jsonb
+        example: '{"livestock_pressure": {"waterbody": "Hole Brook", "in": {...}, "out": {...}, "steps": {...}}}'
+        description: >-
+          A few of the file's rows, and what each table it fills makes of
+          them, for the admin page's Transformation panels (see
+          catalyst/admin/examples.py). Made from the file, so it can be made
+          again; empty for uploads before 20 November 2026 until it is
 
   publishes:
     title: Publishes

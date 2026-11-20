@@ -12,8 +12,9 @@
      downloaded. Each source file (one of the original Power BI dashboard's) and each Excel
      table has its own source on the left, which opens its upload. Between each source and its
      tables is its transformation: what's done to the data on the way in (the original's
-     formulas for a source file, 1 to 1 for an Excel table). Each data table's box lists where
-     it's shown on the dashboards. Above the diagram, the Publish box puts what's been approved
+     formulas for a source file, 1 to 1 for an Excel table), shown with real data when it's
+     clicked. Source files come first, then Excel tables, then downloads. Each data table's box
+     lists where it's shown on the dashboards. Above the diagram, the Publish box puts what's been approved
      on the public dashboards. */
   :root {
     color-scheme: light dark;
@@ -460,20 +461,37 @@
   .from.same { background: transparent; border: 1.5px dashed var(--f); }
   .from ol { margin: 6px 0 0; padding-left: 22px; }
   .from ol li + li { margin-top: 5px; }
-  .from .xf-for { margin-top: 14px; font-weight: 700; }
-  .from .xf-for:first-child { margin-top: 0; }
-  .from .pbi, .fn .pbi { display: block; margin-top: 2px; color: var(--muted); font-size: .82rem; }
-  .io { margin-top: 18px; }
-  .io h3 { margin: 0 0 6px; font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
-  .io > p { margin: 0; }
-  .from.io h3 { color: var(--f); }
-  .headings li.own { font-family: var(--mono); font-size: .78rem; background: var(--card); border-color: var(--f); color: var(--f); }
-  .fn { margin: 8px 0 0; padding-left: 22px; }
-  .fn > li + li { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
-  .fn-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
-  .fn-line .headings { margin: 0; }
-  .fn-from { color: var(--muted); font-size: .82rem; }
-  .fn-text { margin: 6px 0 0; }
+  .from .pbi { display: block; margin-top: 2px; color: var(--muted); font-size: .82rem; }
+
+  /* A transformation, with real data: what comes in, each step done to one waterbody's rows, what goes out. */
+  .panel.wide { width: min(960px, 100%); }
+  .xf-lead { margin: 10px 0 0; color: var(--muted); }
+  .stage { margin-top: 22px; }
+  .stage h3 { margin: 0 0 6px; }
+  .stage h3 .num { flex: none; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%;
+    background: var(--text); color: var(--card); font-size: .78rem; transform: translateY(-1px); }
+  .stage > p { margin: 0 0 8px; font-size: .92rem; }
+  .stage .muted { color: var(--muted); }
+  .mini-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--card); }
+  .mini-wrap:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  table.mini { border-collapse: collapse; font-size: .82rem; width: max-content; min-width: 100%; }
+  table.mini th, table.mini td { padding: 5px 9px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+  table.mini th { background: var(--bg); font-weight: 650; white-space: nowrap; }
+  table.mini td { white-space: nowrap; }
+  table.mini td.long { white-space: normal; min-width: 200px; max-width: 300px; }
+  table.mini td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  table.mini tr:last-child td { border-bottom: none; }
+  table.mini tr.ex td { background: var(--f-soft); }
+  table.mini .blank { color: var(--muted); }
+  .xf-steps { margin: 0; padding-left: 24px; }
+  .xf-steps > li + li { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .xf-steps p { margin: 0; }
+  .xf-steps .pbi { display: block; margin-top: 4px; color: var(--muted); font-size: .82rem; }
+  .eg { margin-top: 6px; padding: 6px 10px; border-radius: 6px; background: var(--card); font-size: .88rem;
+    border: 1px solid var(--border); overflow-wrap: anywhere; }
+  .eg-label { font-weight: 650; color: var(--f); margin-right: 6px; }
+  .eg-value { font-weight: 650; }
+  .eg-to { color: var(--muted); margin: 0 6px; }
   .headings { display: flex; flex-wrap: wrap; gap: 4px 6px; list-style: none; margin: 6px 0 0; padding: 0; }
   .steps .sheet-name { margin-top: 8px; font-weight: 700; }
   .headings li { padding: 1px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); font-size: .82rem; }
@@ -824,7 +842,8 @@ function makePlan(model) {
     sources.set(t.name, g);
   }
   const hubGroup = hub ? sources.get(hub.name) : null;
-  const rank = g => (g === hubGroup ? 0 : g.fill === "api" ? 1 : g.fill === "input" ? 2 : g.fill === "excel" ? 3 : g.fill === "command" ? 4 : 5);
+  // Source files first, then Excel uploads, then downloads (the hub's first among them, so its line is short).
+  const rank = g => ({ input: 0, excel: 1, api: 2, command: 3 }[g.fill] ?? 4) * 2 + (g === hubGroup ? 0 : 1);
   groups.sort((a, b) => rank(a) - rank(b) || a.order - b.order);
   const main = groups.filter(g => !g.quiet);
   const house = groups.filter(g => g.quiet);
@@ -933,14 +952,15 @@ function geometry(plan, rectOf) {
       return { id: w.id, d: sCurve(A.r, midY(A), B.l, midY(B)), dots: [[B.l, midY(B)]] };
     }
     if (w.type === "bridge") {
-      // The hub's own source, in the first row: right, above the tables, and down into the top of the hub.
-      const sx = A.r, sy = midY(A), hx = midX(B), hy = B.t;
-      if (hy - sy < 24 || hx - sx < 40) {
+      // The hub's own source, in a row with no tables of its own: right along its row, then up into the
+      // bottom of the hub (or down into its top, if the source is higher up).
+      const sx = A.r, sy = midY(A), hx = midX(B), below = sy > B.b, hy = below ? B.b : B.t;
+      if (Math.abs(hy - sy) < 24 || hx - sx < 40) {
         return { id: w.id, d: sCurve(A.r, midY(A), B.l, midY(B)), dots: [[B.l, midY(B)]] };
       }
-      const r = Math.min(16, (hy - sy) / 2, (hx - sx) / 2);
+      const r = Math.min(16, Math.abs(hy - sy) / 2, (hx - sx) / 2), turn = below ? -r : r;
       const d = "M" + num(sx) + " " + num(sy) + "H" + num(hx - r) +
-        "Q" + num(hx) + " " + num(sy) + " " + num(hx) + " " + num(sy + r) + "V" + num(hy);
+        "Q" + num(hx) + " " + num(sy) + " " + num(hx) + " " + num(sy + turn) + "V" + num(hy);
       return { id: w.id, d, dots: [[hx, hy]] };
     }
     if (w.type === "hub") {
@@ -1011,7 +1031,7 @@ function start() {
   flow.appendChild(svg);
 
   // Every column after the transformation is tables, so the headings say so.
-  const heads = [["1", "Where the data comes from"], ["2", "Transformation", "Each table's inputs and how they're worked out"], ["3", "Data tables", "And where each is on the dashboards"]];
+  const heads = [["1", "Where the data comes from"], ["2", "Transformation", "Click one for a real example"], ["3", "Data tables", "And where each is on the dashboards"]];
   if (plan.hub) heads.push(["4", titleOf(plan.hub) + " table", "Joins them up by " + plan.hubLabel]);
   if (plan.dash.length) {
     const name = plan.dash.length === 1 ? titleOf(plan.dash[0]) + " table" : "Dashboard tables";
@@ -1341,6 +1361,7 @@ function start() {
     if (view === "transform" ? !plan.xfOf(t) : (view !== "source" || !g)) view = "table";
     if (!current) opener = from || document.activeElement;
     current = { name, view };
+    panel.classList.toggle("wide", view === "transform");  // room for its example tables
     if (view === "table") renderDetails(t);
     else if (view === "transform") renderTransform(t);
     else if (g.input) renderInputUpload(g);
@@ -1447,8 +1468,21 @@ function start() {
     return fills;
   }
 
-  // How a table is worked out: its inputs, the function (each step: the columns it fills, from which
-  // inputs, how, and where that is in the Power BI file), and the table.
+  // How a table is worked out, with real data: a few rows coming in, each step done to one waterbody's
+  // rows, then the same rows going out. A downloaded table's example is in the model (diagram.yaml); a
+  // source file's or Excel table's is made from its last approved file, so it's fetched (examples.py).
+  const fetchedExamples = new Map();  // table name -> a promise of its example
+  function exampleFor(t) {
+    if (t.transform.example) return Promise.resolve(t.transform.example);
+    if (!fetchedExamples.has(t.name)) {
+      const got = fetch("/admin/tables/" + encodeURIComponent(t.name) + "/example", { credentials: "same-origin" })
+        .then(r => (r.ok ? r.json() : Promise.reject(new Error("the page said " + r.status))));
+      got.catch(() => fetchedExamples.delete(t.name));  // try again next time
+      fetchedExamples.set(t.name, got);
+    }
+    return fetchedExamples.get(t.name);
+  }
+
   function renderTransform(t) {
     const x = t.transform, f = fillOf(t), same = x.kind === "excel";
     const badge = el("span", "p-badge f-" + f);
@@ -1457,69 +1491,14 @@ function start() {
     badge.append(bi, el("span", null, "Transformation"));
     panelBadge.replaceChildren(badge);
     panelBody.className = "f-" + f;
-    panelTitle.textContent = "How " + titleOf(t) + " is worked out";
-    const own = new Set((t.columns || []).map(c => c.name));
-    const chip = name => el("li", own.has(name) ? "own" : null, own.has(name) ? columnLabel(t, name) : name);
-
-    const out = [];
-    const inputs = el("section", "io");
-    inputs.appendChild(el("h3", null, "Inputs"));
-    const where = el("p");
-    if (x.kind === "input") {
-      const said = (x.file || "") + " " + (x.sheet || "");  // its title in brackets, unless that's already said
-      where.append(document.createTextNode("From "), el("strong", null, x.file),
-        document.createTextNode((x.sheet ? ", the sheet " + x.sheet : "") + (said.includes(x.from) ? "" : " (" + x.from + ")") +
-          ", by the column names in row 1:"));
-    } else if (x.kind === "api") {
-      where.append(el("strong", null, x.file || x.from || "The download"), document.createTextNode(x.file && x.from ? " (" + x.from + ")" : ""),
-        document.createTextNode(x.inputs.length ? ":" : "."));
-    } else {
-      where.textContent = "An Excel file in the table's own layout, uploaded here, with its columns:";
-    }
-    inputs.appendChild(where);
-    if ((x.inputs || []).length) {
-      const ul = el("ul", "headings");
-      for (const name of x.inputs) ul.appendChild(el("li", null, name));
-      inputs.appendChild(ul);
-    }
-    out.push(inputs);
-
-    const fn = el("section", "io from f-" + f + (same ? " same" : ""));
-    fn.appendChild(el("h3", null, "Function"));
-    if (x.kind === "input") fn.appendChild(el("p", "muted", "The original Power BI dashboard's own formulas and numbers, step by step."));
-    if (x.kind === "api") fn.appendChild(el("p", "muted", "Each time it runs, the importer:"));
-    const list = el("ol", "fn");
-    for (const step of x.steps || []) {
-      const li = el("li");
-      if ((step.columns || []).length && !same) {
-        const line = el("div", "fn-line");
-        const cols = el("ul", "headings fills");
-        for (const name of step.columns) cols.appendChild(el("li", "own", columnLabel(t, name)));
-        line.appendChild(cols);
-        line.appendChild(el("span", "fn-from", (step.inputs || []).length ? "from" : ""));
-        if ((step.inputs || []).length) {
-          const ins = el("ul", "headings");
-          for (const name of step.inputs) ins.appendChild(chip(name));
-          line.appendChild(ins);
-        }
-        li.appendChild(line);
-      }
-      li.appendChild(el("p", "fn-text", step.text));
-      if (step.power_bi) li.appendChild(el("span", "pbi", "In Power BI: " + step.power_bi));
-      list.appendChild(li);
-    }
-    fn.appendChild(list);
-    out.push(fn);
-
-    const table = el("section", "io");
-    table.appendChild(el("h3", null, "Table"));
-    const cols = el("ul", "headings");
-    for (const c of t.columns || []) cols.appendChild(el("li", "own", c.label || c.name));
-    const row = el("div", "link-row");
-    row.append(el("span", "via", "Fills"), jumpButton(t));
-    table.append(row, cols);
-    out.push(table);
-
+    panelTitle.textContent = (same ? "How " + titleOf(t) + " is filled" : "How " + titleOf(t) + " is worked out");
+    const lead = el("p", "xf-lead",
+      x.kind === "input" ? "Worked out from the " + x.from + " file, with the original Power BI dashboard's formulas. Here's real data going through it."
+        : x.kind === "api" ? "Downloaded from " + x.from + " by the importer, and changed on the way in. Here's real data going through it."
+          : "Uploaded here in Excel, in the table's own layout, so it goes in as it is. Here's real data going through it.");
+    const body = el("div");
+    body.appendChild(el("p", "muted stage", "Getting the example…"));
+    const out = [lead, body];
     const g = plan.sources.get(t.name);
     if (g && g.input) {
       const back = el("button", "jump f-input");
@@ -1528,11 +1507,144 @@ function start() {
       bi2.appendChild(icon("upload", 16));
       back.append(bi2, el("span", null, "Upload " + g.input.title));
       back.addEventListener("click", () => openPanel(t.name, "source"));
-      const r = el("div", "link-row");
+      const r = el("div", "link-row stage");
       r.append(el("span", "via", "Its source file"), back);
       out.push(r);
     }
     panelBody.replaceChildren(...out);
+    const showing = () => current && current.name === t.name && current.view === "transform";
+    exampleFor(t).then(ex => { if (showing()) body.replaceChildren(...drawExample(t, ex || {})); })
+      .catch(e => { if (showing()) body.replaceChildren(el("p", "alert stage", "The example couldn't be got (" + e.message + "). Close this and open it again to try again.")); });
+  }
+
+  function drawExample(t, ex) {
+    const x = t.transform, same = x.kind === "excel";
+    const ins = ex.in && (ex.in.rows || []).length ? ex.in : null, outs = ex.out && (ex.out.rows || []).length ? ex.out : null;
+
+    const one = stage("1", "Coming in");
+    if (ex.missing) one.appendChild(el("p", "muted", ex.missing));
+    if (ins) {
+      const p = el("p");
+      if (x.kind === "api") p.textContent = ex.about || "";
+      else {
+        const file = isLocal(ex.file_url) ? link(null, ex.file_url, ex.file) : el("strong", null, ex.file);
+        p.append(document.createTextNode("From "), file,
+          document.createTextNode(" (approved " + ex.when + ")" + (x.sheet ? ", the sheet " + x.sheet : "") + ": " +
+            someOf(ins) + (same ? "." : ", with only the columns used.")));
+      }
+      one.append(p, miniTable(ins.columns, ins, null));
+    }
+
+    const two = stage("2", "What's done");
+    if (same) two.appendChild(el("p", null, "Nothing: each column goes into the table's column with the same name, as it is (1 to 1). The upload is only checked first: the column names, each value's type, and that no row is there twice."));
+    else {
+      if (ex.waterbody && ins) two.appendChild(el("p", "muted", "Each step, with " + ex.waterbody + " (highlighted) as the example:"));
+      const ol = el("ol", "xf-steps");
+      (x.steps || []).forEach((step, i) => {
+        const li = el("li");
+        const p = el("p");
+        if ((step.columns || []).length) p.appendChild(el("strong", null, step.columns.map(c => columnLabel(t, c)).join(", ") + ": "));
+        p.appendChild(document.createTextNode(step.text));
+        li.appendChild(p);
+        const eg = x.kind === "api" ? step.example : (ex.steps || [])[i];
+        if (eg) li.appendChild(stepExample(t, eg, ex.waterbody));
+        if (step.power_bi) li.appendChild(el("span", "pbi", "In Power BI: " + step.power_bi));
+        ol.appendChild(li);
+      });
+      two.appendChild(ol);
+    }
+
+    const three = stage("3", "Going out");
+    if (outs) {
+      three.appendChild(el("p", null, (ex.missing ? "The table as it is now: " : same ? "The same rows, in the table: "
+        : "What they make, in the table: ") + someOf(outs) + "."));
+      three.appendChild(miniTable(outs.columns.map(c => columnLabel(t, c)), outs, t));
+    } else three.appendChild(el("p", "muted", "The table has no rows yet."));
+    return [one, two, three];
+  }
+
+  function stage(n, title) {
+    const s = el("section", "stage");
+    const h = el("h3");
+    h.append(el("span", "num", n), document.createTextNode(title));
+    s.appendChild(h);
+    return s;
+  }
+  // e.g. "3 of its 92 rows", or "all 3 of its rows"
+  function someOf(part) {
+    const n = (part.rows || []).length, total = part.total;
+    if (total == null) return n === 1 ? "1 row" : n + " rows";
+    if (n >= total) return n === 1 ? "its 1 row" : "all " + n + " of its rows";
+    return n + " of its " + Number(total).toLocaleString("en-GB") + " rows";
+  }
+
+  // A value as an example shows it: whole numbers as they are (they're often IDs or years), others to 2
+  // decimal places from 100 up (with commas from 1,000), or to 6 figures (e.g. a latitude); empty as a dash.
+  function exampleValue(v) {
+    if (v == null || v === "") return null;
+    if (typeof v === "boolean") return v ? "Yes" : "No";
+    if (typeof v === "number") {
+      if (Number.isInteger(v)) return String(v);
+      if (Math.abs(v) >= 100) return v.toLocaleString("en-GB", { maximumFractionDigits: 2 });
+      return String(Number(v.toPrecision(6)));
+    }
+    return String(v);
+  }
+  const LONGEST_CELL = 80, LONG_CELL = 32;  // text longer than this is cut short; than this, wraps
+  function miniTable(heads, part, t) {
+    const wrap = el("div", "mini-wrap");
+    wrap.setAttribute("tabindex", "0");  // it scrolls sideways when it's wide
+    wrap.setAttribute("role", "region");
+    wrap.setAttribute("aria-label", "Example rows");
+    const table = el("table", "mini");
+    const tr = el("tr");
+    for (const h of heads) tr.appendChild(el("th", null, h));
+    const thead = el("thead");
+    thead.appendChild(tr);
+    const tbody = el("tbody");
+    const marked = new Set(part.example || []);
+    (part.rows || []).forEach((row, i) => {
+      const r = el("tr", marked.has(i) ? "ex" : null);
+      row.forEach(v => {
+        const shown = exampleValue(v);
+        const td = el("td", typeof v === "number" ? "num" : shown && shown.length > LONG_CELL ? "long" : null);
+        if (shown == null) td.appendChild(el("span", "blank", "–"));
+        else if (shown.length > LONGEST_CELL) {
+          td.textContent = shown.slice(0, LONGEST_CELL - 1) + "…";
+          td.title = shown;
+        } else td.textContent = shown;
+        r.appendChild(td);
+      });
+      tbody.appendChild(r);
+    });
+    table.append(thead, tbody);
+    wrap.appendChild(table);
+    return wrap;
+  }
+  // A step done to the example: in words, or its inputs' values, then its columns'.
+  function stepExample(t, eg, waterbody) {
+    const box = el("p", "eg");
+    box.appendChild(el("span", "eg-label", waterbody ? waterbody + ":" : "e.g."));
+    if (typeof eg === "string") {
+      box.appendChild(document.createTextNode(eg.replace(/\.$/, "") + "."));
+      return box;
+    }
+    const pair = (name, v) => {
+      const s = el("span", "eg-pair");
+      const shown = exampleValue(v);
+      s.append(document.createTextNode(name + " "), el("span", "eg-value", shown == null ? "(empty)" : shown));
+      return s;
+    };
+    (eg.in || []).forEach(([name, v, own], i) => {
+      if (i) box.appendChild(document.createTextNode(", "));
+      box.appendChild(pair(own ? columnLabel(t, name) : name, v));
+    });
+    if ((eg.in || []).length) box.appendChild(el("span", "eg-to", "→"));
+    (eg.out || []).forEach(([name, v], i) => {
+      if (i) box.appendChild(document.createTextNode(", "));
+      box.appendChild(pair(columnLabel(t, name), v));
+    });
+    return box;
   }
 
   function fromBox(t, f, many) {

@@ -3,8 +3,8 @@
 # The sections, in order: the core tables in each, and a short explanation.
 #
 # The data tables (one per dataset) always come last, in their own section. A
-# core table that isn't listed here still appears, under "Other tables", so
-# nothing is ever left off the page.
+# core table that isn't listed here, or in `left_off`, still appears, under
+# "Other tables", so nothing is left off the page by mistake.
 
 sections:
 
@@ -28,18 +28,10 @@ sections:
       table that has one.
     tables: [datasets]
 
-  - title: Uploads
-    description: >-
-      A record of every file uploaded here (Excel tables and source files):
-      who uploaded it, when, and what it changed. The files themselves are
-      kept too.
-    tables: [uploads]
-
-  - title: Publishes
-    description: >-
-      A record of each time the public dashboards were published: who
-      pressed Publish, and when.
-    tables: [publishes]
+# Tables the page leaves off: the admin page's own records, which no data comes into and
+# no dashboard shows. They're still in the database (and its backups), and each upload is
+# listed in its table's or source file's panel.
+left_off: [uploads, publishes]
 
 # The data tables' description is shown above the diagram, as how the tables are split, with
 # what each holds (diagram.py's HOLDS) under it.
@@ -70,20 +62,45 @@ data_tables:
 # none. Tables worked out from a source file (`filled_by: input`) aren't listed here at all:
 # their source and steps are in their input's code (catalyst/importers/inputs/), next to the
 # formulas.
-# Put a step in "double quotes" if it has a colon and a space (": ") or a " #" in it.
+#
+# Each step is a sentence, or `step:` and an `example:` of it, done to real data. And `example` is
+# the real data: a few rows of the download as they came in (`in`, by the download's headings), and
+# the same rows in the table (`out`, by its column names), shown with the steps when the box is
+# clicked. They're copied from a download (`about` says which), so they don't change when the data's
+# downloaded again. (Source files' and Excel uploads' examples are made from their last approved
+# file, so they're always up to date: see catalyst/admin/examples.py.)
+# Put a step in "double quotes" if it has a colon and a space (": ") or a " #" in it, and a time
+# such as "319:14:24" too (or it's read as a number).
 filled:
   catchments:
     source: EA Catchment Data Explorer
     url: https://environment.data.gov.uk/catchment-planning/
     command: importer catchments imports/catchments.json
     input: Each catchment's shapefile from the EA's Catchment Data Explorer, and its web page there
-    inputs: [WB_NAME, WB_CAT, RBD_ID, RBD_NAME, MANCAT_ID, MNCAT_NAME, OPCAT_ID, OPCAT_NAME, hydromorph, the outline,
-             the river line, "Length (web page)", "Upstream and downstream waterbodies (web page)"]
+    inputs: [WB_ID, WB_NAME, WB_CAT, RBD_ID, RBD_NAME, MANCAT_ID, MNCAT_NAME, OPCAT_ID, OPCAT_NAME, hydromorph,
+             the outline, the river line, "Length (web page)", "Downstream waterbodies (web page)"]
     transformation:
-      - Downloads each catchment's shapefile from the EA, and reads its details, outline and river line.
-      - Reads its river length and the catchments upstream and downstream from its EA web page, which the download doesn't have.
-      - Works out its area from the outline.
+      - step: Downloads each catchment's shapefile from the EA, and reads its details, outline and river line.
+        example: Hole Brook's WB_NAME is Hole Brook, its MNCAT_NAME North Devon and its MANCAT_ID 3062.
+      - step: Reads its river length and the catchments upstream and downstream from its EA web page, which the download doesn't have.
+        example: "Hole Brook's page gives a length of 12.288 km, no waterbodies upstream, and one downstream: Lower River Okement (GB108050008130)."
+      - step: Works out its area from the outline.
+        example: Hole Brook's outline is 4,199.39 ha.
       - Adds a row for each catchment, or updates its row if it's already there.
+    example:
+      about: Hole Brook's shapefile and web page, as downloaded on 29 October 2026.
+      in:
+        - {WB_ID: GB108050014090, WB_NAME: Hole Brook, WB_CAT: River, RBD_ID: 8, RBD_NAME: South West, MANCAT_ID: 3062,
+           MNCAT_NAME: North Devon, OPCAT_ID: 3468, OPCAT_NAME: Torridge,
+           hydromorph: not designated artificial or heavily modified, the outline: (map area), the river line: (map line),
+           "Length (web page)": 12.288 km, "Downstream waterbodies (web page)": Lower River Okement}
+      out:
+        - {id: GB108050014090, name: Hole Brook, waterbody_type: River, river_basin_district_id: 8,
+           river_basin_district: South West, management_catchment_id: 3062, management_catchment: North Devon,
+           operational_catchment_id: 3468, operational_catchment: Torridge,
+           hydromorphological_designation: not designated artificial or heavily modified, area_ha: 4199.390378574183,
+           river_length_km: 12.288, boundary: (map area), river_line: (map line), upstream_ids: null,
+           downstream_ids: GB108050008130}
   ea_classifications:
     source: EA Catchment Data Explorer
     url: https://environment.data.gov.uk/catchment-planning/
@@ -91,10 +108,29 @@ filled:
     input: The EA's classifications.csv for each management catchment
     inputs: [Water Body ID, Classification Item, Year, Cycle, Classification Level, Status, Certainty]
     transformation:
-      - Downloads the EA's classifications file (CSV) for each management catchment the catchments are in.
-      - Keeps only the rows for the catchments in the Catchments table.
-      - Renames the EA's columns to the table's (e.g. Water Body ID to Catchment ID), and turns years and cycles into numbers.
+      - step: Downloads the EA's classifications file (CSV) for each management catchment the catchments are in.
+        example: North Devon's file (management catchment 3062) has 277 rows for Hole Brook.
+      - step: Keeps only the rows for the catchments in the Catchments table.
+        example: Hole Brook, GB108050014090, is in the Catchments table, so its rows are kept.
+      - step: Renames the EA's columns to the table's (e.g. Water Body ID to Catchment ID), and turns years and cycles into numbers.
+        example: Year "2019" (text in the CSV) becomes the number 2019, in the Year column.
       - Replaces every row in the table.
+    example:
+      about: Three of Hole Brook's 277 rows in North Devon's classifications.csv, as downloaded on 29 October 2026, with only the columns used (it has 21).
+      in:
+        - {Water Body ID: GB108050014090, Classification Item: Ecological, Year: "2019", Cycle: "3",
+           Classification Level: "Ecological, chemical or quantitative status", Status: Moderate, Certainty: Very Certain}
+        - {Water Body ID: GB108050014090, Classification Item: Phosphate, Year: "2019", Cycle: "3",
+           Classification Level: Element, Status: Moderate, Certainty: Very Certain}
+        - {Water Body ID: GB108050014090, Classification Item: Fish, Year: "2022", Cycle: "3",
+           Classification Level: Element, Status: High, Certainty: No Information}
+      out:
+        - {catchment_id: GB108050014090, item: Ecological, year: 2019, cycle: 3,
+           level: "Ecological, chemical or quantitative status", status: Moderate, certainty: Very Certain}
+        - {catchment_id: GB108050014090, item: Phosphate, year: 2019, cycle: 3, level: Element, status: Moderate,
+           certainty: Very Certain}
+        - {catchment_id: GB108050014090, item: Fish, year: 2022, cycle: 3, level: Element, status: High,
+           certainty: No Information}
   ea_rnags:
     source: EA Catchment Data Explorer
     url: https://environment.data.gov.uk/catchment-planning/
@@ -103,10 +139,41 @@ filled:
     inputs: [ID, Water Body ID, Cycle, Classification Element, Classification Status, Activity, Activity Certainty,
              Business Sector, Category, Swmi, National Swmi Header]
     transformation:
-      - Downloads the EA's reasons for not achieving good (CSV) for each management catchment the catchments are in.
-      - Keeps only the rows for the catchments in the Catchments table.
-      - Renames the EA's columns to the table's (e.g. Swmi to Source type).
+      - step: Downloads the EA's reasons for not achieving good (CSV) for each management catchment the catchments are in.
+        example: North Devon's file (management catchment 3062) has 8 rows for Hole Brook.
+      - step: Keeps only the rows for the catchments in the Catchments table.
+        example: Hole Brook, GB108050014090, is in the Catchments table, so its rows are kept.
+      - step: Renames the EA's columns to the table's (e.g. Swmi to Source type).
+        example: Swmi "Diffuse source" goes in Source type, and National Swmi Header "Pollution from rural areas" in National issue.
       - Replaces every row in the table.
+    example:
+      about: Three of Hole Brook's 8 rows in North Devon's rnags.csv, as downloaded on 29 October 2026, with only the columns used (it has 28).
+      in:
+        - {ID: "570848", Water Body ID: GB108050014090, Cycle: "3", Classification Element: Macrophytes and Phytobenthos Combined,
+           Classification Status: Moderate, Activity: Poor nutrient management, Activity Certainty: Probable,
+           Business Sector: Agriculture - Livestock, Category: Agriculture and rural land management, Swmi: Diffuse source,
+           National Swmi Header: Pollution from rural areas}
+        - {ID: "570847", Water Body ID: GB108050014090, Cycle: "3", Classification Element: Macrophytes and Phytobenthos Combined,
+           Classification Status: Moderate, Activity: Sewage discharge (continuous), Activity Certainty: Probable,
+           Business Sector: Waste water treatment, Category: Water Industry, Swmi: Point source,
+           National Swmi Header: Pollution from waste water}
+        - {ID: "570846", Water Body ID: GB108050014090, Cycle: "3", Classification Element: Macrophytes and Phytobenthos Combined,
+           Classification Status: Moderate, Activity: Farm/site infrastructure, Activity Certainty: Confirmed,
+           Business Sector: Agriculture - Livestock, Category: Agriculture and rural land management, Swmi: Point source,
+           National Swmi Header: Pollution from rural areas}
+      out:
+        - {id: 570848, catchment_id: GB108050014090, cycle: 3, element: Macrophytes and Phytobenthos Combined,
+           element_status: Moderate, activity: Poor nutrient management, activity_certainty: Probable,
+           business_sector: Agriculture - Livestock, category: Agriculture and rural land management,
+           source_type: Diffuse source, national_issue: Pollution from rural areas}
+        - {id: 570847, catchment_id: GB108050014090, cycle: 3, element: Macrophytes and Phytobenthos Combined,
+           element_status: Moderate, activity: Sewage discharge (continuous), activity_certainty: Probable,
+           business_sector: Waste water treatment, category: Water Industry, source_type: Point source,
+           national_issue: Pollution from waste water}
+        - {id: 570846, catchment_id: GB108050014090, cycle: 3, element: Macrophytes and Phytobenthos Combined,
+           element_status: Moderate, activity: Farm/site infrastructure, activity_certainty: Confirmed,
+           business_sector: Agriculture - Livestock, category: Agriculture and rural land management,
+           source_type: Point source, national_issue: Pollution from rural areas}
   storm_overflows:
     source: EA storm overflow annual returns
     url: https://www.data.gov.uk/dataset/event-duration-monitoring-storm-overflows-annual-returns
@@ -116,11 +183,47 @@ filled:
              Storm Discharge Asset Type, Outlet Discharge NGR, WFD Waterbody ID, "Receiving Water / Environment (common name)",
              Total Duration, Counted spills]
     transformation:
-      - "Downloads each year's return from 2021: a spreadsheet with a sheet per water company and a row per storm overflow."
-      - Finds each column by its heading, as they move between years.
-      - Keeps the overflows into a catchment in the Catchments table, by their WFD waterbody ID. Those with no ID (mostly into estuaries and the sea) are left out.
-      - "Turns the spill hours into numbers (blank or #N/A means no figure, not zero), and the grid reference into a latitude and longitude."
+      - step: "Downloads each year's return from 2021: a spreadsheet with a sheet per water company and a row per storm overflow."
+        example: The 2025 return has a row for each of Hole Brook's 5 overflows.
+      - step: Finds each column by its heading, as they move between years.
+        example: In 2025 the spill hours are under "Total Duration (hh:mm:ss) all spills prior to processing through 12-24h count method".
+      - step: Keeps the overflows into a catchment in the Catchments table, by their WFD waterbody ID. Those with no ID (mostly into estuaries and the sea) are left out.
+        example: EXBOURNE STW_SO_OKEHAMPTON's WFD Waterbody ID is GB108050014090, Hole Brook, so it's kept.
+      - step: "Turns the spill hours into numbers (blank or #N/A means no figure, not zero), and the grid reference into a latitude and longitude."
+        example: 319:14:24 becomes 319.24 hours, and SS60630198 becomes 50.8006, -3.9791.
       - "Replaces every row in the table: one per overflow per year."
+    example:
+      about: Three of Hole Brook's 5 rows in the 2025 return, as downloaded on 18 November 2026.
+      in:
+        - {Unique ID: SBB00423, Water Company Name: South West Water, "Site Name (WaSC operational)": EXBOURNE STW_SO_OKEHAMPTON,
+           EA Permit Reference: 200365/SF/01, Activity Reference on Permit: A2, Storm Discharge Asset Type: Inlet SO at WwTW,
+           Outlet Discharge NGR: SS60630198, WFD Waterbody ID: GB108050014090,
+           "Receiving Water / Environment (common name)": (S)TRIB. OF HOLE BROOK, Total Duration: "319:14:24", Counted spills: 84}
+        - {Unique ID: SBB01047, Water Company Name: South West Water,
+           "Site Name (WaSC operational)": SAMPFORD COURTENAY STW_SO_SAMPFORD COURT, EA Permit Reference: NRA-SW-3657,
+           Activity Reference on Permit: A3, Storm Discharge Asset Type: Inlet SO at WwTW, Outlet Discharge NGR: SS63370117,
+           WFD Waterbody ID: GB108050014090, "Receiving Water / Environment (common name)": TRIBUTARY OF HOLE BROOK,
+           Total Duration: "15:55:12", Counted spills: 15}
+        - {Unique ID: SBB00169, Water Company Name: South West Water,
+           "Site Name (WaSC operational)": BROADWOODKELLY STW_SSO_BROADWOODKELLY, EA Permit Reference: 202216,
+           Activity Reference on Permit: A2, Storm Discharge Asset Type: Storm tank at WwTW, Outlet Discharge NGR: SS61210568,
+           WFD Waterbody ID: GB108050014090, "Receiving Water / Environment (common name)": TRIBUTARY OF HOLE BROOK(S),
+           Total Duration: "143:51:36", Counted spills: 14}
+      out:
+        - {id: 1389, catchment_id: GB108050014090, year: 2025, company: South West Water, site_name: EXBOURNE STW_SO_OKEHAMPTON,
+           unique_id: SBB00423, permit_reference: 200365/SF/01, activity_reference: A2, asset_type: Inlet SO at WwTW,
+           receiving_water: (S)TRIB. OF HOLE BROOK, grid_reference: SS60630198, easting: 260630, northing: 101980,
+           latitude: 50.800572626099694, longitude: -3.979109944672232, spill_hours: 319.24, spill_count: 84}
+        - {id: 1462, catchment_id: GB108050014090, year: 2025, company: South West Water,
+           site_name: SAMPFORD COURTENAY STW_SO_SAMPFORD COURT, unique_id: SBB01047, permit_reference: NRA-SW-3657,
+           activity_reference: A3, asset_type: Inlet SO at WwTW, receiving_water: TRIBUTARY OF HOLE BROOK,
+           grid_reference: SS63370117, easting: 263370, northing: 101170, latitude: 50.79394588536847,
+           longitude: -3.939950214230557, spill_hours: 15.92, spill_count: 15}
+        - {id: 1463, catchment_id: GB108050014090, year: 2025, company: South West Water,
+           site_name: BROADWOODKELLY STW_SSO_BROADWOODKELLY, unique_id: SBB00169, permit_reference: "202216",
+           activity_reference: A2, asset_type: Storm tank at WwTW, receiving_water: TRIBUTARY OF HOLE BROOK(S),
+           grid_reference: SS61210568, easting: 261210, northing: 105680, latitude: 50.833964542369785,
+           longitude: -3.9722854259972897, spill_hours: 143.86, spill_count: 14}
   sewage_overflow_pressure:
     worked_out: true  # added up from the returns, not as downloaded
     source: EA storm overflow annual returns
@@ -129,10 +232,23 @@ filled:
     input: The same returns, as read into Storm Overflows
     inputs: [WFD Waterbody ID, Total Duration]
     transformation:
-      - Adds up the spill hours of all the overflows into each catchment in the latest year of the returns (2025 now). An overflow with no figure adds nothing, and a catchment with none has 0 hours. In Power BI, this is the DAX measure Total Spill Duration 2025 (in seconds).
-      - Matches overflows to catchments by their waterbody ID. The original matched by name, so it missed the few whose waterbody name the water company typed differently (e.g. MOLE).
-      - "Works out the pressure from the spill hours: Very High above 1,440 hours, High above 720, Medium above 240, Low above 120, otherwise Very Low. It's the Untreated Sewage tile in Risk Levels. In Power BI, this is the DAX measure Sewage Overflow Pressure (5,184,000, 2,592,000, 864,000 and 432,000 seconds)."
+      - step: Adds up the spill hours of all the overflows into each catchment in the latest year of the returns (2025 now). An overflow with no figure adds nothing, and a catchment with none has 0 hours. In Power BI, this is the DAX measure Total Spill Duration 2025 (in seconds).
+        example: Hole Brook in 2025, its 5 overflows' hours added up, 319.24 + 15.92 + 143.86 + 1.7 + 0, is 480.72 hours.
+      - step: Matches overflows to catchments by their waterbody ID. The original matched by name, so it missed the few whose waterbody name the water company typed differently (e.g. MOLE).
+        example: All 5 have Hole Brook's ID, GB108050014090, so all 5 are added up for Hole Brook.
+      - step: "Works out the pressure from the spill hours: Very High above 1,440 hours, High above 720, Medium above 240, Low above 120, otherwise Very Low. It's the Untreated Sewage tile in Risk Levels. In Power BI, this is the DAX measure Sewage Overflow Pressure (5,184,000, 2,592,000, 864,000 and 432,000 seconds)."
+        example: 480.72 hours is above 240 but not above 720, so Medium.
       - Replaces every row in the table, at the same time as Storm Overflows.
+    example:
+      about: Hole Brook's 5 rows in the 2025 return, as downloaded on 18 November 2026, with only the columns used.
+      in:
+        - {Site Name (WaSC operational): EXBOURNE STW_SO_OKEHAMPTON, WFD Waterbody ID: GB108050014090, Total Duration: "319:14:24"}
+        - {Site Name (WaSC operational): SAMPFORD COURTENAY STW_SO_SAMPFORD COURT, WFD Waterbody ID: GB108050014090, Total Duration: "15:55:12"}
+        - {Site Name (WaSC operational): BROADWOODKELLY STW_SSO_BROADWOODKELLY, WFD Waterbody ID: GB108050014090, Total Duration: "143:51:36"}
+        - {Site Name (WaSC operational): HAYES BARN EXBOURNE_CSO_EXBOURNE, WFD Waterbody ID: GB108050014090, Total Duration: "1:42:00"}
+        - {Site Name (WaSC operational): SAMPFORD COURTENAY STW_SSO_SAMPFORD COUR, WFD Waterbody ID: GB108050014090, Total Duration: "0:00:00"}
+      out:
+        - {catchment_id: GB108050014090, year: 2025, spill_hours: 480.72, pressure: Medium}
   river_obstacles:
     source: River Obstacles (EA and The Rivers Trust)
     url: https://river-obstacles-theriverstrust.hub.arcgis.com/
@@ -140,9 +256,27 @@ filled:
     input: Every obstacle in the box around the catchments, from River Obstacles' map service
     inputs: [globalid, ea_obstructid, site_name, obstacle_type, origin, status, the point]
     transformation:
-      - Downloads every obstacle in the box around the catchments from River Obstacles' map service.
-      - Keeps those inside a catchment's outline, and gives each that catchment's ID.
+      - step: Downloads every obstacle in the box around the catchments from River Obstacles' map service.
+        example: 762 obstacles, in a box from Exmoor to Dartmoor.
+      - step: Keeps those inside a catchment's outline, and gives each that catchment's ID.
+        example: The culvert at 50.85178, -3.98447 is inside Hole Brook's outline, so it's kept, with Hole Brook's ID, GB108050014090.
       - Replaces every row in the table.
+    example:
+      about: Three of the obstacles in Hole Brook, as downloaded on 29 October 2026.
+      in:
+        - {globalid: 8ba07b1c-3da6-4b25-86f1-996f6c0a1f21, ea_obstructid: 38566, site_name: null, obstacle_type: culvert,
+           origin: artificial, status: null, the point: "-3.98447, 50.85178"}
+        - {globalid: 7b10b96a-42b2-4564-b376-ae9817d243e6, ea_obstructid: 38592, site_name: null, obstacle_type: culvert,
+           origin: artificial, status: null, the point: "-3.97794, 50.85519"}
+        - {globalid: 0bbba9d2-382b-4d35-af50-739cc6f7adea, ea_obstructid: 38602, site_name: null, obstacle_type: ford,
+           origin: artificial, status: null, the point: "-3.97236, 50.85663"}
+      out:
+        - {id: 8ba07b1c-3da6-4b25-86f1-996f6c0a1f21, ea_id: 38566, catchment_id: GB108050014090, site_name: null,
+           obstacle_type: culvert, origin: artificial, status: null, latitude: 50.851780939, longitude: -3.98447373999994}
+        - {id: 7b10b96a-42b2-4564-b376-ae9817d243e6, ea_id: 38592, catchment_id: GB108050014090, site_name: null,
+           obstacle_type: culvert, origin: artificial, status: null, latitude: 50.8551925360001, longitude: -3.97794068199994}
+        - {id: 0bbba9d2-382b-4d35-af50-739cc6f7adea, ea_id: 38602, catchment_id: GB108050014090, site_name: null,
+           obstacle_type: ford, origin: artificial, status: null, latitude: 50.8566270580001, longitude: -3.97236051999994}
   postcodes:
     source: Ordnance Survey Code-Point Open
     url: https://osdatahub.os.uk/downloads/open/CodePointOpen
@@ -151,18 +285,24 @@ filled:
     inputs: [Postcode, Positional_quality_indicator, Eastings, Northings]
     transformation:
       - Downloads Code-Point Open, the centre point of every postcode in Great Britain.
-      - Keeps the postcodes whose centre is inside a catchment's outline, and gives each that catchment's ID. The rest (e.g. by an estuary or the sea) are left out.
-      - Turns each centre from British National Grid into a latitude and longitude.
+      - step: Keeps the postcodes whose centre is inside a catchment's outline, and gives each that catchment's ID. The rest (e.g. by an estuary or the sea) are left out.
+        example: EX19 8AR's centre is inside Hole Brook's outline, so it's kept, with Hole Brook's ID, GB108050014090.
+      - step: Turns each centre from British National Grid into a latitude and longitude.
+        example: Eastings 261726, Northings 107532 becomes 50.850732, -3.965662.
       - Replaces every row in the table.
+    example:
+      about: Three of Hole Brook's 88 postcodes in Code-Point Open's ex.csv, as downloaded on 13 November 2026, with only the columns used.
+      in:
+        - {Postcode: EX19 8AR, Positional_quality_indicator: 10, Eastings: 261726, Northings: 107532}
+        - {Postcode: EX19 8AS, Positional_quality_indicator: 10, Eastings: 261111, Northings: 107241}
+        - {Postcode: EX19 8AT, Positional_quality_indicator: 10, Eastings: 260719, Northings: 107013}
+      out:
+        - {postcode: EX19 8AR, catchment_id: GB108050014090, latitude: 50.850732, longitude: -3.965662}
+        - {postcode: EX19 8AS, catchment_id: GB108050014090, latitude: 50.84797, longitude: -3.974283}
+        - {postcode: EX19 8AT, catchment_id: GB108050014090, latitude: 50.845826, longitude: -3.979761}
   locations:
     how: command
     note: Changed with a database command for now (see OPERATING.md).
-  uploads:
-    how: admin
-    note: The admin page adds a row each time someone uploads a file (an Excel table or a source file).
-  publishes:
-    how: admin
-    note: The admin page adds a row each time someone presses Publish. The publish command adds one too.
 
 # Where each table is shown on the dashboards, so someone looking at a panel can find the table
 # to update. Each table's box in the diagram's third column lists its panels, by page.
@@ -231,9 +371,10 @@ dashboard:
 # each table's number on the panels it's in, and its box in the diagram has the same number.
 #
 # Every table on the dashboards has one (every table in `dashboard` above, and Catchments and
-# Locations: the waterbodies' names and outlines, and which are on each dashboard). They're in the
-# diagram's order, top to bottom. Once given, a number stays with its table: give a new table the
-# next number up, then take the screenshots again (screenshots/README.md).
+# Locations: the waterbodies' names and outlines, and which are on each dashboard). They were
+# given in the diagram's order, top to bottom, before the downloaded tables moved to the bottom
+# (20 November 2026). Once given, a number stays with its table: give a new table the next number
+# up, then take the screenshots again (screenshots/README.md).
 numbers:
   catchments: 1
   ea_classifications: 2
@@ -268,4 +409,3 @@ links:
   - {from: catchments.upstream_ids, to: catchments}
   - {from: catchments.downstream_ids, to: catchments}
   - {from: datasets.table_name, to: data tables}
-  - {from: uploads.uploaded_to, to: excel tables}  # or a source file's code

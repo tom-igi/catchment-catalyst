@@ -7,6 +7,7 @@ import pytest
 import sqlalchemy as sa
 from openpyxl import Workbook
 
+from catalyst.admin import examples
 from catalyst.db import load_schema
 from catalyst.db.sync import apply_changes
 from catalyst.importers import inputs
@@ -316,6 +317,21 @@ def test_habitat_works_out_each_share_and_coverage(database):
     assert "Bog isn't a habitat the original's formula gives a relative coverage for, so it's left empty." in result.notes
 
 
+def test_habitats_share_says_its_example_in_words(database):
+    """For the admin page's Transformation panel: a share needs all the waterbody's habitats to show it."""
+    data = habitat_file(("Abbey River", "Farmland", 1, "6000000"), ("Abbey River", "Urban", 1, "4000000"),
+                        ("Badgworthy Water", "Woodland", 1, "1000000"))
+    result = run(database, data, "Nat Eng Simplified Habitat.csv", source=HABITAT)
+    with database.connect() as conn:
+        made = examples.for_input(conn, SCHEMA, HABITAT, result)["habitat_land_use"]
+    assert made["waterbody"] == "Abbey River"  # the most rows in the file
+    steps = examples.shown(made, HABITAT.table_steps("habitat_land_use"))["steps"]
+    assert steps[3] == "Farmland: 600 ha ÷ 1,000 ha (all 2: 600 + 400) × 100 = 60%"  # (steps[0] matches it to a catchment)
+    assert steps[2] == {"in": [["SUM_SHAPE_Area", "6000000", False]], "out": [["area_ha", 600.0]]}  # as in the file: text
+    # Its rows, highlighted, and one of the next waterbody's, as it has only two.
+    assert ([row[1] for row in made["out"]["rows"]], made["out"]["example"]) == (["Farmland", "Urban", "Woodland"], [0, 1])
+
+
 @pytest.mark.parametrize("name, share, level", [
     ("Farmland", 0.60, "High"), ("Farmland", 0.5999, "Medium"), ("Farmland", 0.39, "Low"),
     ("not farmed", 0.08, "Medium"), ("Urban", 0.06, "High"), ("Urban", 0.029, "Low"), ("Woodland", 0.1, "Medium"),
@@ -502,6 +518,35 @@ def test_classification_facts_work_out_the_values_and_thresholds(database):
     assert thresholds[BADGWORTHY, "Fish (EQR)"] == (0.7, 0.4, 0.2, 0.03)  # fixed
     assert thresholds[BADGWORTHY, "Inverts ASPT (EQR)"] == (0.97, 0.86, 0.72, 0.59)  # for every waterbody in the file
     assert (BADGWORTHY, "Phosphate (mg/l)") not in thresholds  # it has no boundaries
+
+
+def test_classification_facts_say_their_examples_in_words(database):
+    """For the admin page's Transformation panel: an average or median of the year's facts, with the facts."""
+    data = workbook(("Classification Data", [
+        FACT_HEADINGS,
+        fact(ABBEY, 2025, "Fish", "EQR", "0.5054"), fact(ABBEY, 2025, "Fish", "EQR", "0.4556"),
+        fact(ABBEY, 2019, "Phosphate", "Phosphate", "0.0465"),  # one fact in 2019, but four in 2022: that's shown
+        *[fact(ABBEY, 2022, "Phosphate", "Phosphate", v) for v in ("0.05", "0.06", "0.07", "0.08")],
+        fact(ABBEY, 2019, "Phosphate", "Good/Moderate Boundary - mg/l", "0.04"),
+        *[fact(ABBEY, 2022, "Phosphate", f"{b} Boundary - mg/l", v)
+          for b, v in [("High/Good", "0.03"), ("Good/Moderate", "0.048"), ("Moderate/Poor", "0.1"), ("Poor/Bad", "0.5")]],
+        fact(BADGWORTHY, 2022, "Fish", "EQR", "0.1"),
+    ]))
+    result = run(database, data, "North Devon WB Classification Facts Data.xlsx", source=FACTS)
+    with database.connect() as conn:
+        made = examples.for_input(conn, SCHEMA, FACTS, result)
+    assert made["ea_scores"]["waterbody"] == made["ea_thresholds"]["waterbody"] == "Abbey River"  # the same in each
+    steps = FACTS.table_steps("ea_scores")
+    said = dict(zip((step.text.split(":")[0] for step in steps), examples.shown(made["ea_scores"], steps)["steps"]))
+    assert said["Fish (EQR)"] == "In 2025, the average of 0.5054 and 0.4556 is 0.4805, which rounds to 0.481"
+    assert said["Phosphate (mg/l)"] == "In 2022, the median of 0.05, 0.06, 0.07 and 0.08 is 0.065"
+    assert said["Ammonia (mg/l)"] is None  # Abbey River has no ammonia facts
+    assert said["From the value (before rounding) and its thresholds"] == \
+        "Fish (EQR) in 2025: 0.481, with High at 0.7, Good 0.4, Moderate 0.2 and Poor 0.03, is Good"
+    steps = FACTS.table_steps("ea_thresholds")
+    boundaries = examples.shown(made["ea_thresholds"], steps)["steps"][-1]
+    assert boundaries == ("Phosphate (mg/l): its boundaries in 2022, the latest year with them: High/Good 0.03, "
+                          "Good/Moderate 0.048, Moderate/Poor 0.1, Poor/Bad 0.5")
 
 
 def test_classification_facts_list_a_year_that_isnt_one(database):

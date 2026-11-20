@@ -48,12 +48,16 @@ published dashboards at <http://localhost:8080>.
 
 The admin page is a diagram of every table: where its data comes from and how they join up.
 Click a table to see its columns and download it as Excel (any table; map shapes are left
-out). On the left, where the data comes from, each import command has a box (with the
-source's website and the command that downloads its tables again), each source file
-(**Upload file**, to upload it as it came, with the Power BI dashboard's formulas as its
-transformation), and each table filled by Excel upload (**Upload data**, to upload an edited copy). It's made from `schema.yaml` each time it's opened, plus
-`backend/catalyst/admin/diagram.yaml` (the sections, and where each downloaded table comes
-from, its website and its command: add a new importer's table there).
+out). On the left, where the data comes from: first each source file (**Upload file**, to
+upload it as it came, with the Power BI dashboard's formulas as its transformation), then each
+table filled by Excel upload (**Upload data**, to upload an edited copy), then at the bottom
+each import command (with the source's website and the command that downloads its tables
+again). Click a box in the Transformation column to see real data going through it: a few
+rows coming in, each step done to one waterbody's rows, and the rows that go into the table.
+The admin page's own records (Uploads and Publishes) aren't shown. It's made from
+`schema.yaml` each time it's opened, plus `backend/catalyst/admin/diagram.yaml` (the
+sections, and where each downloaded table comes from, its website, its command and its
+example: add a new importer's table there).
 
 To connect a database client (DBeaver, pgAdmin, etc.): host `localhost`, port `5434`,
 database / user / password `catalyst`. To change these, copy `.env.example` to `.env`.
@@ -143,9 +147,11 @@ If a formula or one of its tables changes later, click **Work it out again** in 
 place. It works the tables out again from the last approved file, with the formulas as they
 are now, and shows the preview as an upload does, without anyone uploading the file again.
 
-Each of its tables has a **Power BI's formulas** box in the Transformation column: its inputs
-(the file's columns it reads), the function (how each of the table's columns is worked out, with
-where that is in the Power BI file), and the table. To add another source file, see `backend/catalyst/importers/inputs/__init__.py`.
+Each of its tables has a **Power BI's formulas** box in the Transformation column. Click it to
+see the last approved file going through the formulas: a few of its rows (with only the columns
+used), each step done to one waterbody's rows (with where it is in the Power BI file), and the
+rows they make in the table. The examples are made when the file is uploaded and kept with it
+(`backend/catalyst/admin/examples.py`). To add another source file, see `backend/catalyst/importers/inputs/__init__.py`.
 
 ### From Excel (the admin page)
 

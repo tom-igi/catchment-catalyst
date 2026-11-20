@@ -3,7 +3,7 @@
 Where the build is up to, the decisions made along the way, and what's next.
 For the overall design, see [PLAN.md](PLAN.md). For commands, see [README.md](README.md).
 
-**Last updated:** 20 November 2026 (the Waterbody Lookup's five tables merged into Waterbody Figures; the admin page says how the data tables are split and what each holds; large Excel downloads fixed; uploaded files kept in the database; Work it out again for source files; where the figures are worked out, written down)
+**Last updated:** 20 November 2026 (the Waterbody Lookup's five tables merged into Waterbody Figures; the admin page says how the data tables are split and what each holds; large Excel downloads fixed; uploaded files kept in the database; Work it out again for source files; where the figures are worked out, written down; downloads moved to the bottom of the admin page, Uploads and Publishes taken off it, and each Transformation shown with real data)
 
 ---
 
@@ -15,7 +15,7 @@ Tom to run things himself, 29 October 2026).
 ```bash
 docker compose up -d                      # start the local database, admin page and dashboard preview
 docker compose run --rm schema plan       # should say "The database already matches schema.yaml."
-docker compose run --rm test              # run the tests (287 passing at the last update)
+docker compose run --rm test              # run the tests (291 passing at the last update)
 docker compose run --rm publish           # rebuild the dashboard pages (or the admin page's Publish button)
 ```
 
@@ -152,6 +152,26 @@ The scripts that built and uploaded the files were one-offs, kept outside the pr
   for each table, whose panel shows its inputs, the function (a step for each column: from which inputs, how,
   and where in the Power BI file) and the table. A test checks every column of every source file's tables is
   explained.
+- **Each transformation is shown with real data** (Tom, 20 November 2026: "an example of the table coming in,
+  then the transformation with an actual example, then an example of the table out"). Its panel has three
+  parts: **Coming in** (a few rows of the file, with only the columns used), **What's done** (each step, done to
+  one waterbody's rows: its inputs' values, then its columns', or in words where that doesn't show it, e.g. "In
+  2025, the median of 0.11392, 0.20192, 0.23981 and 0.14571 is 0.173815, which rounds to 0.174") and **Going
+  out** (the rows they make in the table). The waterbody is the one with the most rows and figures, the same in
+  every table the file fills. A source file's and an Excel table's are made from its last approved file when
+  it's uploaded, and kept with the upload (the uploads table's `examples` column, `admin/examples.py`), as the EA
+  classification facts file takes 30 seconds to read. Older uploads' were made the first time their panel was
+  opened, and they're made again if a step's words change. A downloaded table's is copied into `diagram.yaml`
+  (Hole Brook, which has something in every download), as its downloads aren't on the admin container; it says
+  which download it's from. Improvement Information and Water UK's plans have never had a file approved here, so
+  their panels say so and show the table as it is.
+- **Source files first, downloads last** (Tom, 20 November 2026): the admin page's rows go source files, Excel
+  tables, then the downloads, so what people upload is at the top. The numbers stay with their tables (as on the
+  screenshots), so the page now reads 8 to 23, then 1 to 7. Catchments' line runs along its source's row and up
+  into it.
+- **Uploads and Publishes are off the admin page** (Tom, 20 November 2026, "so this is just a technical page"):
+  `left_off` in `diagram.yaml`. They're still in the database and its backups, each upload is listed in its
+  table's or source file's panel, and both can still be downloaded at `/admin/tables/<name>/download`.
 - **Each table says how it's filled** with `filled_by` in the master file: `api` (an importer, in `importers/api/`), `excel` (the admin page, using the shared code in `importers/excel/`) or `input` (a source file uploaded as it came, with its own code in `importers/inputs/`). Only `excel` tables can be uploaded as an edited copy, and source files have their own uploads; every table can be downloaded. The diagram shows which is which.
 - **An Excel table's upload is an exact copy of the table.** Same column names (any order), first sheet. No column mapping screen and no code per table. (Source files are the exception: see the first point above.)
 - **Each upload replaces the whole table**, rather than only adding rows. One process covers adding, correcting and deleting, so no editing screen is needed. The workflow is: download, edit, upload.
@@ -434,7 +454,7 @@ database the same, so literally just adding the data")
 - **The live admin login is `tom`** (made with `hash-password`).
 - **Before the DNS record, view it through an SSH tunnel** to the containers (their addresses from `docker inspect … catchment-catalyst-web-1 catchment-catalyst-admin-1`): dashboards at <http://localhost:8081/north-devon/>, admin at <http://localhost:8001/admin>.
 - **SSH from WSL to the VM** works since WSL's own key was added to the VM's `~/.ssh/authorized_keys` (Windows already had its own, different key).
-- **Updating the VM after 20 November 2026: copy the database from the laptop again,** as above. The uploaded files are in the database now (the uploads table's `file` column), so `imports/raw/` no longer needs copying for them, and the admin container no longer mounts `imports/`. A `git pull` and `schema apply` alone would be refused (the required `file` column can't be added to the VM's existing uploads), which is safe: nothing would change.
+- **Updating the VM after 20 November 2026: copy the database from the laptop again,** as above. The uploaded files are in the database now (the uploads table's `file` column), so `imports/raw/` no longer needs copying for them, and the admin container no longer mounts `imports/`. The Transformation panels' examples (the uploads table's `examples` column) come with it too. A `git pull` and `schema apply` alone would be refused (the required `file` column can't be added to the VM's existing uploads), which is safe: nothing would change.
 - **Still to do:** nightly backups (until then, the only copy of the live data is `backups/catalyst.dump` on the laptop, as of 12 November) and OPERATING.md §2 and §3. **To start again on the VM:** `docker compose down` in the folder first, then `sudo rm -rf /opt/catchment-catalyst` (the database is in `db-data/`, so nothing is left elsewhere apart from Docker images).
 - **The dashboards can be embedded** in another site, such as Smart Biosphere's (no `X-Frame-Options`). The admin page can't be.
 

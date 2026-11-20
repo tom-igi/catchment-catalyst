@@ -3,7 +3,8 @@
 Every file that gets as far as a preview gets a row in the uploads table, with
 the file kept exactly as it was uploaded (its `file` column), so it's in the
 database's backups. (Until 20 November 2026 they were kept in imports/raw/.)
-The file is only read when it's needed: the lists here leave it out.
+The file is only read when it's needed: the lists here leave it out, and its
+examples (the Transformation panels' real data, catalyst.admin.examples) too.
 
 A source file can also be worked out again from an earlier upload's file, with
 its formulas as they are now: that's a new upload of the same file, with
@@ -37,6 +38,7 @@ def create(
     comparisons: dict[str, Comparison],
     source_file: bool = False,
     worked_out_again_from: int | None = None,
+    examples: dict | None = None,
 ) -> int:
     """Record the upload, with its file. Returns the upload's ID.
 
@@ -47,7 +49,8 @@ def create(
         uploads.insert()
         .values(
             uploaded_to=uploaded_to, file_name=file_name, file=data, uploaded_by=user, rows_in_file=rows_in_file,
-            worked_out_again_from=worked_out_again_from, **_counts(comparisons, source_file),
+            worked_out_again_from=worked_out_again_from, examples=examples if examples is not None else sa.null(),
+            **_counts(comparisons, source_file),
         )
         .returning(uploads.c.id)
     ).scalar_one()
@@ -62,6 +65,17 @@ def file(conn: sa.Connection, schema: Schema, upload_id: int) -> bytes:
     """The upload's file, as it was uploaded."""
     uploads = _table(schema)
     return bytes(conn.execute(sa.select(uploads.c.file).where(uploads.c.id == upload_id)).scalar_one())
+
+
+def examples(conn: sa.Connection, schema: Schema, upload_id: int) -> dict | None:
+    """The upload's examples, by table (None if they haven't been made: see catalyst.admin.examples)."""
+    uploads = _table(schema)
+    return conn.scalar(sa.select(uploads.c.examples).where(uploads.c.id == upload_id))
+
+
+def keep_examples(conn: sa.Connection, schema: Schema, upload_id: int, made: dict) -> None:
+    uploads = _table(schema)
+    conn.execute(uploads.update().where(uploads.c.id == upload_id).values(examples=made))
 
 
 def recent(conn: sa.Connection, schema: Schema, uploaded_to: str, limit: int = 10) -> list[sa.Row]:
@@ -122,6 +136,6 @@ def _table(schema: Schema) -> sa.Table:
 
 
 def _select(schema: Schema) -> sa.Select:
-    """The uploads' rows without their files, which are only read when needed (see `file`)."""
+    """The uploads' rows without their files and examples, which are only read when needed (see `file`)."""
     uploads = _table(schema)
-    return sa.select(*(c for c in uploads.columns if c.name != "file"))
+    return sa.select(*(c for c in uploads.columns if c.name not in {"file", "examples"}))

@@ -29,7 +29,7 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from catalyst.importers.excel import FileRow
 
-from .common import Input, SourceRow, Step
+from .common import Example, Input, SourceRow, Step
 
 SHEET = "Classification Data"
 ID, YEAR, ITEM, FACT, CODE, SET_TYPE, VALUE = (
@@ -185,6 +185,66 @@ def work_out(rows: list[SourceRow], problems: list[str], notes: list[str]) -> di
 
 # --- In words, for the admin page --------------------------------------------------------
 
+def _listed(values: list[float], most: int = 8) -> str:
+    """e.g. 0.71, 0.74 and 0.72; or the first 8 and how many more. As in the file, not rounded."""
+    shown = [f"{v:g}" for v in values[:most]]
+    if len(values) > most:
+        return f"{', '.join(shown)} and {len(values) - most} more"
+    return shown[0] if len(shown) == 1 else f"{', '.join(shown[:-1])} and {shown[-1]}"
+
+
+def _value_example(measure: Measure):
+    """The measure's value for the waterbody in the year with the most facts (the latest, if several have as many):
+    e.g. In 2019, the average of 0.71, 0.74 and 0.72 is 0.72333, which rounds to 0.723."""
+    def example(ex: Example) -> str | None:
+        found = {row["year"]: row["value"] for row in ex.out if row["measure"] == measure.name}
+        facts = {year: [] for year in found}
+        for row in ex.rows:
+            year = _number(row.cells.get(YEAR))
+            if year in facts and measure.pick(row.cells) and (number := _number(row.cells.get(VALUE))) is not None:
+                facts[year].append(number)
+        if not found or not any(facts.values()):
+            return None
+        year = max(found, key=lambda y: (len(facts[y]), y))
+        values, shown = facts[year], found[year]
+        if len(values) == 1:
+            worked = f"In {year}, its one fact is {values[0]:g}"
+        else:
+            raw = statistics.fmean(values) if measure.how == "average" else statistics.median(values)
+            worked = f"In {year}, the {measure.how} of {_listed(values)} is {raw:.6g}"
+        return worked + (f", which rounds to {shown:g}" if f"{shown:g}" != f"{values[0] if len(values) == 1 else raw:.6g}" else "")
+    return example
+
+
+def _status_example(ex: Example) -> str | None:
+    """e.g. Fish (EQR) in 2025: 0.723, with High at 0.7, Good 0.4, Moderate 0.2 and Poor 0.03, is High."""
+    row = next((row for row in ex.out if row["status"]), None)
+    limits = next((t for t in ex.tables.get("ea_thresholds", []) if row and t["measure"] == row["measure"]), None)
+    if row is None or limits is None:
+        return None
+    return (f"{row['measure']} in {row['year']}: {row['value']:g}, with High at {limits['high']:g}, Good {limits['good']:g}, "
+            f"Moderate {limits['moderate']:g} and Poor {limits['poor']:g}, is {row['status']}")
+
+
+def _boundary_example(ex: Example) -> str | None:
+    """e.g. Phosphate (mg/l): its boundaries in 2022, the latest year with them, are 0.036, 0.069, 0.164 and 1.003."""
+    for row in ex.out:
+        measure = next((m for m in MEASURES if m.name == row["measure"] and m.boundary), None)
+        if measure is None:
+            continue
+        item, unit = measure.boundary
+        years = {
+            int(year) for r in ex.rows
+            if str(r.cells.get(ITEM) or "").casefold() == item.casefold()
+            and str(r.cells.get(FACT) or "").casefold().endswith(f"boundary - {unit}".casefold())
+            and (year := _number(r.cells.get(YEAR))) is not None
+        }
+        found = ", ".join(f"{BOUNDARIES[level]} {row[level]:g}" for level in LEVELS if row[level] is not None)
+        latest = f" in {max(years)}, the latest year with them" if years else ""
+        return f"{measure.name}: its boundaries{latest}: {found}"
+    return None
+
+
 def _score_steps() -> tuple[Step, ...]:
     groups: dict[str, list[str]] = {}
     for m in MEASURES:
@@ -198,11 +258,12 @@ def _score_steps() -> tuple[Step, ...]:
         ),
         *(Step(("value",), (*m.reads, YEAR, VALUE),
                f"{m.name}: {m.words}, rounded to {m.decimals} decimal places (halves up).",
-               f"DAX measures EA Classification Data[{m.power_bi}]") for m in MEASURES),
+               f"DAX measures EA Classification Data[{m.power_bi}]", _value_example(m)) for m in MEASURES),
         Step(
             ("status",), ("value", "EA Thresholds"),
             f"From the value (before rounding) and its thresholds: {status}.",
             "DAX measures EA Classification Data[EAColour2016] … [EAColour2025] (each value's colour)",
+            _status_example,
         ),
     )
 
@@ -227,6 +288,7 @@ def _threshold_steps() -> tuple[Step, ...]:
             f"Physico-chemistry's ({read}): the waterbody's High/Good, Good/Moderate, Moderate/Poor and Poor/Bad "
             "Boundary facts, from the latest year that has each (the largest, if there are several).",
             "DAX measures EA Classification Data[AmmoniaHigh], [AmmoniaGood] … (MAX in the LatestYear)",
+            _boundary_example,
         ),
     )
 

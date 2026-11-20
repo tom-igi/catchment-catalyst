@@ -4,12 +4,15 @@
 `title`, `description` and `filled_by`, each column's `description` and
 `example`), plus the sections, where each downloaded table comes from (with its
 web page and command), what's done to its data on the way in (its
-transformation), where each data table is shown on the dashboards and the extra
-links from diagram.yaml, each table's number (as on the numbered screenshots of
-the dashboards), and each source file (catalyst.importers.inputs) with the
-tables it fills and the original Power BI dashboard's formulas it uses. The
-admin page adds the row counts and the uploads, and templates/home.html draws
-the diagram from them.
+transformation, with a downloaded table's example), where each data table is
+shown on the dashboards and the extra links from diagram.yaml, each table's
+number (as on the numbered screenshots of the dashboards), and each source file
+(catalyst.importers.inputs) with the tables it fills and the original Power BI
+dashboard's formulas it uses. The admin page adds the row counts and the
+uploads, and templates/home.html draws the diagram from them. (A source file's
+or Excel table's example is made from its last approved file: examples.py.)
+
+The tables in `left_off` (the admin page's own records) aren't on the page.
 
 It's made each time the page is opened, so it always matches the schema.yaml
 the admin page is running. When you add a table filled by an importer, add it
@@ -76,7 +79,8 @@ def model(schema: Schema | None = None, counts: dict[str, int] | None = None,
     if problems:
         raise ValueError(" ".join(problems))
 
-    sections = _sections(schema, config)
+    left_off = _left_off(schema, config.get("left_off") or [])
+    sections = _sections(schema, config, left_off)
     shown = _dashboard(schema, config.get("dashboard") or {})
     numbers = _numbers(schema, config.get("numbers") or {}, shown)
     return {
@@ -89,7 +93,7 @@ def model(schema: Schema | None = None, counts: dict[str, int] | None = None,
              "number": numbers.get(t.name), "transform": _transform(t, filled.get(t.name) or {})}
             for s in sections for t in s.tables
         ],
-        "links": _links(schema, config.get("links") or []),
+        "links": [l for l in _links(schema, config.get("links") or []) if not {l["from"], l["to"]} & left_off],
         "holds": [{"key": key, "label": label, "text": text} for key, (label, text) in HOLDS.items()],
         "inputs": [_input(source) for source in inputs.INPUTS.values() if source.name in schema.input_tables.values()],
     }
@@ -112,7 +116,8 @@ def _input(source: inputs.Input) -> dict:
 
 def _transform(table: sa.Table, filled: dict) -> dict | None:
     """A table's transformation, the diagram's middle column: its inputs, and the steps (the function) that turn
-    them into the table's columns. None for a table no data comes into (e.g. Uploads)."""
+    them into the table's columns, with a downloaded table's example. None for a table no data comes into (e.g.
+    Locations)."""
     fill = table.info.get("filled_by")
     columns = [c.name for c in table.columns]
     if fill == "input":
@@ -123,16 +128,20 @@ def _transform(table: sa.Table, filled: dict) -> dict | None:
             for step in source.table_steps(table.name)
         ]
         return {
-            "kind": "input", "name": "Power BI's formulas", "sub": _counts(len(read), len(steps)),
+            "kind": "input", "name": "Power BI's formulas", "sub": _steps(len(steps)),
             "from": source.title, "input": source.name, "file": source.file, "sheet": source.table_sheet(table.name),
             "inputs": read, "steps": steps,
         }
     if fill == "api":
         read = filled.get("inputs") or []
-        steps = [{"columns": [], "inputs": [], "text": step, "power_bi": ""} for step in filled.get("transformation") or []]
+        steps = [
+            {"columns": [], "inputs": [], "text": _step_text(step), "power_bi": "", "example": _step_example(step)}
+            for step in filled.get("transformation") or []
+        ]
         return {
-            "kind": "api", "name": "Reshaped", "sub": _counts(len(read), len(steps)) if read else "By the importer",
+            "kind": "api", "name": "Reshaped", "sub": _steps(len(steps)) if steps else "By the importer",
             "from": filled.get("source"), "file": filled.get("input"), "sheet": None, "inputs": read, "steps": steps,
+            "example": _api_example(table, filled.get("example")),
         }
     if fill == "excel":
         return {
@@ -147,15 +156,53 @@ def _transform(table: sa.Table, filled: dict) -> dict | None:
     return None
 
 
-def _counts(columns: int, steps: int) -> str:
-    """e.g. 11 columns in, 5 steps."""
-    return f"{columns} column{'' if columns == 1 else 's'} in, {steps} step{'' if steps == 1 else 's'}"
+def _steps(steps: int) -> str:
+    """e.g. 5 steps."""
+    return f"{steps} step{'' if steps == 1 else 's'}"
 
 
-def _sections(schema: Schema, config: dict) -> list[Section]:
-    """The sections from diagram.yaml, with every table in exactly one."""
+def _step_text(step) -> str:
+    """A downloaded table's step: a sentence, or `step` and its `example`."""
+    return step if isinstance(step, str) else step["step"]
+
+
+def _step_example(step) -> str | None:
+    return None if isinstance(step, str) else step.get("example")
+
+
+def _api_example(table: sa.Table, example) -> dict | None:
+    """A downloaded table's example from diagram.yaml: a few rows of the download (`in`), and the same rows in the
+    table (`out`), each as {columns, rows}, as a source file's are (examples.py)."""
+    if example is None:
+        return None
+    problem = f"The `filled` list in diagram.yaml gives {table.name} an example"
+    if not isinstance(example, dict) or set(example) - {"about", "in", "out"}:
+        raise ValueError(f"{problem} that isn't `about`, `in` and `out`")
+    shown = {}
+    for side in ("in", "out"):
+        rows = example.get(side)
+        if not isinstance(rows, list) or not rows or not all(isinstance(row, dict) for row in rows):
+            raise ValueError(f"{problem} without `{side}`: a list of rows, each a column's name and its value")
+        columns = list(dict.fromkeys(name for row in rows for name in row))
+        if side == "out" and (unknown := [name for name in columns if name not in table.columns]):
+            raise ValueError(f"{problem} with {', '.join(unknown)}, which isn't one of its columns in schema.yaml")
+        shown[side] = {"columns": columns, "rows": [[row.get(name) for name in columns] for row in rows]}
+    return {"about": str(example.get("about") or ""), **shown}
+
+
+def _left_off(schema: Schema, names) -> set[str]:
+    """The tables diagram.yaml's `left_off` leaves off the page."""
+    if not isinstance(names, list) or (unknown := [name for name in names if name not in schema.metadata.tables]):
+        raise ValueError(f"The `left_off` list in diagram.yaml should list tables in schema.yaml, not {names}")
+    if data := [name for name in names if name in schema.data_tables]:
+        raise ValueError(f"The `left_off` list in diagram.yaml has {', '.join(data)}, a data table, which is always on the page")
+    return set(names)
+
+
+def _sections(schema: Schema, config: dict, left_off: set[str] = frozenset()) -> list[Section]:
+    """The sections from diagram.yaml, with every table in exactly one, except those left off."""
     tables = schema.metadata.tables
-    core = [name for name in tables if name not in schema.data_tables]
+    core = [name for name in tables if name not in schema.data_tables and name not in left_off]
     sections, placed = [], set()
     for entry in config["sections"]:
         unknown = [name for name in entry["tables"] if name not in core]
@@ -218,8 +265,13 @@ def _table(table: sa.Table, schema: Schema, section: str, filled: dict, dashboar
     if url is not None and not str(url).startswith("https://"):
         raise ValueError(f"The `filled` list in diagram.yaml gives {table.name} the web page {url}, which should start with https://")
     steps = filled.get("transformation") or []
-    if not isinstance(steps, list) or not all(isinstance(step, str) for step in steps):
-        raise ValueError(f"The `filled` list in diagram.yaml gives {table.name} a transformation that isn't a list of steps")
+    if not isinstance(steps, list) or not all(
+        isinstance(step, str) or (isinstance(step, dict) and isinstance(step.get("step"), str) and set(step) <= {"step", "example"}
+                                  and isinstance(step.get("example", ""), str))
+        for step in steps
+    ):
+        raise ValueError(f"The `filled` list in diagram.yaml gives {table.name} a transformation that isn't a list of steps "
+                         "(each a sentence, or `step` and its `example`)")
     read = filled.get("inputs") or []
     if not isinstance(read, list) or not all(isinstance(name, str) for name in read):
         raise ValueError(f"The `filled` list in diagram.yaml gives {table.name} inputs that aren't a list of column names")
@@ -242,7 +294,7 @@ def _table(table: sa.Table, schema: Schema, section: str, filled: dict, dashboar
         "url": url,  # the source's web page
         "command": f"docker compose run --rm {filled['command']}" if filled.get("command") else None,
         "note": filled.get("note"),
-        "transformation": steps,  # what's done to the data on the way in; none means it's copied 1 to 1
+        "transformation": [_step_text(step) for step in steps],  # what's done to the data on the way in; none: 1 to 1
         "dashboard": dashboard,  # where it's shown on the dashboards: [{page, panels}]
         "rows": rows,
         "one_row_per": [_label(c) for c in key] if len(key) > 1 else None,

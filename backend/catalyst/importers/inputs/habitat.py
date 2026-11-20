@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from catalyst.importers.excel import FileRow
 
-from .common import Input, SourceRow, Step, number
+from .common import Example, Input, SourceRow, Step, figure, number
 
 NAME, HABITAT, AREA = "water_body_name", "Simplified_Habitat_Type", "SUM_SHAPE_Area"
 # Relative coverage, from a habitat's share of the waterbody: (High at or above, Medium at or above). DAX compares
@@ -75,6 +75,15 @@ def work_out(rows: list[SourceRow], problems: list[str], notes: list[str]) -> di
     return {"habitat_land_use": habitats}
 
 
+def _share_example(ex: Example) -> str | None:
+    """e.g. Farmland: 1,234.5 ha ÷ 2,706.1 ha (all 5: 1,234.5 + …) × 100 = 45.62%."""
+    if not ex.out or ex.out[0]["percent_of_catchment"] is None:
+        return None
+    first, areas = ex.out[0], [row["area_ha"] for row in ex.out]
+    return (f"{first['habitat']}: {figure(first['area_ha'])} ha ÷ {figure(sum(areas))} ha (all {len(areas)}: "
+            f"{' + '.join(figure(a) for a in areas)}) × 100 = {figure(first['percent_of_catchment'])}%")
+
+
 def _bands() -> str:
     return "; ".join(f"{name} High at {high:.0%} or more, Medium at {medium:.0%}" for name, (high, medium) in COVERAGE.items())
 
@@ -108,6 +117,7 @@ HABITAT_FILE = Input(
             "The habitat's area ÷ all the waterbody's habitat areas added up (not the catchment's own area, so the five "
             "add up to 100%), as a %.",
             "DAX measures Nat Eng Simplified Habitat[Habitat % of Catchment] and [Catchment Total Area (ha)]",
+            _share_example,
         ),
         Step(
             ("relative_coverage",), ("habitat", "percent_of_catchment"),

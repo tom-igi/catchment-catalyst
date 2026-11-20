@@ -196,13 +196,15 @@ def test_only_tables_filled_by_excel_can_be_updated(app, client):
 def test_every_table_can_be_downloaded(app, client):
     tables = {t["name"]: t for t in page_model(client.get("/admin").text)["tables"]}
     for name in app.state.schema.metadata.tables:
-        assert tables[name]["download"]["url"] == f"/admin/tables/{name}/download"
+        if name in tables:  # (Uploads and Publishes aren't on the page, but can be downloaded too)
+            assert tables[name]["download"]["url"] == f"/admin/tables/{name}/download"
         response = client.get(f"/admin/tables/{name}/download")
         assert response.status_code == 200, name
         assert response.headers["content-disposition"].startswith(f'attachment; filename="{name}_')
     assert tables["catchments"]["download"]["left_out"] == ["boundary", "river_line"]  # map shapes
     assert tables["catchments"]["download"]["left_out_why"] == "map shapes, thousands of coordinates long"
-    assert tables["uploads"]["download"]["left_out"] == ["file"]  # the files themselves: each from its upload
+    uploads_sheet = load_workbook(io.BytesIO(client.get("/admin/tables/uploads/download").content)).active
+    assert "file" not in [c.value for c in uploads_sheet[1]]  # the files themselves: each from its upload
     assert tables["ea_scores"]["download"]["left_out"] == [] and tables["ea_scores"]["download"]["left_out_why"] is None
 
     sheet = load_workbook(io.BytesIO(client.get("/admin/tables/catchments/download").content)).active
@@ -402,6 +404,49 @@ def test_a_source_file_can_be_worked_out_again(app, client):
     assert [(r["id"], r["file"], r["again_from"]) for r in recent] == [(2, "APHA February.xlsx", 1), (1, "APHA February.xlsx", None)]
     assert source_details(client)["update"]["again"]["file_url"] == "/admin/uploads/2/file"  # the last approved
     assert client.post("/admin/inputs/livestock/work-out-again").status_code == 404  # a table, not a source file
+
+
+def test_a_transformations_example_is_from_its_last_approved_file(app, client):
+    """The real data in a Transformation panel: rows of the file, each step done to one waterbody's, and the rows they
+    make in the table. (A downloaded table's is in diagram.yaml: test_diagram.py.)"""
+    add_named_catchments(app)
+    example = client.get("/admin/tables/livestock_pressure/example").json()
+    assert example["missing"] == "No APHA livestock data file has been approved here yet, so there's no example from it."
+    assert (example["out"]["rows"], example["out"]["total"]) == ([], 0)  # the table as it is now
+    assert client.get("/admin/tables/catchments/example").status_code == 404
+
+    upload_source(client, apha_file(ABBEY_ROW, BADGWORTHY_ROW), name="APHA February.xlsx")
+    assert client.get("/admin/tables/livestock_pressure/example").json()["missing"]  # not until it's approved
+    approve(client, 1)
+    example = client.get("/admin/tables/livestock_pressure/example").json()
+    assert (example["file"], example["file_url"], example["waterbody"]) == ("APHA February.xlsx", "/admin/uploads/1/file", "Abbey River")
+    assert example["in"]["columns"][:2] == ["Catchment Name", "Beef Density Per SqKm"]  # only the columns it uses
+    assert [row[0] for row in example["in"]["rows"]] == ["Abbey River", "Badgworthy Water"]
+    assert (example["in"]["example"], example["in"]["total"]) == ([0], 2)  # the example's highlighted
+    assert example["out"]["columns"][:2] == ["catchment_id", "nitrogen_load"]
+    assert [row[0] for row in example["out"]["rows"]] == [WEST, EAST] and example["out"]["rows"][0][-1] == "Medium"
+    steps = example["steps"]  # one for each of the table's steps, in order
+    assert steps[0] == {"in": [["Catchment Name", "Abbey River", False]], "out": [["catchment_id", WEST]]}
+    assert steps[1] == "37.37 × 70 + 73.27 × 110 + 14.59 × 20 + 57.32 × 13 + 907.59 × 0.6 = 12,257.13"  # in its words
+    assert [name for name, _, own in steps[3]["in"] if own] == ["nitrogen_load", "phosphate_load"]  # worked out before
+    livestock = client.get("/admin/tables/livestock/example").json()
+    assert livestock["waterbody"] == "Abbey River" and len(livestock["out"]["rows"]) == 5  # its five kinds of livestock
+    assert len(livestock["in"]["rows"]) == 1  # all from its one row
+
+    # Kept with the upload; made again from its file if it wasn't (an upload before 20 November 2026).
+    with app.state.engine.begin() as conn:
+        assert set(conn.scalar(sa.text("SELECT examples FROM uploads WHERE id = 1"))) == {"livestock", "livestock_pressure"}
+        conn.execute(sa.text("UPDATE uploads SET examples = NULL"))
+    assert client.get("/admin/tables/livestock_pressure/example").json()["steps"] == steps
+    with app.state.engine.connect() as conn:
+        assert conn.scalar(sa.text("SELECT examples IS NOT NULL FROM uploads WHERE id = 1"))
+
+    # An Excel table's: its file's first rows, which go into the table as they are.
+    upload(client, PLANS)
+    approve(client, 2)
+    example = client.get(f"/admin/tables/{TABLE}/example").json()
+    assert example["in"]["columns"] == list(HEADINGS) and example["in"]["total"] == 2
+    assert example["out"] == example["in"] and example["steps"] == []
 
 
 def test_a_source_file_cancelled_or_out_of_date(app, client):

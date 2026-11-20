@@ -20,7 +20,7 @@ from dataclasses import dataclass
 
 from catalyst.importers.excel import FileRow
 
-from .common import Input, SourceRow, Step, banded, count, number
+from .common import Example, Input, SourceRow, Step, banded, count, figure, number
 
 NAME = "Catchment Name"
 
@@ -95,6 +95,17 @@ def _bands(bands, lowest: str) -> str:
     return ", ".join(f"{name} above {_n(above)}" for above, name in bands) + f", otherwise {lowest}"
 
 
+def _load_example(weight: str, column: str):
+    """e.g. 45.2 × 70 + 30.1 × 110 + … = 7,123.4: the waterbody's densities in the formula."""
+    def example(ex: Example) -> str | None:
+        if not ex.rows or not ex.out:
+            return None
+        densities = [number(ex.rows[0], a.density, [], blank=0.0) for a in ANIMALS]
+        sums = " + ".join(f"{figure(d)} × {_n(getattr(a, weight))}" for d, a in zip(densities, ANIMALS))
+        return f"{sums} = {figure(ex.out[0][column])}"
+    return example
+
+
 NUMBERS = tuple(a.number for a in ANIMALS)
 DENSITIES = tuple(a.density for a in ANIMALS)
 STEPS = {
@@ -126,11 +137,13 @@ STEPS = {
             ("nitrogen_load",), DENSITIES,
             "Kg a year per km² = " + _sum("nitrogen") + " (each the density, blank as 0).",
             "Power Query, APHA Livestock Data: step Added Custom (Nitrogen Load kg per yr per sqKm)",
+            _load_example("nitrogen", "nitrogen_load"),
         ),
         Step(
             ("phosphate_load",), DENSITIES,
             "Kg a year per km² = " + _sum("phosphate") + ".",
             "Power Query, APHA Livestock Data: step Added Custom1 (Phosphate Load kg per yr per sqKm)",
+            _load_example("phosphate", "phosphate_load"),
         ),
         Step(
             ("nitrogen_and_phosphate_load",), ("nitrogen_load", "phosphate_load"),

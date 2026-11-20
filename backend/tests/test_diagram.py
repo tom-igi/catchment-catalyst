@@ -32,15 +32,18 @@ def render(model: dict, **context) -> str:
 def test_the_model_has_every_table_and_column():
     schema = load_schema()
     tables = {t["name"]: t for t in diagram.model(schema)["tables"]}
-    assert set(tables) == set(schema.metadata.tables)
+    # All but the admin page's own records (diagram.yaml's left_off), which no data comes into.
+    assert set(tables) == set(schema.metadata.tables) - {"uploads", "publishes"}
     for table in schema.metadata.tables.values():
+        if table.name not in tables:
+            continue
         assert tables[table.name]["title"] == table.info["title"]
         assert [c["name"] for c in tables[table.name]["columns"]] == [c.name for c in table.columns]
 
 
 def test_sections_come_in_the_order_of_diagram_yaml():
     sections = [s["title"] for s in diagram.model(load_schema())["sections"]]
-    assert sections == ["Locations", "Catchments", "Datasets", "Uploads", "Publishes", "Data tables"]  # every core table has a section
+    assert sections == ["Locations", "Catchments", "Datasets", "Data tables"]  # every core table on the page has a section
 
 
 def test_the_model_says_how_each_table_is_filled():
@@ -53,7 +56,7 @@ def test_the_model_says_how_each_table_is_filled():
     assert tables["ea_classifications"]["command"] == tables["ea_rnags"]["command"] != tables["catchments"]["command"]
     assert tables["catchments"]["command"] == "docker compose run --rm importer catchments imports/catchments.json"
     assert tables["ea_scores"]["fill"] == "input" and tables["location_text"]["fill"] == "excel"
-    assert (tables["uploads"]["fill"], tables["publishes"]["fill"], tables["locations"]["fill"]) == ("admin", "admin", "command")
+    assert tables["locations"]["fill"] == "command"
     assert all(t["fill"] in {"api", "input", "excel"} for t in tables.values() if t["kind"] == "data")
     # Tables worked out from the same source file share one box on the page, too.
     assert tables["livestock"]["fill"] == tables["livestock_pressure"]["fill"] == "input"
@@ -70,7 +73,7 @@ def test_the_model_says_what_each_table_holds():
     assert tables["sewage_overflow_pressure"]["holds"] == "worked_out"  # added up from the storm overflow returns
     assert (tables["waterbody_figures"]["holds"], tables["river_status_text"]["holds"]) == ("worked_out", "worked_out")
     assert (tables["location_text"]["holds"], tables["datasets"]["holds"]) == ("typed", "typed")
-    assert (tables["uploads"]["holds"], tables["locations"]["holds"]) == (None, None)  # no data comes into them
+    assert tables["locations"]["holds"] is None  # no data comes into it
     assert [h["label"] for h in model["holds"]] == ["As downloaded", "Worked out", "Typed in"]
     assert all(t["holds"] for t in tables.values() if t["kind"] == "data")
 
@@ -94,7 +97,7 @@ def test_each_table_has_its_own_transformation():
     tables = {t["name"]: t for t in diagram.model(load_schema())["tables"]}
     # A source file's: its inputs (the file's columns it reads), and a step for each of its columns, as the Power BI did.
     pressure = tables["livestock_pressure"]["transform"]
-    assert (pressure["kind"], pressure["name"], pressure["sub"]) == ("input", "Power BI's formulas", "6 columns in, 5 steps")
+    assert (pressure["kind"], pressure["name"], pressure["sub"]) == ("input", "Power BI's formulas", "5 steps")
     assert (pressure["file"], pressure["sheet"]) == ("APHA Livestock Data Feb 2026.xlsx", "Appendix 1 EIR2026_00630")
     assert pressure["inputs"][0] == "Catchment Name" and "Pig Density Per SqKm" in pressure["inputs"]
     assert [step["columns"] for step in pressure["steps"]] == [
@@ -107,11 +110,28 @@ def test_each_table_has_its_own_transformation():
     rnags = tables["ea_rnags"]["transform"]
     assert (rnags["kind"], rnags["name"], rnags["file"]) == ("api", "Reshaped", "The EA's rnags.csv for each management catchment")
     assert "Swmi" in rnags["inputs"] and rnags["steps"][0]["text"].startswith("Downloads")
-    # An Excel table's: 1 to 1. Housekeeping: none.
+    # An Excel table's: 1 to 1. One no data comes into: none.
     assert tables["location_text"]["transform"]["name"] == "1 to 1"
-    assert tables["uploads"]["transform"] is None
+    assert tables["locations"]["transform"] is None
     for t in tables.values():  # every table data comes into has one
         assert (t["transform"] is not None) == (t["fill"] in {"api", "input", "excel"}), t["name"]
+
+
+def test_each_downloaded_table_has_a_real_example():
+    """Copied from a download into diagram.yaml: rows coming in, a step or two done to them, and the rows going out."""
+    tables = {t["name"]: t for t in diagram.model(load_schema())["tables"]}
+    for t in tables.values():
+        if t["fill"] == "api":
+            example = t["transform"]["example"]
+            assert example["about"] and example["in"]["rows"] and example["out"]["rows"], t["name"]
+            assert any(step["example"] for step in t["transform"]["steps"]), t["name"]
+    pressure = tables["sewage_overflow_pressure"]["transform"]
+    assert pressure["example"]["in"]["columns"] == ["Site Name (WaSC operational)", "WFD Waterbody ID", "Total Duration"]
+    assert pressure["example"]["in"]["rows"][0][2] == "319:14:24"  # a time, not read as a number
+    assert pressure["example"]["out"] == {"columns": ["catchment_id", "year", "spill_hours", "pressure"],
+                                          "rows": [["GB108050014090", 2025, 480.72, "Medium"]]}
+    assert "319.24 + 15.92 + 143.86 + 1.7 + 0" in pressure["steps"][0]["example"]
+    assert pressure["steps"][-1]["example"] is None  # Replaces every row: nothing to show
 
 
 def test_the_model_says_where_each_data_table_is_on_the_dashboards():
@@ -144,7 +164,6 @@ def test_each_table_on_the_dashboards_has_a_number():
     numbers = [t["number"] for t in tables.values() if t["number"] is not None]
     assert len(numbers) == len(set(numbers))
     assert (tables["catchments"]["number"], tables["locations"]["number"]) == (1, 24)  # the waterbodies, and which are shown
-    assert tables["uploads"]["number"] is None  # not on the dashboards
 
 
 def test_the_model_has_every_link():
@@ -158,7 +177,7 @@ def test_the_model_has_every_link():
     assert {(name, "location_id", "locations", "id") for name in by_location} <= links
     assert ("locations", "catchment_ids", "catchments", "list") in links
     assert {("datasets", "table_name", name, "name") for name in data_tables} <= links
-    assert ("uploads", "uploaded_to", "location_text", "name") in links
+    assert not {name for link in links for name in (link[0], link[2])} & {"uploads", "publishes"}  # left off the page
 
 
 def test_a_mistake_in_diagram_yaml_is_reported(tmp_path):
@@ -175,9 +194,22 @@ def test_a_mistake_in_diagram_yaml_is_reported(tmp_path):
     settings.write_text(ONLY_DATA_TABLES_SECTION + "filled: {catchments: {transformation: {Downloads: it}}}\n")
     with pytest.raises(ValueError, match="a transformation that isn't a list of steps"):
         diagram.model(load_schema(), diagram_file=settings)
-    settings.write_text(ONLY_DATA_TABLES_SECTION + "filled: {uploads: {how: admin, worked_out: true}}\n")
-    with pytest.raises(ValueError, match="gives uploads worked_out: True, but it can only be true, for a table filled by an importer"):
+    settings.write_text(ONLY_DATA_TABLES_SECTION + "filled: {locations: {how: command, worked_out: true}}\n")
+    with pytest.raises(ValueError, match="gives locations worked_out: True, but it can only be true, for a table filled by an importer"):
         diagram.model(load_schema(), diagram_file=settings)
+    settings.write_text(ONLY_DATA_TABLES_SECTION + "filled: {catchments: {transformation: [{step: Downloads it., eg: x}]}}\n")
+    with pytest.raises(ValueError, match="each a sentence, or `step` and its `example`"):
+        diagram.model(load_schema(), diagram_file=settings)
+    settings.write_text(ONLY_DATA_TABLES_SECTION + "filled: {catchments: {example: {in: [{WB_ID: X}], out: [{nope: X}]}}}\n")
+    with pytest.raises(ValueError, match="gives catchments an example with nope, which isn't one of its columns"):
+        diagram.model(load_schema(), diagram_file=settings)
+    settings.write_text(ONLY_DATA_TABLES_SECTION + "filled: {catchments: {example: {in: [{WB_ID: X}]}}}\n")
+    with pytest.raises(ValueError, match="gives catchments an example without `out`"):
+        diagram.model(load_schema(), diagram_file=settings)
+    for left_off, problem in [("[nope]", "should list tables in schema.yaml"), ("[livestock]", "has livestock, a data table")]:
+        settings.write_text(ONLY_DATA_TABLES_SECTION + f"left_off: {left_off}\n")
+        with pytest.raises(ValueError, match=problem):
+            diagram.model(load_schema(), diagram_file=settings)
     settings.write_text(ONLY_DATA_TABLES_SECTION + "filled: {catchments: {inputs: WB_NAME}}\n")
     with pytest.raises(ValueError, match="inputs that aren't a list of column names"):
         diagram.model(load_schema(), diagram_file=settings)
@@ -232,7 +264,7 @@ def test_the_admin_page_is_the_diagram(app, client):
     assert '<meta name="robots" content="noindex, nofollow">' in page.text
     assert "<h1>Your data</h1>" in page.text and "Logged in as <strong>tom</strong>" in page.text
     rows = {t["name"]: t["rows"] for t in page_model(page.text)["tables"]}
-    assert set(rows) == set(app.state.schema.metadata.tables)
+    assert set(rows) == set(app.state.schema.metadata.tables) - {"uploads", "publishes"}
     assert rows["catchments"] == 2
     assert {t["name"]: t["number"] for t in page_model(page.text)["tables"]}["catchments"] == 1  # each box shows it
     # How the data tables are split, from diagram.yaml, and what each box's label (e.g. Worked out) means.

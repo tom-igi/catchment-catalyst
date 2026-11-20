@@ -6,6 +6,7 @@
     /admin#<table>                    the diagram with a table's details open
     /admin#upload-<table or input>    ...or with an Excel table's or a source file's upload open
     /admin/tables/<table>/download    any table as an Excel file
+    /admin/tables/<table>/example     the real data shown in its Transformation panel, as JSON (see examples.py)
     /admin/tables/<table>/upload      upload an edited copy (Excel tables only)
     /admin/inputs/<input>/upload      upload a source file as it came (see catalyst.importers.inputs)
     /admin/inputs/<input>/work-out-again   work its tables out again from its last approved file, with the
@@ -38,7 +39,7 @@ from zoneinfo import ZoneInfo
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from geoalchemy2 import Geometry
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -48,7 +49,7 @@ from catalyst import publish
 from catalyst.db import load_schema
 from catalyst.importers import excel, inputs
 
-from . import diagram, passwords, uploads
+from . import diagram, examples, passwords, uploads
 from .settings import Settings
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -357,6 +358,51 @@ def download(request: Request, table: AnyTable):
     )
 
 
+@router.get("/tables/{table_name}/example")
+def table_example(request: Request, table: AnyTable):
+    """The real data in a source file's or Excel table's Transformation panel: from its last approved file, as kept
+    with its upload, or made from the file now if it wasn't kept (an upload before examples were) or the formulas'
+    words have changed since."""
+    state = request.app.state
+    schema = state.schema
+    fill = table.info.get("filled_by")
+    if fill not in {"input", "excel"}:
+        raise HTTPException(404, "Only a source file's or an Excel table's example is made from its file.")
+    uploaded_to = table.info["input"] if fill == "input" else table.name
+    steps = list(inputs.INPUTS[uploaded_to].table_steps(table.name)) if fill == "input" else []
+    with state.engine.connect() as conn:
+        last = uploads.last_approved(conn, schema).get(uploaded_to)
+        kept = (uploads.examples(conn, schema, last.id) or {}).get(table.name) if last else None
+    if last is None:
+        what = inputs.INPUTS[uploaded_to].title if fill == "input" else "Excel"
+        return JSONResponse({"missing": f"No {what} file has been approved here yet, so there's no example from it.",
+                             "out": _first_rows(state, table)})
+    if examples.out_of_date(kept, steps):
+        try:
+            with state.engine.begin() as conn:
+                made = examples.make(conn, schema, uploaded_to, uploads.file(conn, schema, last.id), last.file_name)
+                uploads.keep_examples(conn, schema, last.id, made)
+        except excel.UploadError:
+            return JSONResponse({"missing": f"The last approved file, {last.file_name}, can't be read as the table is "
+                                            "now, so there's no example from it.", "out": _first_rows(state, table)})
+        kept = made.get(table.name)
+    return JSONResponse({
+        **examples.shown(kept or {}, steps),
+        "file": last.file_name, "when": _when(last.approved_at), "upload_url": f"/admin/uploads/{last.id}",
+        "file_url": f"/admin/uploads/{last.id}/file",
+    })
+
+
+def _first_rows(state, table: sa.Table) -> dict:
+    """A table's first few rows, as an example's `out`, for a table with no file to make one from."""
+    columns = excel.downloadable_columns(table)
+    with state.engine.connect() as conn:
+        rows = conn.execute(sa.select(*columns).order_by(*table.primary_key.columns).limit(examples.ROWS)).all()
+        total = _count(conn, table)
+    return {"columns": [c.name for c in columns], "rows": [[examples.plain(v) for v in row] for row in rows],
+            "example": [], "total": total}
+
+
 @router.post("/tables/{table_name}/upload")
 def upload(request: Request, user: User, table: ExcelTable, file: Annotated[UploadFile | None, File()] = None):
     return _upload(request, user, table.name, file)
@@ -419,7 +465,7 @@ def _keep_for_preview(request: Request, user: str, uploaded_to: str, file_name: 
                 return RedirectResponse(_upload_panel(uploaded_to), 303)
             upload_id = uploads.create(
                 conn, state.schema, uploaded_to, file_name, data, user, changes.rows_in_file, changes.comparisons,
-                source_file=changes.source_file, worked_out_again_from=worked_out_again_from,
+                source_file=changes.source_file, worked_out_again_from=worked_out_again_from, examples=changes.examples,
             )
     except excel.UploadError as e:
         return _upload_problems(request, uploaded_to, file_name, e.problems)
@@ -547,6 +593,7 @@ class Changes:
     rows_in_file: int
     source_file: bool = False
     notes: list[str] = field(default_factory=list)
+    examples: dict[str, dict] = field(default_factory=dict)  # each table's, for its Transformation panel
 
     @property
     def has_changes(self) -> bool:
@@ -563,12 +610,14 @@ def _changes(conn: sa.Connection, state, uploaded_to: str, data: bytes, file_nam
     """Read a file uploaded to a table or a source file, and compare it with the table(s). Raises UploadError."""
     schema = state.schema
     if uploaded_to in inputs.INPUTS:
-        result = inputs.INPUTS[uploaded_to].run(conn, schema, data, file_name)
+        source = inputs.INPUTS[uploaded_to]
+        result = source.run(conn, schema, data, file_name)
         comparisons = {name: excel.compare(conn, schema.metadata.tables[name], rows) for name, rows in result.tables.items()}
-        return Changes(comparisons, result.rows_read, source_file=True, notes=result.notes)
+        made = examples.for_input(conn, schema, source, result)
+        return Changes(comparisons, result.rows_read, source_file=True, notes=result.notes, examples=made)
     table = schema.metadata.tables[uploaded_to]
     rows = excel.read_upload(table, data)
-    return Changes({table.name: excel.compare(conn, table, rows)}, len(rows))
+    return Changes({table.name: excel.compare(conn, table, rows)}, len(rows), examples=examples.for_excel(table, rows))
 
 
 def _kept_changes(conn: sa.Connection, state, upload: sa.Row) -> Changes:

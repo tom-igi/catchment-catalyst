@@ -31,7 +31,7 @@ INPUTS below, and mark its tables in schema.yaml with `filled_by: input` and
 from catalyst.db import Schema
 
 from .apha_livestock import APHA_LIVESTOCK
-from .common import Input, Result, SourceRow, Step, read_sheet, read_sheets
+from .common import Example, Input, Result, SourceRow, Step, figure, read_sheet, read_sheets
 from .ea_classification_facts import EA_CLASSIFICATION_FACTS
 from .esme import ESME
 from .habitat import HABITAT_FILE
@@ -47,7 +47,7 @@ INPUTS: dict[str, Input] = {
     )
 }
 
-__all__ = ["INPUTS", "Input", "Result", "SourceRow", "Step", "check", "read_sheet", "read_sheets"]
+__all__ = ["INPUTS", "Example", "Input", "Result", "SourceRow", "Step", "check", "figure", "read_sheet", "read_sheets"]
 
 
 def check(schema: Schema) -> list[str]:

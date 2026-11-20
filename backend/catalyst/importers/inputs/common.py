@@ -27,17 +27,30 @@ NAMES_LISTED = 10  # in notes and problems
 READS = {".xlsx": "Excel workbook", ".xls": "older Excel workbook", ".csv": "CSV file"}
 
 
+@dataclass
+class Example:
+    """One waterbody's rows, for a step's worked example on the admin page (Step.example)."""
+    rows: list[SourceRow]  # its rows in the file (on the table's sheet)
+    out: list[dict[str, Any]]  # its rows in the table, worked out from them
+    tables: dict[str, list[dict[str, Any]]]  # and its rows in each table the file fills
+
+
 @dataclass(frozen=True)
 class Step:
     """How some of a table's columns are worked out: from which inputs, how (in words), and where that is in
     the original Power BI file (e.g. "Power Query, APHA Livestock Data: step Custom1").
 
     `inputs` are the file's columns it reads, or the table's own columns worked out by an earlier step (or,
-    rarely, another table the same file fills). The admin page shows them as the step's inputs."""
+    rarely, another table the same file fills). The admin page shows them as the step's inputs.
+
+    The admin page shows each step done to one waterbody: its inputs' values, then its columns'. Where that
+    doesn't show what happens (e.g. an average of many rows), `example` says it in words instead, e.g.
+    "In 2025, the average of 0.71, 0.74 and 0.72 = 0.723", or None if the waterbody has nothing to show."""
     columns: tuple[str, ...]  # the table's columns it fills
     inputs: tuple[str, ...]
     text: str
     power_bi: str
+    example: Callable[[Example], str | None] | None = field(default=None, compare=False)
 
 
 @dataclass
@@ -59,6 +72,7 @@ class Result:
     tables: dict[str, list[FileRow]]
     rows_read: int
     notes: list[str] = field(default_factory=list)
+    rows: list[SourceRow] = field(default_factory=list)  # the file's rows for a catchment, each with its ID
 
 
 @dataclass(frozen=True)
@@ -130,7 +144,7 @@ class Input:
             problems.extend(_missing_values(schema.metadata.tables[name], table_rows))
         if problems:
             raise UploadError(problems)
-        return Result(tables, len(rows), notes)
+        return Result(tables, len(rows), notes, matched)
 
 
 # --- Reading the file ------------------------------------------------------------
@@ -364,6 +378,17 @@ def count(row: SourceRow, heading: str, problems: list[str], blank: int | None =
         return int(value), None
     problems.append(f"{row.where}, {heading}: {value!r} isn't a whole number.")
     return blank, None
+
+
+def figure(value: float | None) -> str:
+    """A number as an example shows it: with commas, and 2 decimal places at most (3 figures, if it's under 1)."""
+    if value is None:
+        return "blank"
+    if float(value).is_integer():
+        return f"{int(value):,}"
+    if abs(value) < 1:
+        return f"{value:.3g}"
+    return f"{value:,.2f}".rstrip("0").rstrip(".")
 
 
 def banded(value: float, bands: tuple[tuple[float, str], ...], otherwise: str) -> str:
