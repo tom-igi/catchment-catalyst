@@ -32,6 +32,15 @@ from catalyst.importers import inputs
 
 DIAGRAM_FILE = Path(__file__).with_name("diagram.yaml")
 FILLS = {"api", "input", "excel", "command", "admin"}
+# What a table holds, shown in its box (where it comes from is in the column on its left). An importer's tables
+# are as downloaded, unless their `filled` entry in diagram.yaml says `worked_out: true`; a source file's are
+# worked out; an Excel table's are typed in. Tables no data comes into (e.g. Uploads) have none.
+HOLDS = {
+    "downloaded": ("As downloaded", "The download's own columns, including some the dashboards don't show."),
+    "worked_out": ("Worked out", "Only what the dashboards show, taken from a download or source file, or worked out from "
+                                 "it with the original Power BI dashboard's formulas."),
+    "typed": ("Typed in", "Written by hand, and uploaded here in Excel."),
+}
 
 MAP_SHAPES = {
     "POINT": "Map point", "MULTIPOINT": "Map points",
@@ -81,6 +90,7 @@ def model(schema: Schema | None = None, counts: dict[str, int] | None = None,
             for s in sections for t in s.tables
         ],
         "links": _links(schema, config.get("links") or []),
+        "holds": [{"key": key, "label": label, "text": text} for key, (label, text) in HOLDS.items()],
         "inputs": [_input(source) for source in inputs.INPUTS.values() if source.name in schema.input_tables.values()],
     }
 
@@ -213,6 +223,10 @@ def _table(table: sa.Table, schema: Schema, section: str, filled: dict, dashboar
     read = filled.get("inputs") or []
     if not isinstance(read, list) or not all(isinstance(name, str) for name in read):
         raise ValueError(f"The `filled` list in diagram.yaml gives {table.name} inputs that aren't a list of column names")
+    worked_out = filled.get("worked_out", False)
+    if not isinstance(worked_out, bool) or (worked_out and fill != "api"):
+        raise ValueError(f"The `filled` list in diagram.yaml gives {table.name} worked_out: {worked_out}, but it can only be "
+                         "true, for a table filled by an importer")
     key = list(table.primary_key.columns)
     return {
         "name": table.name,
@@ -222,6 +236,7 @@ def _table(table: sa.Table, schema: Schema, section: str, filled: dict, dashboar
         "kind": "data" if table.name in schema.data_tables else "core",
         "section": section,
         "fill": fill,  # api, input, excel, command or admin
+        "holds": _holds(fill, worked_out),  # a key of HOLDS, or None
         "input": table.info.get("input"),  # for `filled_by: input`, the source file it's worked out from
         "source": filled.get("source"),
         "url": url,  # the source's web page
@@ -233,6 +248,13 @@ def _table(table: sa.Table, schema: Schema, section: str, filled: dict, dashboar
         "one_row_per": [_label(c) for c in key] if len(key) > 1 else None,
         "columns": [_column(c, len(key)) for c in table.columns],
     }
+
+
+def _holds(fill: str, worked_out: bool) -> str | None:
+    """What a table holds (see HOLDS)."""
+    if fill == "api":
+        return "worked_out" if worked_out else "downloaded"
+    return {"input": "worked_out", "excel": "typed"}.get(fill)
 
 
 def _column(column: sa.Column, key_size: int) -> dict:

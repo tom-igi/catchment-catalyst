@@ -196,19 +196,18 @@ def test_apha_problems_are_listed(database):
 
 def test_waterbody_lookup_works_out_the_originals_figures(database):
     result = run(database, LOOKUP_FILE.read_bytes(), "Waterbody Lookup.xls", source=LOOKUP)
-    tables = {name: {r.values["catchment_id"]: r.values for r in rows} for name, rows in result.tables.items()}
-    assert tables["catchment_rankings"] == {ABBEY: {"catchment_id": ABBEY, "ranking": 44},
-                                            BADGWORTHY: {"catchment_id": BADGWORTHY, "ranking": 79},
-                                            BRAY: {"catchment_id": BRAY, "ranking": 1}}
-    assert {i: row["number_of_farms"] for i, row in tables["farms"].items()} == {ABBEY: 24, BADGWORTHY: 2}  # Bray's is blank
-    abbey = tables["sewerage_properties"][ABBEY]
+    assert list(result.tables) == ["waterbody_figures"]  # one table, a row per waterbody
+    lookup = {r.values["catchment_id"]: r.values for r in result.tables["waterbody_figures"]}
+    assert {i: row["ranking"] for i, row in lookup.items()} == {ABBEY: 44, BADGWORTHY: 79, BRAY: 1}
+    assert {i: row["number_of_farms"] for i, row in lookup.items()} == {ABBEY: 24, BADGWORTHY: 2, BRAY: None}  # Bray's is blank
+    abbey = lookup[ABBEY]
     assert (abbey["public_sewerage_properties"], abbey["private_sewerage_properties"]) == (526, 610)
     assert abbey["private_sewerage_per_ha"] == 610 / (16981213.366974927 / 10_000) == pytest.approx(0.3592, abs=1e-4)
     assert abbey["private_sewerage_rating"] == "High"  # below 1, not below 0.3
-    assert tables["sewerage_properties"][BADGWORTHY]["private_sewerage_rating"] == "Very Low"  # 0.014
-    assert tables["ecological_classes"][ABBEY] == {"catchment_id": ABBEY, "year": 2025, "ecological_class": "Moderate"}
-    assert tables["river_information"][ABBEY] == {
-        "catchment_id": ABBEY, "catchment_area_ha": pytest.approx(1698.12, abs=0.01), "river_length_km": pytest.approx(9.6045),
+    assert lookup[BADGWORTHY]["private_sewerage_rating"] == "Very Low"  # 0.014
+    assert (abbey["ecological_class_year"], abbey["ecological_class"]) == (2025, "Moderate")
+    assert {k: abbey[k] for k in ("catchment_area_ha", "river_length_km", "river_system", "upstream_rivers", "downstream_rivers")} == {
+        "catchment_area_ha": pytest.approx(1698.12, abs=0.01), "river_length_km": pytest.approx(9.6045),
         "river_system": "Coastal", "upstream_rivers": "None", "downstream_rivers": "Sea",
     }
     # Matched by ID: the waterbody that isn't one of ours is left out.
@@ -226,8 +225,9 @@ def test_waterbody_lookup_lists_text_in_its_figures_and_refuses_an_unknown_class
     ], problems, notes)
     assert notes == ["Row 2, Biosphere Ranking: '6 8' isn't a number, so it's left empty.",
                      "Row 2, FARMS: 'N/A' isn't a number, so it's left empty."]
-    assert tables["farms"] == [] and tables["catchment_rankings"] == []
-    assert [r.values["ecological_class"] for r in tables["ecological_classes"]] == ["Moderate"]  # written as the EA does
+    two, three = (r.values for r in tables["waterbody_figures"])
+    assert two["number_of_farms"] is None and two["ranking"] is None  # left empty
+    assert (two["ecological_class_year"], two["ecological_class"]) == (2025, "Moderate")  # written as the EA does
     assert problems == ["Row 3, ecological_class: 'Moderat' isn't one of High, Good, Moderate, Poor or Bad."]
 
 

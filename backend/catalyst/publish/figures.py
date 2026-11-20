@@ -20,7 +20,6 @@ from typing import Any
 from .collect import Location, slug
 
 CLASSIFICATIONS = "ea_classifications"
-ECOLOGICAL_CLASSES = "ecological_classes"  # from the Waterbody Lookup: years the EA's classifications don't have yet
 RNAGS = "ea_rnags"
 OVERFLOWS = "storm_overflows"
 OBSTACLES = "river_obstacles"
@@ -28,17 +27,14 @@ SCORES = "ea_scores"
 THRESHOLDS = "ea_thresholds"
 HABITAT = "habitat_land_use"
 RIVER_TEXT = "river_status_text"
-RANKINGS = "catchment_rankings"
-FARMS = "farms"
 LIVESTOCK = "livestock"
 LIVESTOCK_PRESSURE = "livestock_pressure"
-RIVER_INFO = "river_information"
 OVERFLOW_PRESSURE = "sewage_overflow_pressure"
 ESME_RISKS = "esme_risk_levels"
 PHOSPHATE = "phosphate_sources"
 PHOSPHATE_SPLIT = "phosphate_point_diffuse"
-PROPERTIES = "sewerage_properties"
 IMPROVEMENTS = "sewerage_improvements"
+WATERBODY_FIGURES = "waterbody_figures"  # the Waterbody Lookup's: ranking, 2025 class, river information, farms and sewerage properties
 LOCATION_TEXT = "location_text"
 INTERVENTION_TYPES = "intervention_types"
 INTERVENTION_WATERBODIES = "intervention_waterbodies"
@@ -105,7 +101,7 @@ RISK_NAMES = {
 }
 RISK_COLUMNS = {
     "untreated_sewage": (OVERFLOW_PRESSURE, "pressure"),
-    "sewage_private": (PROPERTIES, "private_sewerage_rating"),
+    "sewage_private": (WATERBODY_FIGURES, "private_sewerage_rating"),
     "livestock": (LIVESTOCK_PRESSURE, "pressure"),
     **{name: (ESME_RISKS, name) for name in ["runoff", "modification", "invasive_species", "overheating", "running_dry"]},
 }
@@ -221,17 +217,18 @@ class Figures:
                 key = (row["item"], row["year"])
                 if row["status"] and (key not in results or row["cycle"] > results[key]["cycle"]):
                     results[key] = row
-        # Catchment ID -> year -> ecological status: the EA's, and from Ecological Classes for a
+        # Catchment ID -> year -> ecological status: the EA's, and from the Waterbody Lookup for a
         # year it doesn't have yet (2025), in place of the EA's, as the original dashboard did.
         self.ecological: dict[str, dict[int, str]] = {}
         for catchment_id, results in self.results.items():
             by_year = {year: row["status"] for (item, year), row in results.items() if item == ECOLOGICAL}
             if by_year:
                 self.ecological[catchment_id] = by_year
-        classes = location.dataset(ECOLOGICAL_CLASSES)
-        for catchment_id, rows in (classes.rows if classes else {}).items():
+        lookup = location.dataset(WATERBODY_FIGURES)
+        for catchment_id, rows in (lookup.rows if lookup else {}).items():
             for row in rows:
-                self.ecological.setdefault(catchment_id, {})[row["year"]] = row["ecological_class"]
+                if row["ecological_class"]:
+                    self.ecological.setdefault(catchment_id, {})[row["ecological_class_year"]] = row["ecological_class"]
         self.years = sorted({y for by_year in self.ecological.values() for y in by_year}, reverse=True)
 
     def status(self, catchment_id: str) -> str | None:
@@ -345,9 +342,9 @@ class Figures:
         return sorted(found, key=str.lower)
 
     def river_info(self, catchment: dict[str, Any]) -> dict[str, Any]:
-        """The River Information box: from River Information (the Waterbody Lookup) where it has the catchment, as on
-        the original, otherwise the EA's. The rivers up and downstream are (text, catchment ID to link to, or None)."""
-        row = self._one(RIVER_INFO, catchment["id"])
+        """The River Information box: from the Waterbody Lookup where it has the catchment, as on the original,
+        otherwise the EA's. The rivers up and downstream are (text, catchment ID to link to, or None)."""
+        row = self._one(WATERBODY_FIGURES, catchment["id"])
         if row:
             return {
                 "area_ha": row["catchment_area_ha"], "length_km": row["river_length_km"], "river_system": row["river_system"],
@@ -447,7 +444,7 @@ class Figures:
         return self._one(RIVER_TEXT, catchment_id)
 
     def ranking(self, catchment_id: str) -> int | None:
-        return self._one(RANKINGS, catchment_id).get("ranking")
+        return self._one(WATERBODY_FIGURES, catchment_id).get("ranking")
 
     def risks(self, catchment_id: str, tiles: list[str]) -> list[tuple[str, str | None]]:
         """The Risk Levels tiles: (name, level) for each of the tiles, in that order."""
@@ -475,7 +472,7 @@ class Figures:
     # -------------------------------------------------------------------------
 
     def farms(self, catchment_id: str) -> int | None:
-        return self._one(FARMS, catchment_id).get("number_of_farms")
+        return self._one(WATERBODY_FIGURES, catchment_id).get("number_of_farms")
 
     def livestock(self, catchment: dict[str, Any]) -> list[dict[str, Any]]:
         """The catchment's livestock: number (or its note, e.g. Less than 5), density per km² (100 ha) and rating."""
@@ -503,7 +500,7 @@ class Figures:
 
     def properties(self, catchment: dict[str, Any]) -> dict[str, Any]:
         """Properties on public and private sewerage, and private sewerage per hectare of the catchment."""
-        row = self._one(PROPERTIES, catchment["id"])
+        row = self._one(WATERBODY_FIGURES, catchment["id"])
         return {
             "public": row.get("public_sewerage_properties"),
             "private": row.get("private_sewerage_properties"),

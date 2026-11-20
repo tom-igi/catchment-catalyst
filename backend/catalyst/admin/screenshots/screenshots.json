@@ -1,5 +1,5 @@
 {
-  "taken": "2026-11-18",
+  "taken": "2026-11-20",
   "dashboard": "http://localhost:8080/north-devon/",
   "waterbody": {
     "id": "GB108050014340",
@@ -75,63 +75,51 @@
         },
         {
           "number": 13,
-          "table": "catchment_rankings",
-          "what": [
-            "Catchment Ranking"
-          ]
-        },
-        {
-          "number": 14,
-          "table": "ecological_classes",
+          "table": "waterbody_figures",
           "what": [
             "Map colours: each waterbody's 2025 ecological class",
-            "EA Ecological Classification: 2025"
-          ]
-        },
-        {
-          "number": 17,
-          "table": "sewerage_properties",
-          "what": [
+            "Catchment Ranking",
+            "EA Ecological Classification: 2025",
             "Risk Levels: Sewage (Private)"
           ]
         },
         {
-          "number": 19,
+          "number": 15,
           "table": "livestock_pressure",
           "what": [
             "Risk Levels: Livestock"
           ]
         },
         {
-          "number": 23,
+          "number": 19,
           "table": "datasets",
           "what": [
             "The text in each \"i\" button"
           ]
         },
         {
-          "number": 24,
+          "number": 20,
           "table": "intervention_types",
           "what": [
             "Interventions: each intervention's name, and the group it's in"
           ]
         },
         {
-          "number": 25,
+          "number": 21,
           "table": "intervention_waterbodies",
           "what": [
             "Interventions: which this waterbody needs, with their size, cost and lead"
           ]
         },
         {
-          "number": 27,
+          "number": 23,
           "table": "location_text",
           "what": [
             "The text under the dashboard"
           ]
         },
         {
-          "number": 28,
+          "number": 24,
           "table": "locations",
           "what": [
             "Which waterbodies are on this dashboard"
@@ -196,36 +184,30 @@
         },
         {
           "number": 13,
-          "table": "catchment_rankings",
-          "what": [
-            "Catchment Ranking"
-          ]
-        },
-        {
-          "number": 14,
-          "table": "ecological_classes",
+          "table": "waterbody_figures",
           "what": [
             "Map colours: each waterbody's 2025 ecological class",
+            "Catchment Ranking",
             "EA Ecological Classification: 2025",
             "Environment Agency Scoring: Ecological in 2025"
           ]
         },
         {
-          "number": 23,
+          "number": 19,
           "table": "datasets",
           "what": [
             "The text in each \"i\" button"
           ]
         },
         {
-          "number": 27,
+          "number": 23,
           "table": "location_text",
           "what": [
             "The text under the dashboard"
           ]
         },
         {
-          "number": 28,
+          "number": 24,
           "table": "locations",
           "what": [
             "Which waterbodies are on this dashboard"
@@ -301,70 +283,52 @@
         },
         {
           "number": 13,
-          "table": "catchment_rankings",
-          "what": [
-            "Catchment Ranking"
-          ]
-        },
-        {
-          "number": 14,
-          "table": "ecological_classes",
+          "table": "waterbody_figures",
           "what": [
             "Map colours: each waterbody's 2025 ecological class",
-            "EA Ecological Classification: 2025"
-          ]
-        },
-        {
-          "number": 15,
-          "table": "river_information",
-          "what": [
-            "River Information: area, length, river system, upstream and downstream rivers"
-          ]
-        },
-        {
-          "number": 16,
-          "table": "farms",
-          "what": [
+            "Catchment Ranking",
+            "EA Ecological Classification: 2025",
+            "River Information: area, length, river system, upstream and downstream rivers",
             "Number of Farms"
           ]
         },
         {
-          "number": 18,
+          "number": 14,
           "table": "livestock",
           "what": [
             "Livestock Pressures"
           ]
         },
         {
-          "number": 19,
+          "number": 15,
           "table": "livestock_pressure",
           "what": [
             "Risk Levels: Livestock"
           ]
         },
         {
-          "number": 20,
+          "number": 16,
           "table": "phosphate_sources",
           "what": [
             "Phosphate source (estimated)"
           ]
         },
         {
-          "number": 23,
+          "number": 19,
           "table": "datasets",
           "what": [
             "The text in each \"i\" button"
           ]
         },
         {
-          "number": 27,
+          "number": 23,
           "table": "location_text",
           "what": [
             "The text under the dashboard"
           ]
         },
         {
-          "number": 28,
+          "number": 24,
           "table": "locations",
           "what": [
             "Which waterbodies are on this dashboard"
@@ -429,50 +393,38 @@
         },
         {
           "number": 13,
-          "table": "catchment_rankings",
-          "what": [
-            "Catchment Ranking"
-          ]
-        },
-        {
-          "number": 14,
-          "table": "ecological_classes",
+          "table": "waterbody_figures",
           "what": [
             "Map colours: each waterbody's 2025 ecological class",
-            "EA Ecological Classification: 2025"
-          ]
-        },
-        {
-          "number": 17,
-          "table": "sewerage_properties",
-          "what": [
+            "Catchment Ranking",
+            "EA Ecological Classification: 2025",
             "Properties on public and private sewerage",
             "Risk Levels: Sewage (Private)"
           ]
         },
         {
-          "number": 21,
+          "number": 17,
           "table": "phosphate_point_diffuse",
           "what": [
             "Source of Phosphate"
           ]
         },
         {
-          "number": 22,
+          "number": 18,
           "table": "sewerage_improvements",
           "what": [
             "Asset Improvement Plans"
           ]
         },
         {
-          "number": 23,
+          "number": 19,
           "table": "datasets",
           "what": [
             "The text in each \"i\" button"
           ]
         },
         {
-          "number": 27,
+          "number": 23,
           "table": "location_text",
           "what": [
             "Intermittent Discharges (the explanation)",
@@ -481,7 +433,7 @@
           ]
         },
         {
-          "number": 28,
+          "number": 24,
           "table": "locations",
           "what": [
             "Which waterbodies are on this dashboard"
@@ -528,36 +480,24 @@
           ]
         },
         {
-          "number": 14,
-          "table": "ecological_classes",
+          "number": 13,
+          "table": "waterbody_figures",
           "what": [
             "Map colours: each waterbody's 2025 ecological class",
-            "Ecological Class 2025 counts"
-          ]
-        },
-        {
-          "number": 16,
-          "table": "farms",
-          "what": [
-            "Number of Farms (added up)"
-          ]
-        },
-        {
-          "number": 17,
-          "table": "sewerage_properties",
-          "what": [
+            "Ecological Class 2025 counts",
+            "Number of Farms (added up)",
             "Properties on public and private sewerage (added up)"
           ]
         },
         {
-          "number": 23,
+          "number": 19,
           "table": "datasets",
           "what": [
             "The text in each \"i\" button"
           ]
         },
         {
-          "number": 27,
+          "number": 23,
           "table": "location_text",
           "what": [
             "Why is the river system failing?, What is happening now? and Intervention hypothesis (a button each)",
@@ -575,7 +515,7 @@
       "height": 1688,
       "numbers": [
         {
-          "number": 27,
+          "number": 23,
           "table": "location_text",
           "what": [
             "Critical Path"
@@ -592,14 +532,14 @@
       "height": 1688,
       "numbers": [
         {
-          "number": 26,
+          "number": 22,
           "table": "intervention_unit_costs",
           "what": [
             "Unit Cost of Interventions: each intervention's costs"
           ]
         },
         {
-          "number": 27,
+          "number": 23,
           "table": "location_text",
           "what": [
             "Unit Cost of Interventions: the Purpose"
@@ -613,17 +553,17 @@
       "url": "intervention-management/",
       "note": null,
       "width": 2160,
-      "height": 1590,
+      "height": 1623,
       "numbers": [
         {
-          "number": 24,
+          "number": 20,
           "table": "intervention_types",
           "what": [
             "Intervention Summary: the table (a row for each intervention)"
           ]
         },
         {
-          "number": 27,
+          "number": 23,
           "table": "location_text",
           "what": [
             "Intervention Summary: the text above the table"
@@ -637,10 +577,10 @@
       "url": "intervention-management/",
       "note": "Intervention 8 is shown: each of the others has the same layout.",
       "width": 2160,
-      "height": 2284,
+      "height": 2295,
       "numbers": [
         {
-          "number": 24,
+          "number": 20,
           "table": "intervention_types",
           "what": [
             "Interventions Detail: the buttons (each intervention's short name)",
@@ -649,7 +589,7 @@
           ]
         },
         {
-          "number": 25,
+          "number": 21,
           "table": "intervention_waterbodies",
           "what": [
             "Interventions Detail: the waterbodies that need it, with size, cost, funding, delivery and lead"
@@ -663,10 +603,10 @@
       "url": "intervention-management/",
       "note": null,
       "width": 2160,
-      "height": 979,
+      "height": 1044,
       "numbers": [
         {
-          "number": 27,
+          "number": 23,
           "table": "location_text",
           "what": [
             "Community Action"

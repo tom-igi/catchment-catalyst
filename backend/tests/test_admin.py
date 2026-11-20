@@ -417,8 +417,8 @@ def test_publishing_puts_what_is_approved_on_the_dashboard(app, client, tmp_path
     assert "2 uploads approved since the last publish, so not on it yet: Intervention Waterbodies." in publish_box(page)
     assert '<section class="publish is-waiting"' in page
     with app.state.engine.begin() as conn:  # a different table
-        conn.execute(sa.text("UPDATE uploads SET uploaded_to = 'farms' WHERE id = 2"))
-    assert "so not on it yet: Intervention Waterbodies and Farms." in publish_box(client.get("/admin").text)
+        conn.execute(sa.text("UPDATE uploads SET uploaded_to = 'waterbody_lookup' WHERE id = 2"))
+    assert "so not on it yet: Intervention Waterbodies and Waterbody Lookup." in publish_box(client.get("/admin").text)
 
     client.post("/admin/publish")
     assert "Everything approved is on it." in publish_box(client.get("/admin").text)

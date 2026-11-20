@@ -225,9 +225,11 @@ tables:
     title: Datasets
     description: >-
       The text in the dashboard's "i" info buttons: one row for each data table
-      that has one, and one for the Risk Levels panel (risk_levels), which is
-      made from several tables. A panel's "i" button is greyed out until it
-      has a row here. In Excel, Alt+Enter starts a new line in a cell.
+      that has one, one for the Risk Levels panel (risk_levels), which is
+      made from several tables, and one for the Catchment Ranking panel
+      (catchment_rankings), which is one column of the Waterbody Lookup. A
+      panel's "i" button is greyed out until it has a row here. In Excel,
+      Alt+Enter starts a new line in a cell.
       The text can have paragraphs, bullets, bold, links, headings and sections, written as described under Location Text.
     filled_by: excel
     columns:
@@ -238,7 +240,8 @@ tables:
         description: >-
           The data table, by its name in the database (shown under its title
           when you click it on the admin page), e.g. livestock. Or risk_levels,
-          for the Risk Levels panel
+          for the Risk Levels panel, or catchment_rankings, for the Catchment
+          Ranking panel
       info_text:
         type: text
         example: "Risk levels assessed by the catchment partnership in 2026. Source: …"
@@ -813,13 +816,16 @@ data_tables:
         example: Low
         description: The Overheating tile, from the river shade
 
-  catchment_rankings:
-    title: Catchment Ranking
+  waterbody_figures:
+    renamed_from: waterbody_lookup
+    title: Waterbody Figures
     description: >-
-      Each catchment's ranking, shown as e.g. "Catchment Ranking: 68/92" on
-      every Waterbody Dashboard page (the 92 is the location's number of river
-      waterbodies). From the Waterbody Lookup, as the original Power BI
-      dashboard had it.
+      The Waterbody Lookup's figures for each catchment, one row each, as the
+      original Power BI dashboard had them: its ranking, its 2025 ecological
+      class, its river information, its number of farms and its properties on
+      public and private sewerage. A figure the lookup doesn't have is left
+      empty, and the dashboard shows nothing for it (or, for the river
+      information, the EA's, from Catchments, if the catchment has no row).
     filled_by: input
     input: waterbody_lookup
     columns:
@@ -831,34 +837,61 @@ data_tables:
       ranking:
         type: integer
         example: 68
-        required: true
-
-  ecological_classes:
-    title: Ecological Classes
-    description: >-
-      Each catchment's ecological class for a year the EA's Catchment Data
-      Explorer doesn't have yet (2025), from the Waterbody Lookup, as the
-      original Power BI dashboard had it. The maps' colours, the class counts
-      and that year in EA Ecological Classification use it in place of the
-      EA's own.
-    filled_by: input
-    input: waterbody_lookup
-    columns:
-      catchment_id:
-        type: text
-        example: GB108050014460
-        primary_key: true
-        references: catchments.id
-      year:
+        description: >-
+          The catchment's ranking, shown as e.g. "Catchment Ranking: 68/92" on
+          every Waterbody Dashboard page (the 92 is the location's number of
+          river waterbodies)
+      ecological_class_year:
         type: integer
         example: 2025
-        primary_key: true
-        description: The year it's the class for
+        description: The year of its ecological class, one the EA's Catchment Data Explorer doesn't have yet
       ecological_class:
         type: text
         example: Moderate
-        required: true
-        description: High, Good, Moderate, Poor or Bad
+        description: >-
+          High, Good, Moderate, Poor or Bad. The maps' colours, the class
+          counts and that year in EA Ecological Classification use it in place
+          of the EA's own
+      catchment_area_ha:
+        type: double
+        example: 1698.1
+        description: The catchment's area in hectares (River Information, on the Land Use Data page)
+      river_length_km:
+        type: double
+        example: 9.6
+        description: The river's length in km
+      river_system:
+        type: text
+        example: Taw
+        description: e.g. Taw, Torridge, Lyn or Coastal
+      upstream_rivers:
+        type: text
+        example: Hole Water, Nadrid Water
+        description: The rivers upstream, by name, separated by commas, or None
+      downstream_rivers:
+        type: text
+        example: Mole (Taw to Bray)
+        description: The rivers (or e.g. Sea) downstream, by name, separated by commas
+      number_of_farms:
+        type: integer
+        example: 68
+        description: Shown on the Land Use Data page, and added up on the Catchment Dashboard
+      public_sewerage_properties:
+        type: integer
+        example: 310
+        description: Properties on the water company's sewerage (e.g. SWW), shown on the Sewerage Data page and added up on the Catchment Dashboard
+      private_sewerage_properties:
+        type: integer
+        example: 467
+        description: Properties on private sewerage (e.g. septic tanks)
+      private_sewerage_per_ha:
+        type: double
+        example: 0.36
+        description: Properties on private sewerage per hectare of the catchment (its area in the Waterbody Lookup)
+      private_sewerage_rating:
+        type: text
+        example: High
+        description: Very Low, Low, Medium, High or Very High, from private sewerage per hectare. The Sewage (Private) tile in Risk Levels
 
   ea_thresholds:
     title: EA Thresholds
@@ -898,60 +931,6 @@ data_tables:
   #  Waterbody Dashboard: land use and sewerage, one catchment at a time
   #  (the Catchment Dashboard adds these up for the whole location)
   # ---------------------------------------------------------------------------
-
-  river_information:
-    title: River Information
-    description: >-
-      The Land Use Data page's River Information: each catchment's area,
-      river length, river system, and the rivers upstream and downstream, from
-      the Waterbody Lookup, as the original Power BI dashboard had them. A
-      catchment with no row here shows the EA's instead (from Catchments).
-    filled_by: input
-    input: waterbody_lookup
-    columns:
-      catchment_id:
-        type: text
-        example: GB108050014460
-        primary_key: true
-        references: catchments.id
-      catchment_area_ha:
-        type: double
-        example: 1698.1
-        description: The catchment's area in hectares
-      river_length_km:
-        type: double
-        example: 9.6
-        description: The river's length in km
-      river_system:
-        type: text
-        example: Taw
-        description: e.g. Taw, Torridge, Lyn or Coastal
-      upstream_rivers:
-        type: text
-        example: Hole Water, Nadrid Water
-        description: The rivers upstream, by name, separated by commas, or None
-      downstream_rivers:
-        type: text
-        example: Mole (Taw to Bray)
-        description: The rivers (or e.g. Sea) downstream, by name, separated by commas
-
-  farms:
-    title: Farms
-    description: >-
-      The number of farms in each catchment, shown on the Land Use Data page
-      and added up on the Catchment Dashboard. From the Waterbody Lookup.
-    filled_by: input
-    input: waterbody_lookup
-    columns:
-      catchment_id:
-        type: text
-        example: GB108050014460
-        primary_key: true
-        references: catchments.id
-      number_of_farms:
-        type: integer
-        example: 68
-        required: true
 
   livestock:
     title: Livestock
@@ -1090,40 +1069,6 @@ data_tables:
         example: 61.0
         required: true
         description: Its share of the catchment's phosphate, in %
-
-  sewerage_properties:
-    title: Sewerage Properties
-    description: >-
-      How many properties in each catchment are on the water company's
-      sewerage and how many on private sewerage (e.g. septic tanks), with
-      private sewerage per hectare and its rating (the Sewage (Private) tile
-      in Risk Levels). Shown on the Sewerage Data page, and added up on the
-      Catchment Dashboard. Worked out from the Waterbody Lookup, as the
-      original Power BI dashboard did.
-    filled_by: input
-    input: waterbody_lookup
-    columns:
-      catchment_id:
-        type: text
-        example: GB108050014460
-        primary_key: true
-        references: catchments.id
-      public_sewerage_properties:
-        type: integer
-        example: 310
-        description: Properties on the water company's sewerage (e.g. SWW)
-      private_sewerage_properties:
-        type: integer
-        example: 467
-        description: Properties on private sewerage
-      private_sewerage_per_ha:
-        type: double
-        example: 0.36
-        description: Properties on private sewerage per hectare of the catchment (its area in the Waterbody Lookup)
-      private_sewerage_rating:
-        type: text
-        example: High
-        description: Very Low, Low, Medium, High or Very High, from private sewerage per hectare
 
   sewerage_improvements:
     title: Sewerage Improvements

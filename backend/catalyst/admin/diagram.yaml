@@ -41,12 +41,17 @@ sections:
       pressed Publish, and when.
     tables: [publishes]
 
+# The data tables' description is shown above the diagram, as how the tables are split, with
+# what each holds (diagram.py's HOLDS) under it.
 data_tables:
   title: Data tables
   description: >-
-    One table per dataset, such as EA scores or habitat. Every row belongs to
-    a catchment, linked by Catchment ID, except in tables about a whole
-    location (such as Location Text), which are linked by Location ID.
+    Each table is filled from one place only: a download, a source file or
+    an Excel upload. So an upload only ever changes its own tables, and one
+    file can fill several. Each table also has one kind of row: one per
+    waterbody, several per waterbody (e.g. one per year), or one per
+    location. So one panel on the dashboards can use several tables, and one
+    table can be in several panels.
 
 # How each table gets its data, shown in its box on the left of the diagram ("where the
 # data comes from"). Tables marked `filled_by: api` in schema.yaml give where they're
@@ -59,10 +64,12 @@ data_tables:
 # `transformation` is what happens to the data between where it comes from and the table:
 # the diagram's "Transformation" column, a box for each table. A few short steps, shown when
 # its box is clicked, with `input` (what's downloaded, in words) and `inputs` (its columns).
-# Tables filled by an importer each say what it does to the downloads. Excel uploads are
-# copied 1 to 1 (the file is already in the table's layout), so they have none. Tables
-# worked out from a source file (`filled_by: input`) aren't listed here at all: their source
-# and steps are in their input's code (catalyst/importers/inputs/), next to the formulas.
+# Tables filled by an importer each say what it does to the downloads, and `worked_out: true` if the
+# table is worked out from them (e.g. added up), rather than holding them as they come (the label in
+# its box). Excel uploads are copied 1 to 1 (the file is already in the table's layout), so they have
+# none. Tables worked out from a source file (`filled_by: input`) aren't listed here at all:
+# their source and steps are in their input's code (catalyst/importers/inputs/), next to the
+# formulas.
 # Put a step in "double quotes" if it has a colon and a space (": ") or a " #" in it.
 filled:
   catchments:
@@ -115,6 +122,7 @@ filled:
       - "Turns the spill hours into numbers (blank or #N/A means no figure, not zero), and the grid reference into a latitude and longitude."
       - "Replaces every row in the table: one per overflow per year."
   sewage_overflow_pressure:
+    worked_out: true  # added up from the returns, not as downloaded
     source: EA storm overflow annual returns
     url: https://www.data.gov.uk/dataset/event-duration-monitoring-storm-overflows-annual-returns
     command: importer storm-overflows
@@ -166,48 +174,48 @@ filled:
 # Put a panel's name in "double quotes" if it has a colon and a space (": ") or a " #" in it.
 dashboard:
   Every Waterbody tab:  # the column down the left of River Status, EA Data, Land Use Data and Sewerage Data
-    Map colours: [ea_classifications, ecological_classes]
+    Map colours: [ea_classifications, waterbody_figures]
     Postcode search: postcodes
-    Catchment Ranking: catchment_rankings
-    EA Ecological Classification: [ea_classifications, ecological_classes]
+    Catchment Ranking: waterbody_figures
+    EA Ecological Classification: [ea_classifications, waterbody_figures]
     Failing Elements: ea_classifications
     EA RNAGs: ea_rnags
     Text at the bottom: location_text
   River Status:
     Why is the river failing?: river_status_text
     What is happening now?: river_status_text
-    Risk Levels: [sewage_overflow_pressure, sewerage_properties, livestock_pressure, esme_risk_levels]
+    Risk Levels: [sewage_overflow_pressure, waterbody_figures, livestock_pressure, esme_risk_levels]
     Intervention hypothesis: river_status_text
     Interventions: [intervention_types, intervention_waterbodies]
   EA Data:
     Environment Agency Scoring: [ea_classifications, ea_scores, ea_thresholds]
   Land Use Data:
-    River Information: river_information
+    River Information: waterbody_figures
     Habitat and Land Usage: habitat_land_use
     Risk Levels: [livestock_pressure, esme_risk_levels]
     River Obstacles: river_obstacles
-    Number of Farms: farms
+    Number of Farms: waterbody_figures
     Livestock Pressures: livestock
     Phosphate source (estimated): phosphate_sources
   Sewerage Data:
     Intermittent Discharges: location_text
     Intermittent Sewage Discharges (hrs per year): storm_overflows
     Outlet Locations: storm_overflows
-    Properties on public and private sewerage: sewerage_properties
+    Properties on public and private sewerage: waterbody_figures
     Continuous Discharge: location_text
     Source of Phosphate: phosphate_point_diffuse
-    Risk Levels: [sewage_overflow_pressure, sewerage_properties]
+    Risk Levels: [sewage_overflow_pressure, waterbody_figures]
     Asset Improvement Plans: sewerage_improvements
   Every dashboard page:
     '"i" info buttons': datasets  # quoted, as it starts with a quote mark
   Catchment Dashboard:
-    Map colours: [ea_classifications, ecological_classes]
-    Ecological Class counts: [ea_classifications, ecological_classes]
+    Map colours: [ea_classifications, waterbody_figures]
+    Ecological Class counts: [ea_classifications, waterbody_figures]
     Why is the river system failing?: location_text
     What is happening now?: location_text
     Intervention hypothesis: location_text
-    Number of Farms: farms
-    Properties on public and private sewerage: sewerage_properties
+    Number of Farms: waterbody_figures
+    Properties on public and private sewerage: waterbody_figures
     Sewage outflows (CSO & STW): storm_overflows
     Habitat and Land Usage: habitat_land_use
     Text at the bottom: location_text
@@ -239,22 +247,18 @@ numbers:
   habitat_land_use: 10
   river_status_text: 11
   esme_risk_levels: 12
-  catchment_rankings: 13
-  ecological_classes: 14
-  river_information: 15
-  farms: 16
-  sewerage_properties: 17
-  livestock: 18
-  livestock_pressure: 19
-  phosphate_sources: 20
-  phosphate_point_diffuse: 21
-  sewerage_improvements: 22
-  datasets: 23
-  intervention_types: 24
-  intervention_waterbodies: 25
-  intervention_unit_costs: 26
-  location_text: 27
-  locations: 28
+  waterbody_figures: 13
+  livestock: 14
+  livestock_pressure: 15
+  phosphate_sources: 16
+  phosphate_point_diffuse: 17
+  sewerage_improvements: 18
+  datasets: 19
+  intervention_types: 20
+  intervention_waterbodies: 21
+  intervention_unit_costs: 22
+  location_text: 23
+  locations: 24
 
 # Links the database can't check, so they aren't in schema.yaml as `references`:
 # a list of IDs, or a table's name. `to: data tables` means every data table, and

@@ -72,9 +72,9 @@
   </section>
 
   <div class="cd-figures">
-    {% set farms = figures.total("farms", "number_of_farms", ids) %}
-    {% set public = figures.total("sewerage_properties", "public_sewerage_properties", ids) %}
-    {% set private = figures.total("sewerage_properties", "private_sewerage_properties", ids) %}
+    {% set farms = figures.total("waterbody_figures", "number_of_farms", ids) %}
+    {% set public = figures.total("waterbody_figures", "public_sewerage_properties", ids) %}
+    {% set private = figures.total("waterbody_figures", "private_sewerage_properties", ids) %}
     {% set outflows = figures.overflow_count(ids) %}
     <p class="pill purple">Number of Farms: {{ farms.value | number }} {{ total_note(farms) }}</p>
     <p class="pill clay">Properties on {{ company or "public" }} sewerage: {{ public.value | number }} {{ total_note(public) }}</p>

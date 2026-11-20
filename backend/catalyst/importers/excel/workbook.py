@@ -78,10 +78,14 @@ def write_table(table: sa.Table, rows: Iterable[Mapping[str, Any]]) -> bytes:
     sheet.title = table.name[:31]  # Excel's limit
     columns = downloadable_columns(table)
     sheet.append([c.name for c in columns])
-    for row in rows:
-        sheet.append([_cell_value(row[c.name]) for c in columns])
-        for cell in sheet[sheet.max_row]:
-            if cell.data_type == "f":  # text starting with "=" is text, not a formula for Excel to run
+    # The row number is counted here: openpyxl works out sheet.max_row by looking at
+    # every cell, which made a large table (e.g. 27,000 rows) take minutes.
+    for row_number, row in enumerate(rows, start=2):
+        values = [_cell_value(row[c.name]) for c in columns]
+        sheet.append(values)
+        for column_number, value in enumerate(values, start=1):
+            if isinstance(value, str) and value.startswith("="):  # text, not a formula for Excel to run
+                cell = sheet.cell(row=row_number, column=column_number)
                 cell.data_type, cell.quotePrefix = "s", True
 
     for i, column in enumerate(columns, start=1):

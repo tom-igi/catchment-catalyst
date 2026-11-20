@@ -174,9 +174,8 @@ def test_tables_filled_by_excel_must_suit_an_upload():
 def test_tables_worked_out_from_a_source_file_say_which():
     schema = load_schema()
     assert schema.input_tables == {
-        "catchment_rankings": "waterbody_lookup", "ecological_classes": "waterbody_lookup", "farms": "waterbody_lookup",
-        "livestock": "apha_livestock", "livestock_pressure": "apha_livestock", "sewerage_properties": "waterbody_lookup",
-        "esme_risk_levels": "esme", "river_information": "waterbody_lookup", "habitat_land_use": "habitat",
+        "waterbody_figures": "waterbody_lookup", "livestock": "apha_livestock", "livestock_pressure": "apha_livestock",
+        "esme_risk_levels": "esme", "habitat_land_use": "habitat",
         "river_status_text": "improvement_information", "phosphate_sources": "sagis_phosphate",
         "phosphate_point_diffuse": "sagis_phosphate", "sewerage_improvements": "water_company_plans",
         "ea_scores": "ea_classification_facts", "ea_thresholds": "ea_classification_facts",

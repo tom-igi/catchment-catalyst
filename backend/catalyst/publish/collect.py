@@ -27,9 +27,10 @@ from catalyst.db.schema import LOCATION_COLUMN, key_column
 SIMPLIFY_DEGREES = 0.0001
 COORDINATE_DECIMALS = 5
 WORDS = {"id": "ID", "ids": "IDs", "ea": "EA", "ha": "(ha)", "km": "(km)", "url": "URL"}
-# Panels made from several tables, whose "i" text is in the Datasets table under this name instead of a
-# table's. Each is collected as a Dataset with no rows, so its "i" button works like any other.
-INFO_PANELS = {"risk_levels": "Risk Levels"}
+# Panels whose "i" text is in the Datasets table under this name instead of a table's: Risk Levels is made from
+# several tables, and Catchment Ranking is one column of the Waterbody Lookup. Each is collected as a Dataset with
+# no rows, so its "i" button works like any other.
+INFO_PANELS = {"risk_levels": "Risk Levels", "catchment_rankings": "Catchment Ranking"}
 
 
 class PublishProblem(Exception):

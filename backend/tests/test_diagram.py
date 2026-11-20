@@ -62,6 +62,19 @@ def test_the_model_says_how_each_table_is_filled():
     assert tables["ea_scores"]["one_row_per"] == ["Catchment ID", "Measure", "Year"]
 
 
+def test_the_model_says_what_each_table_holds():
+    model = diagram.model(load_schema())
+    tables = {t["name"]: t for t in model["tables"]}
+    # As downloaded (an importer's), worked out (a source file's, or an importer's that adds them up) or typed in (Excel).
+    assert (tables["ea_classifications"]["holds"], tables["catchments"]["holds"]) == ("downloaded", "downloaded")
+    assert tables["sewage_overflow_pressure"]["holds"] == "worked_out"  # added up from the storm overflow returns
+    assert (tables["waterbody_figures"]["holds"], tables["river_status_text"]["holds"]) == ("worked_out", "worked_out")
+    assert (tables["location_text"]["holds"], tables["datasets"]["holds"]) == ("typed", "typed")
+    assert (tables["uploads"]["holds"], tables["locations"]["holds"]) == (None, None)  # no data comes into them
+    assert [h["label"] for h in model["holds"]] == ["As downloaded", "Worked out", "Typed in"]
+    assert all(t["holds"] for t in tables.values() if t["kind"] == "data")
+
+
 def test_the_model_says_what_happens_to_the_data_on_the_way_in():
     tables = {t["name"]: t for t in diagram.model(load_schema())["tables"]}
     # Each importer says what it does to its downloads, in a few steps...
@@ -73,7 +86,7 @@ def test_the_model_says_what_happens_to_the_data_on_the_way_in():
     assert all(t["transformation"] == [] for t in tables.values() if t["fill"] == "excel")
     # ...and a source file's tables are worked out with the original Power BI dashboard's formulas.
     sources = {i["name"]: i for i in diagram.model(load_schema())["inputs"]}
-    assert sources["waterbody_lookup"]["tables"] == ["catchment_rankings", "farms", "sewerage_properties", "ecological_classes", "river_information"]
+    assert sources["waterbody_lookup"]["tables"] == ["waterbody_figures"]
     assert sources["apha_livestock"]["headings"][0] == "Catchment Name" and sources["apha_livestock"]["sheet"] == "Appendix 1 EIR2026_00630"
 
 
@@ -130,7 +143,7 @@ def test_each_table_on_the_dashboards_has_a_number():
             assert isinstance(t["number"], int), t["name"]
     numbers = [t["number"] for t in tables.values() if t["number"] is not None]
     assert len(numbers) == len(set(numbers))
-    assert (tables["catchments"]["number"], tables["locations"]["number"]) == (1, 28)  # the waterbodies, and which are shown
+    assert (tables["catchments"]["number"], tables["locations"]["number"]) == (1, 24)  # the waterbodies, and which are shown
     assert tables["uploads"]["number"] is None  # not on the dashboards
 
 
@@ -162,6 +175,9 @@ def test_a_mistake_in_diagram_yaml_is_reported(tmp_path):
     settings.write_text(ONLY_DATA_TABLES_SECTION + "filled: {catchments: {transformation: {Downloads: it}}}\n")
     with pytest.raises(ValueError, match="a transformation that isn't a list of steps"):
         diagram.model(load_schema(), diagram_file=settings)
+    settings.write_text(ONLY_DATA_TABLES_SECTION + "filled: {uploads: {how: admin, worked_out: true}}\n")
+    with pytest.raises(ValueError, match="gives uploads worked_out: True, but it can only be true, for a table filled by an importer"):
+        diagram.model(load_schema(), diagram_file=settings)
     settings.write_text(ONLY_DATA_TABLES_SECTION + "filled: {catchments: {inputs: WB_NAME}}\n")
     with pytest.raises(ValueError, match="inputs that aren't a list of column names"):
         diagram.model(load_schema(), diagram_file=settings)
@@ -181,7 +197,7 @@ def test_a_mistake_in_diagram_yaml_is_reported(tmp_path):
         settings.write_text(ONLY_DATA_TABLES_SECTION + f"numbers: {numbers}\n")
         with pytest.raises(ValueError, match=problem):
             diagram.model(load_schema(), diagram_file=settings)
-    settings.write_text(ONLY_DATA_TABLES_SECTION + "dashboard: {River Status: {Risk Levels: esme_risk_levels}}\nnumbers: {farms: 1}\n")
+    settings.write_text(ONLY_DATA_TABLES_SECTION + "dashboard: {River Status: {Risk Levels: esme_risk_levels}}\nnumbers: {livestock: 1}\n")
     with pytest.raises(ValueError, match="has no number for esme_risk_levels, which is on the dashboards"):
         diagram.model(load_schema(), diagram_file=settings)
     settings.write_text(ONLY_DATA_TABLES_SECTION + "links: [{from: locations.nope, to: catchments}]\n")
@@ -219,6 +235,10 @@ def test_the_admin_page_is_the_diagram(app, client):
     assert set(rows) == set(app.state.schema.metadata.tables)
     assert rows["catchments"] == 2
     assert {t["name"]: t["number"] for t in page_model(page.text)["tables"]}["catchments"] == 1  # each box shows it
+    # How the data tables are split, from diagram.yaml, and what each box's label (e.g. Worked out) means.
+    assert '<h2 id="split-title">How the data tables are split</h2>' in page.text
+    assert "<p>Each table is filled from one place only: a download, a source file or an Excel upload." in page.text
+    assert "<dt>Worked out</dt><dd>Only what the dashboards show," in page.text
     assert 'href="/admin/screenshots"' in page.text
 
 
@@ -244,7 +264,7 @@ def test_the_screenshots_page(app, client):
     assert "<h1>Where each part of the dashboard comes from</h1>" in page.text
     assert 'src="/admin/screenshots/1-river-status.webp"' in page.text and "These screenshots are out of date" not in page.text
     # Under each one, each number: its table (on the diagram) and where to update it.
-    assert '<a class="key-table" href="/admin#ecological_classes"><span class="visually-hidden">Table 14: </span>Ecological Classes</a>' in page.text
+    assert '<a class="key-table" href="/admin#waterbody_figures"><span class="visually-hidden">Table 13: </span>Waterbody Figures</a>' in page.text
     assert '<a class="key-update" href="/admin#upload-waterbody_lookup">Upload file: Waterbody Lookup</a>' in page.text
     assert '<a class="key-update" href="/admin#upload-location_text">Upload data (in Excel)</a>' in page.text
     assert '<a class="key-update" href="/admin#from-ea_rnags">Downloaded from EA Catchment Data Explorer</a>' in page.text

@@ -57,7 +57,7 @@ from the same numbers.
 | # | Source file (`Source data/…`) | Power BI query | Tables | Status |
 |---|---|---|---|---|
 | 1 | `APHA Livestock Data/APHA Livestock Data Feb 2026.xlsx` | APHA Livestock Data | `livestock`, new `livestock_pressure` (the Livestock tile) | **Built 18 Nov 2026** |
-| 2 | `Waterbody Lookup/Waterbody Lookup.xls` | Waterbody Lookup | `catchment_rankings`, `farms`, `sewerage_properties` (+ private sewerage per ha and its rating: the Sewage (Private) tile), new `ecological_classes` (2025), new `river_information` | **Built 18 Nov 2026** |
+| 2 | `Waterbody Lookup/Waterbody Lookup.xls` | Waterbody Lookup | `catchment_rankings`, `farms`, `sewerage_properties` (+ private sewerage per ha and its rating: the Sewage (Private) tile), new `ecological_classes` (2025), new `river_information` | **Built 18 Nov 2026**; the five merged into one, `waterbody_figures`, 20 Nov 2026 |
 | 3 | `ESME/ESME_River_water_bodies_Phase_4_….csv` | ESME_River_water_bodies_Phase_4_-8564305916099105313 | new `esme_risk_levels` (Runoff, Modification, Invasive Species, Overheating, Running Dry tiles) | **Built 18 Nov 2026** |
 | 4 | (storm overflows importer, kept) | EDM 2021 to 2025 … Biosphere area | new `sewage_overflow_pressure` (the Untreated Sewage tile); `risk_levels` gone | **Built 18 Nov 2026** |
 | 5 | `Habitats/Nat Eng Simplified Habitat.csv` | Nat Eng Simplified Habitat | `habitat_land_use` (+ `percent_of_catchment`) | **Built 18 Nov 2026** |
@@ -79,6 +79,11 @@ from the same numbers.
 - Checked against the data before: all 92 waterbodies had the same numbers, ratings and Livestock risk.
 
 ### 2. Waterbody Lookup (built)
+
+**Since 20 November 2026** the tables named below (`catchment_rankings`, `farms`, `sewerage_properties`,
+`ecological_classes` and `river_information`) are one table, `waterbody_figures`, with a row per waterbody
+(a blank figure, e.g. Upper East Lyn River's farms, is left empty rather than the row left out). The rest
+of this step is as it was built.
 
 - Ranking: `Biosphere Ranking` as typed (worked out outside the Power BI, in `EA Standardised Scoring/`).
 - Farms: `FARMS` (blank for Upper East Lyn River, so no row, as before). Properties: `SWW Sewerage`,

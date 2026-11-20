@@ -116,7 +116,7 @@ def test_land_use_shows_the_river_information_and_habitat(database, tmp_path):
 def test_river_information_is_the_waterbody_lookups_with_the_eas_otherwise(database, tmp_path):
     east = next(c for c in gather(database).catchments if c["id"] == EAST_OKEMONT)
     # As typed in the Waterbody Lookup: names, linked if they're one of the location's catchments.
-    insert(database, "river_information", [{
+    insert(database, "waterbody_figures", [{
         "catchment_id": WEST_OKEMENT, "catchment_area_ha": 3001.5, "river_length_km": 12.345, "river_system": "Torridge",
         "upstream_rivers": "None", "downstream_rivers": f"{east['name'].upper()}, Taw / Torridge",
     }])
@@ -184,6 +184,15 @@ def test_the_risk_levels_info_button_is_a_panels(database, tmp_path):
         assert "<li>Livestock: APHA data.</li>" in text
 
 
+def test_the_catchment_ranking_info_button_is_a_panels(database, tmp_path):
+    # Catchment Ranking is one column of the Waterbody Lookup, so its "i" text is under the panel's name too.
+    with database.begin() as conn:
+        conn.execute(sa.text("INSERT INTO datasets (table_name, info_text) VALUES ('catchment_rankings', 'From the EA''s 2025 data.')"))
+    text = (publish(database, tmp_path) / "river-status" / WEST_OKEMENT / "index.html").read_text()
+    assert 'popovertarget="info-catchment_rankings"' in text and "<h3>Catchment Ranking</h3>" in text
+    assert "<p>From the EA's 2025 data.</p>" in text
+
+
 def test_figures_cope_with_a_missing_table(database):
     location = gather(database)
     location.datasets = [d for d in location.datasets if d.table not in ("ea_classifications", "ea_rnags", "habitat_land_use")]
@@ -218,10 +227,12 @@ def test_status_counts_are_most_first():
     assert numbers.classification("D") == [(2022, None), (2019, "Bad")]
 
 
-def test_a_year_the_ea_doesnt_have_comes_from_ecological_classes(database, tmp_path):
+def test_a_year_the_ea_doesnt_have_comes_from_the_waterbody_lookup(database, tmp_path):
     # The Waterbody Lookup's 2025 class, as the original dashboard had it.
-    insert(database, "ecological_classes", [{"catchment_id": WEST_OKEMENT, "year": 2025, "ecological_class": "Good"},
-                                            {"catchment_id": EAST_OKEMONT, "year": 2025, "ecological_class": "Bad"}])
+    insert(database, "waterbody_figures", [
+        {"catchment_id": WEST_OKEMENT, "ecological_class_year": 2025, "ecological_class": "Good"},
+        {"catchment_id": EAST_OKEMONT, "ecological_class_year": 2025, "ecological_class": "Bad"},
+    ])
     numbers = figures.Figures(gather(database))
     assert numbers.status(WEST_OKEMENT) == "Good"  # the map's colour
     assert [year for year, _ in numbers.classification(WEST_OKEMENT)] == [2025, 2022, 2019]
@@ -471,7 +482,7 @@ def test_river_status_shows_the_text_risks_interventions_and_ranking(database, t
     }])
     insert(database, "sewage_overflow_pressure", [{"catchment_id": WEST_OKEMENT, "year": 2025, "spill_hours": 1500.0, "pressure": "Very High"}])
     insert(database, "esme_risk_levels", [{"catchment_id": WEST_OKEMENT, "abstraction_sustainability": 4, "running_dry": "Low"}])
-    insert(database, "catchment_rankings", [{"catchment_id": WEST_OKEMENT, "ranking": 7}])
+    insert(database, "waterbody_figures", [{"catchment_id": WEST_OKEMENT, "ranking": 7}])
     here = location_id(database)
     insert(database, "intervention_types", [
         {"location_id": here, "number": 3, "name": "Less metal", "summary_group": "Priority interventions"},
@@ -529,7 +540,7 @@ def test_measured_values_have_at_least_two_decimal_places(value, shown):
 
 
 def test_land_use_shows_farms_livestock_and_phosphate(database, tmp_path):
-    insert(database, "farms", [{"catchment_id": WEST_OKEMENT, "number_of_farms": 68}])
+    insert(database, "waterbody_figures", [{"catchment_id": WEST_OKEMENT, "number_of_farms": 68}])
     insert(database, "livestock", [
         {"catchment_id": WEST_OKEMENT, "livestock": "Sheep", "number": 5558, "number_note": None, "density": 150.25,
          "density_rating": "Medium"},
@@ -565,8 +576,8 @@ def test_land_use_shows_farms_livestock_and_phosphate(database, tmp_path):
 
 
 def test_sewerage_shows_the_properties_plans_and_location_text(database, tmp_path):
-    insert(database, "sewerage_properties", [{"catchment_id": WEST_OKEMENT, "public_sewerage_properties": 54478, "private_sewerage_properties": 467,
-                                              "private_sewerage_per_ha": 0.3592, "private_sewerage_rating": "High"}])
+    insert(database, "waterbody_figures", [{"catchment_id": WEST_OKEMENT, "public_sewerage_properties": 54478, "private_sewerage_properties": 467,
+                                           "private_sewerage_per_ha": 0.3592, "private_sewerage_rating": "High"}])
     insert(database, "sewerage_improvements", [{"catchment_id": WEST_OKEMENT, "site_name": "HIGH BICKINGTON STW", "completion_year": 2035}])
     insert(database, "location_text", [{"location_id": location_id(database), "intermittent_discharges": "When it rains.",
                                         "about_waterbody_dashboard": "Email someone@example.org"}])
@@ -581,7 +592,9 @@ def test_sewerage_shows_the_properties_plans_and_location_text(database, tmp_pat
 
 
 def test_the_catchment_dashboard_adds_up_the_location(database, tmp_path):
-    insert(database, "farms", [{"catchment_id": WEST_OKEMENT, "number_of_farms": 68}])
+    # East Okement has a row, but no figure for its farms (or a class): it isn't counted.
+    insert(database, "waterbody_figures", [{"catchment_id": WEST_OKEMENT, "ranking": 1, "number_of_farms": 68},
+                                           {"catchment_id": EAST_OKEMONT, "ranking": 3, "number_of_farms": None}])
     insert(database, "habitat_land_use", [
         {"catchment_id": WEST_OKEMENT, "habitat": "Woodland", "area_ha": 500},
         {"catchment_id": EAST_OKEMONT, "habitat": "Woodland", "area_ha": 100},
@@ -593,7 +606,7 @@ def test_the_catchment_dashboard_adds_up_the_location(database, tmp_path):
     assert [(a.kind, a.slug) for a in areas] == [("management", ""), ("operational", "torridge")]  # North Devon is the whole location
     ids = [WEST_OKEMENT, EAST_OKEMONT]
     assert numbers.class_counts(ids) == [("High", None), ("Good", None), ("Moderate", None), ("Poor", 1), ("Bad", None)]
-    assert numbers.total("farms", "number_of_farms", ids) == figures.Total(68, 1, 2)
+    assert numbers.total("waterbody_figures", "number_of_farms", ids) == figures.Total(68, 1, 2)
     habitat, covered = numbers.habitat_totals(ids)
     assert [(row["habitat"], row["area_ha"], row["share"]) for row in habitat] == [("Urban", 200, 25.0), ("Woodland", 600, 75.0)]
     assert covered.known == 2  # each share is of all their habitat areas (800 ha), as on the original
