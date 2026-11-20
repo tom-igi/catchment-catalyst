@@ -9,8 +9,6 @@
     /admin/tables/<table>/example     the real data shown in its Transformation panel, as JSON (see examples.py)
     /admin/tables/<table>/upload      upload an edited copy (Excel tables only)
     /admin/inputs/<input>/upload      upload a source file as it came (see catalyst.importers.inputs)
-    /admin/inputs/<input>/work-out-again   work its tables out again from its last approved file, with the
-                                      formulas as they are now: a new upload of the same file, to preview
     /admin/uploads/<id>               preview what an upload will change; approve or cancel
     /admin/publish                    publish the dashboards (the Publish button at the top of /admin)
     /admin/screenshots                numbered screenshots of the dashboards: each part's table, by its
@@ -284,16 +282,8 @@ def _excel_details(conn: sa.Connection, state, table: sa.Table, last: sa.Row | N
 
 
 def _input_details(conn: sa.Connection, state, name: str, last: sa.Row | None) -> dict:
-    """What a source file's upload needs: where to upload it, its recent uploads, and the file it can be worked out
-    again from (its last approved one)."""
-    return {
-        "upload_url": f"/admin/inputs/{name}/upload",
-        "again": {
-            "url": f"/admin/inputs/{name}/work-out-again", "file": last.file_name, "when": _when(last.uploaded_at),
-            "file_url": f"/admin/uploads/{last.id}/file",
-        } if last else None,
-        **_recent_uploads(conn, state, name, last),
-    }
+    """What a source file's upload needs: where to upload it, and its recent uploads."""
+    return {"upload_url": f"/admin/inputs/{name}/upload", **_recent_uploads(conn, state, name, last)}
 
 
 def _recent_uploads(conn: sa.Connection, state, uploaded_to: str, last: sa.Row | None) -> dict:
@@ -311,7 +301,6 @@ def _recent_uploads(conn: sa.Connection, state, uploaded_to: str, last: sa.Row |
                 "added": u.rows_added,
                 "changed": u.rows_changed,
                 "removed": u.rows_removed,
-                "again_from": u.worked_out_again_from,  # worked out again from that upload's file, not uploaded
             }
             for u in uploads.recent(conn, state.schema, uploaded_to, RECENT_UPLOADS)
         ],
@@ -435,24 +424,7 @@ def _upload(request: Request, user: str, uploaded_to: str, file: UploadFile | No
     return _keep_for_preview(request, user, uploaded_to, file.filename, data, same)
 
 
-@router.post("/inputs/{input_name}/work-out-again")
-def work_out_again(request: Request, user: User, source: SourceInput):
-    """Work a source file's tables out again from its last approved file, with the formulas as they are now (e.g.
-    after a formula or a table changed), as a new upload of the same file: previewed, then approved or cancelled."""
-    state = request.app.state
-    with state.engine.connect() as conn:
-        last = uploads.last_approved(conn, state.schema).get(source.name)
-        data = uploads.file(conn, state.schema, last.id) if last else None
-    if last is None:
-        request.session["message"] = f"No {source.title} file has been approved yet, so there's nothing to work out again."
-        return RedirectResponse(_upload_panel(source.name), 303)
-    same = (f"Worked out again from {last.file_name} (uploaded {_when(last.uploaded_at)}): it gives the same "
-            "figures as the tables have now, so there's nothing to change.")
-    return _keep_for_preview(request, user, source.name, last.file_name, data, same, worked_out_again_from=last.id)
-
-
-def _keep_for_preview(request: Request, user: str, uploaded_to: str, file_name: str, data: bytes, same: str,
-                      worked_out_again_from: int | None = None):
+def _keep_for_preview(request: Request, user: str, uploaded_to: str, file_name: str, data: bytes, same: str):
     """Compare a file with the table(s) it fills, and keep it as an upload to preview if it changes anything.
     `same` is the message if it doesn't, with {tables} for "the table" or "the tables it fills"."""
     state = request.app.state
@@ -465,7 +437,7 @@ def _keep_for_preview(request: Request, user: str, uploaded_to: str, file_name: 
                 return RedirectResponse(_upload_panel(uploaded_to), 303)
             upload_id = uploads.create(
                 conn, state.schema, uploaded_to, file_name, data, user, changes.rows_in_file, changes.comparisons,
-                source_file=changes.source_file, worked_out_again_from=worked_out_again_from, examples=changes.examples,
+                source_file=changes.source_file, examples=changes.examples,
             )
     except excel.UploadError as e:
         return _upload_problems(request, uploaded_to, file_name, e.problems)

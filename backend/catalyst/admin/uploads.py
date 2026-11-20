@@ -6,10 +6,6 @@ database's backups. (Until 20 November 2026 they were kept in imports/raw/.)
 The file is only read when it's needed: the lists here leave it out, and its
 examples (the Transformation panels' real data, catalyst.admin.examples) too.
 
-A source file can also be worked out again from an earlier upload's file, with
-its formulas as they are now: that's a new upload of the same file, with
-`worked_out_again_from` saying which.
-
 An upload is either an Excel file for one table (1 to 1), or a source file,
 which can fill several tables. Either way its changes are a Comparison per
 table: `comparisons`, by table name.
@@ -37,7 +33,6 @@ def create(
     rows_in_file: int,
     comparisons: dict[str, Comparison],
     source_file: bool = False,
-    worked_out_again_from: int | None = None,
     examples: dict | None = None,
 ) -> int:
     """Record the upload, with its file. Returns the upload's ID.
@@ -49,7 +44,7 @@ def create(
         uploads.insert()
         .values(
             uploaded_to=uploaded_to, file_name=file_name, file=data, uploaded_by=user, rows_in_file=rows_in_file,
-            worked_out_again_from=worked_out_again_from, examples=examples if examples is not None else sa.null(),
+            examples=examples if examples is not None else sa.null(),
             **_counts(comparisons, source_file),
         )
         .returning(uploads.c.id)

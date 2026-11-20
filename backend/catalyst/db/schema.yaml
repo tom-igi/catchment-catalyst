@@ -255,8 +255,8 @@ tables:
       One row for each file uploaded in the admin page: which table or source
       file it was for, who uploaded it and when, what it changed, and the file
       itself, so an earlier version can be downloaded from the admin page and
-      uploaded again, and a source file can be worked out again. Being in the
-      database, the files are in its backups too.
+      uploaded again (e.g. after a formula changes). Being in the database,
+      the files are in its backups too.
     columns:
       id:
         type: integer
@@ -329,13 +329,6 @@ tables:
         type: timestamptz
         example: 2026-10-29 14:32
         description: When it was approved and the table's rows were replaced
-      worked_out_again_from:
-        type: integer
-        example: 42
-        references: uploads.id
-        description: >-
-          For a source file worked out again (with the formulas as they are
-          now) rather than uploaded again: the earlier upload whose file it is
       examples:
         type: jsonb
         example: '{"livestock_pressure": {"waterbody": "Hole Brook", "in": {...}, "out": {...}, "steps": {...}}}'

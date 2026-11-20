@@ -3,7 +3,7 @@
 Where the build is up to, the decisions made along the way, and what's next.
 For the overall design, see [PLAN.md](PLAN.md). For commands, see [README.md](README.md).
 
-**Last updated:** 20 November 2026 (the Waterbody Lookup's five tables merged into Waterbody Figures; the admin page says how the data tables are split and what each holds; large Excel downloads fixed; uploaded files kept in the database; Work it out again for source files; where the figures are worked out, written down; downloads moved to the bottom of the admin page, Uploads and Publishes taken off it, and each Transformation shown with real data)
+**Last updated:** 20 November 2026 (the Waterbody Lookup's five tables merged into Waterbody Figures; the admin page says how the data tables are split and what each holds; large Excel downloads fixed; uploaded files kept in the database; where the figures are worked out, written down; downloads moved to the bottom of the admin page, Uploads and Publishes taken off it, and each Transformation shown with real data; Work it out again added, then taken out again)
 
 ---
 
@@ -15,7 +15,7 @@ Tom to run things himself, 29 October 2026).
 ```bash
 docker compose up -d                      # start the local database, admin page and dashboard preview
 docker compose run --rm schema plan       # should say "The database already matches schema.yaml."
-docker compose run --rm test              # run the tests (291 passing at the last update)
+docker compose run --rm test              # run the tests (290 passing at the last update)
 docker compose run --rm publish           # rebuild the dashboard pages (or the admin page's Publish button)
 ```
 
@@ -58,7 +58,7 @@ and optional extras are kept self-contained so they're easy to remove.
 | `catchments` | Core | Every EA river waterbody: details, outline, river line, area, length, upstream/downstream IDs. Filled only by the importer. | 92 (every North Devon river) |
 | `locations` | Core | ID, name, and the list of catchment IDs | 1 (North Devon, with the 92 catchments) |
 | `datasets` | Core, Excel | The text in each "i" button: one row per data table that has one (table name, text) | 7 |
-| `uploads` | Core | Every upload: the table or source file it was for (`uploaded_to`), its file name and the file itself (since 20 November 2026), who, when, status, rows added / changed / deleted (and each table's, for a source file), and for a source file worked out again, the upload whose file it is | 46 |
+| `uploads` | Core | Every upload: the table or source file it was for (`uploaded_to`), its file name and the file itself (since 20 November 2026), who, when, status, rows added / changed / deleted (and each table's, for a source file) | 46 |
 | `publishes` | Core | Every publish of the dashboards: when, and who (empty for the publish command) | 5 |
 | `ea_classifications` | Data, EA | The EA's status for each classification item and year (2009 to 2022), per catchment | 27,294 |
 | `ea_rnags` | Data, EA | The EA's reasons for not achieving good: element, activity, sector | 513 |
@@ -178,7 +178,7 @@ The scripts that built and uploaded the files were one-offs, kept outside the pr
 - **The preview is the safety net.** It lists every row to be added, changed and deleted, and warns about deletions (strongly if it would empty the table). Nothing changes until someone approves.
 - **Approval re-checks the preview.** If the table changed in between (e.g. the other person uploaded), approval is refused and the fresh preview is shown. This catches someone uploading from an out-of-date download.
 - **Every uploaded file is kept, in the database** (the uploads table's `file` column, since 20 November 2026; before that in `imports/raw/<table>/`), and listed on the table's page. Undo means downloading an earlier file and uploading it again. In the database, the files are in its backups (a `pg_dump`), and copying the database copies them. The importers' downloads stay in `imports/raw/`: they can always be downloaded again, and some are large. The 46 files there were copied in on 20 November and checked byte for byte; the copies in `imports/raw/` were left where they are.
-- **A source file can be worked out again** (20 November 2026) from its last approved file, with the formulas as they are now: its **Work it out again** button on the admin page. It's a new upload of the same file (`worked_out_again_from` says which), previewed and approved like any other, so changing a formula or a table no longer means finding the file and uploading it again. Excel tables don't need it: they're copied 1 to 1.
+- **No "Work it out again" button** (Tom, 20 November 2026): it was added, then taken out the same day, as it added complications. After a formula changes, download the last approved file from its upload and upload it again; the preview shows what the new formula changes. Its `worked_out_again_from` column was dropped (no upload had used it).
 - **Where the figures are worked out** (20 November 2026, README.md "Where the figures are worked out"): when the data comes in, anything that turns one file into each waterbody's figures (unit changes, densities, ratings, pressures, a habitat's share), so the preview shows the figures changing and each table holds what the dashboards show; when the dashboards are published (`figures.py`), anything that needs more than one table, a whole location, or chooses what to show (the latest year, the EA Data grid, failing elements, totals). Considered and not done: keeping the source files' rows in the database and working everything out at Publish, or keeping both (Tom asked, 20 November 2026). The preview would lose the figures, or there'd be twice as many tables, for no gain at this size.
 - **Rows are matched by the primary key,** which is also the duplicate check: the same catchment, measure and year twice in a file is refused, with the Excel row numbers.
 - **The API importers share only a few small pieces** (`importers/api/common.py`, 11 November 2026): `ImportProblem`, `replace_rows` (empty the table, then insert in batches of 5,000) and `run_folder` (`imports/raw/<table>/<date and time>/`). Each source's downloading and reading stays in its own module, because they really are different. No general framework that runs every importer the same way unless many more sources are added.

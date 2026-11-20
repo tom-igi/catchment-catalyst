@@ -1808,7 +1808,6 @@ function start() {
     for (const r of recent) {
       const li = el("li");
       li.append(el("span", "u-when", r.when), document.createTextNode(" · " + r.who + " · "), link(null, r.file_url, r.file));
-      if (r.again_from) li.appendChild(document.createTextNode(" · worked out again from upload " + r.again_from));
       const what = el("span", "u-what");
       if (r.status === "approved") what.textContent = "Approved: " + r.added + " added, " + r.changed + " changed, " + r.removed + " deleted";
       else if (r.status === "preview") what.appendChild(link(null, r.url, "Waiting to be checked and approved →"));
@@ -1913,27 +1912,6 @@ function start() {
     }
     howRow.append(el("span", "via", "The formulas"), hows);
     out.push(howRow);
-
-    // Work it out again: the last approved file, through the formulas as they are now.
-    if (u.again && isLocal(u.again.url)) {
-      const again = el("div", "again");
-      again.appendChild(el("h3", null, "Work it out again"));
-      const p = el("p");
-      p.append(
-        document.createTextNode("If the formulas or the tables have changed, work " + joinWords(tables) +
-          " out again from the last approved file, "), link(null, u.again.file_url, u.again.file),
-        document.createTextNode(" (uploaded " + u.again.when + "), without uploading it again. " +
-          "You'll see what will change before anything is saved."),
-      );
-      const form = el("form", "upload-form");
-      form.method = "post";
-      form.setAttribute("action", u.again.url);
-      const go = el("button", "btn ghost", "Work it out again");
-      go.type = "submit";
-      form.appendChild(go);
-      again.append(p, form);
-      out.push(again);
-    }
 
     out.push(...recentBlock(u, "Nothing has been uploaded from this source file yet."), fillsRow(g));
     panelBody.replaceChildren(...out);

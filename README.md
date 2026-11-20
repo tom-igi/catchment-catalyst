@@ -143,9 +143,9 @@ database: it can always be downloaded again). See `imports/README.md`.
    any rows left out (waterbodies that aren't in the Catchments table).
 4. Approve it, and every table it fills is changed at once. Then **Publish**, as below.
 
-If a formula or one of its tables changes later, click **Work it out again** in the same
-place. It works the tables out again from the last approved file, with the formulas as they
-are now, and shows the preview as an upload does, without anyone uploading the file again.
+If a formula changes later, download the last approved file (each upload's file is listed
+under **Upload file**, newest first) and upload it again: the preview shows what the new
+formula changes.
 
 Each of its tables has a **Power BI's formulas** box in the Transformation column. Click it to
 see the last approved file going through the formulas: a few of its rows (with only the columns

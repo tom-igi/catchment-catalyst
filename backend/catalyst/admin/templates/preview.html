@@ -14,11 +14,7 @@
 <p class="lead">
   <a href="/admin/uploads/{{ upload.id }}/file">{{ upload.file_name }}</a>
   ({{ upload.rows_in_file | rows }}),
-  {%- if upload.worked_out_again_from %}
-  worked out again with the formulas as they are now, from <a href="/admin/uploads/{{ upload.worked_out_again_from }}">upload {{ upload.worked_out_again_from }}</a>'s file, by {{ upload.uploaded_by }},
-  {%- else %}
   uploaded to {{ uploaded_to }} by {{ upload.uploaded_by }},
-  {%- endif %}
   {{ upload.uploaded_at | when }}.
   {% if filled | length > 1 or (filled and filled[0] != uploaded_to) %}It fills {{ filled | and_list }}.{% endif %}
 </p>

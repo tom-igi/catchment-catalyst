@@ -369,43 +369,6 @@ def test_a_source_files_problems_are_shown_in_its_upload(app, client):
     assert upload_source(client, b"x", source="livestock").status_code == 404  # a table, not a source file
 
 
-def test_a_source_file_can_be_worked_out_again(app, client):
-    """From its last approved file, with the formulas as they are now: e.g. after a formula or a table changed."""
-    add_named_catchments(app)
-    again = "/admin/inputs/apha_livestock/work-out-again"
-    page = client.post(again)
-    assert "No APHA livestock data file has been approved yet, so there&#39;s nothing to work out again." in page.text
-    assert source_details(client)["update"]["again"] is None
-
-    data = apha_file(ABBEY_ROW, BADGWORTHY_ROW)
-    upload_source(client, data, name="APHA February.xlsx")
-    approve(client, 1)
-    details = source_details(client)["update"]["again"]
-    assert (details["url"], details["file"], details["file_url"]) == (again, "APHA February.xlsx", "/admin/uploads/1/file")
-    page = client.post(again)  # the tables already match it
-    assert page.history[-1].headers["location"] == "/admin#upload-apha_livestock"
-    assert "Worked out again from APHA February.xlsx (uploaded " in page.text
-    assert "it gives the same figures as the tables have now, so there&#39;s nothing to change." in page.text
-    assert len(uploads_table(app)) == 1  # nothing kept
-
-    before = rows_in(app, "livestock_pressure")
-    with app.state.engine.begin() as conn:  # as if a formula had changed since
-        conn.execute(sa.text("UPDATE livestock_pressure SET pressure = 'Something else'"))
-    response = client.post(again, follow_redirects=False)
-    assert response.headers["location"] == "/admin/uploads/2"
-    preview = client.get("/admin/uploads/2").text
-    assert "worked out again with the formulas as they are now, from" in preview and "upload 1</a>'s file, by tom" in preview
-    assert "<strong>0</strong> to add" in preview and "<strong>2</strong> to change" in preview
-    approve(client, 2)
-    assert rows_in(app, "livestock_pressure") == before
-    assert uploads_table(app)[1] == (2, "apha_livestock", "tom", "approved", 0, 2, 0)
-    assert kept_file(app, 2) == data
-    recent = source_details(client)["update"]["recent"]
-    assert [(r["id"], r["file"], r["again_from"]) for r in recent] == [(2, "APHA February.xlsx", 1), (1, "APHA February.xlsx", None)]
-    assert source_details(client)["update"]["again"]["file_url"] == "/admin/uploads/2/file"  # the last approved
-    assert client.post("/admin/inputs/livestock/work-out-again").status_code == 404  # a table, not a source file
-
-
 def test_a_transformations_example_is_from_its_last_approved_file(app, client):
     """The real data in a Transformation panel: rows of the file, each step done to one waterbody's, and the rows they
     make in the table. (A downloaded table's is in diagram.yaml: test_diagram.py.)"""

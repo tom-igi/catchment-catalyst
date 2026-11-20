@@ -19,9 +19,9 @@ out").
 3. Each table is compared with its new rows, as an Excel upload is
    (catalyst.importers.excel), and every change is previewed.
 4. Once approved, every table it fills is changed at once.
-5. If a formula changes later, "Work it out again" (on its upload in the admin
-   page) runs its last approved file through the formulas as they are now, as
-   a new upload of the same file, previewed and approved in the same way.
+5. If a formula changes later, download the last approved file (listed under
+   its upload in the admin page) and upload it again, to preview and approve
+   what the new formula changes.
 
 To add one: write its module (apha_livestock.py is an example), list it in
 INPUTS below, and mark its tables in schema.yaml with `filled_by: input` and
