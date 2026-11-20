@@ -232,11 +232,11 @@ filled:
     input: The same returns, as read into Storm Overflows
     inputs: [WFD Waterbody ID, Total Duration]
     transformation:
-      - step: Adds up the spill hours of all the overflows into each catchment in the latest year of the returns (2025 now). An overflow with no figure adds nothing, and a catchment with none has 0 hours. In Power BI, this is the DAX measure Total Spill Duration 2025 (in seconds).
+      - step: Adds up the spill hours of all the overflows into each catchment in the latest year of the returns (2025 now). An overflow with no figure adds nothing, and a catchment with none has 0 hours.
         example: Hole Brook in 2025, its 5 overflows' hours added up, 319.24 + 15.92 + 143.86 + 1.7 + 0, is 480.72 hours.
-      - step: Matches overflows to catchments by their waterbody ID. The original matched by name, so it missed the few whose waterbody name the water company typed differently (e.g. MOLE).
+      - step: Matches overflows to catchments by their waterbody ID.
         example: All 5 have Hole Brook's ID, GB108050014090, so all 5 are added up for Hole Brook.
-      - step: "Works out the pressure from the spill hours: Very High above 1,440 hours, High above 720, Medium above 240, Low above 120, otherwise Very Low. It's the Untreated Sewage tile in Risk Levels. In Power BI, this is the DAX measure Sewage Overflow Pressure (5,184,000, 2,592,000, 864,000 and 432,000 seconds)."
+      - step: "Works out the pressure from the spill hours: Very High above 1,440 hours, High above 720, Medium above 240, Low above 120, otherwise Very Low. It's the Untreated Sewage tile in Risk Levels."
         example: 480.72 hours is above 240 but not above 720, so Medium.
       - Replaces every row in the table, at the same time as Storm Overflows.
     example:

@@ -9,13 +9,13 @@
 <style>
   /* The admin page's home: a left-to-right flow diagram of every table, drawn from the model
      below (made by diagram.py and app.py), with a details panel for each table, where it can be
-     downloaded. Each source file (one of the original Power BI dashboard's) and each Excel
-     table has its own source on the left, which opens its upload. Between each source and its
-     tables is its transformation: what's done to the data on the way in (the original's
-     formulas for a source file, 1 to 1 for an Excel table), shown with real data when it's
-     clicked. Source files come first, then Excel tables, then downloads. Each data table's box
-     lists where it's shown on the dashboards. Above the diagram, the Publish box puts what's been approved
-     on the public dashboards. */
+     downloaded. Each source file and each Excel table has its own source on the left, which
+     opens its upload. Between each source and its tables is its transformation: what's done to
+     the data on the way in (formulas for a source file, 1 to 1 for an Excel table), shown with
+     real data when it's clicked. Source files come first, then Excel tables, then downloads.
+     Each table's box has its number, as on the numbered screenshots of the dashboards. Words
+     are kept to a minimum. Above the diagram, the Publish box puts what's been approved on the
+     public dashboards. */
   :root {
     color-scheme: light dark;
     --bg: #f3f6f7;
@@ -245,33 +245,8 @@
     font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--bg);
   }
   .p-badge.p-number { padding: 5px 12px; background: var(--number); color: #ffffff; }
-  .shots-link { display: flex; align-items: center; gap: 8px; max-width: 760px; margin: -14px 0 26px; font-size: .92rem; color: var(--muted); }
+  .shots-link { display: flex; align-items: center; gap: 8px; margin: -14px 0 26px; font-size: .92rem; }
   .shots-link .tnum { position: static; flex: none; box-shadow: none; }
-
-  /* How the data tables are split, and what each table's box says it holds. */
-  .split-note { max-width: 760px; margin: -12px 0 28px; font-size: .92rem; color: var(--muted); }
-  .split-note h2 { margin: 0 0 4px; font-size: .92rem; color: var(--text); }
-  .split-note p { margin: 0 0 6px; }
-  .split-note dl { display: grid; grid-template-columns: max-content 1fr; gap: 3px 12px; margin: 0; }
-  .split-note dt { font-weight: 650; color: var(--text); }
-  .split-note dd { margin: 0; }
-
-  /* Where a data table is shown on the dashboards: each page, and its panels. Under the table's
-     name, or beside it when the box is wide enough (the Data tables column is the widest). */
-  .table-cell { container-type: inline-size; }  /* so a table's box lays out by its own width */
-  .node.has-dash { flex-wrap: wrap; row-gap: 8px; }
-  .node-dash {
-    flex: 1 1 100%; display: grid; grid-template-columns: 10em minmax(0, 1fr); gap: 4px 10px; align-items: baseline;
-    padding-top: 8px; border-top: 1px solid var(--border); font-size: .78rem; line-height: 1.35;
-  }
-  .nd-page { color: var(--muted); font-weight: 600; }
-  .nd-panels { display: flex; flex-wrap: wrap; gap: 3px 4px; }
-  .nd-panel { padding: 1px 7px; border-radius: 5px; background: var(--quiet-soft); color: var(--text); font-weight: 600; }
-  @container (min-width: 580px) {
-    .node.has-dash { flex-wrap: nowrap; }
-    .node.has-dash .node-text { flex: 0 0 clamp(150px, 24%, 180px); }
-    .node-dash { flex: 1 1 auto; min-width: 0; align-self: stretch; align-content: center; padding: 2px 0 2px 14px; border-top: 0; border-left: 1px solid var(--border); }
-  }
 
   /* The hub and the dashboard tables */
   .hub, .dash { flex-direction: column; align-items: stretch; gap: 6px; padding: 14px 16px; }
@@ -289,10 +264,6 @@
     background: var(--catchment); color: var(--on-solid); font-size: .78rem; font-weight: 700; white-space: nowrap;
   }
   .dash .port { background: var(--catchment-soft); color: var(--catchment); }
-  .node-sum {
-    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
-    font-size: .84rem; line-height: 1.4; color: var(--muted);
-  }
 
   .junction {
     display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 4px 0 12px;
@@ -345,7 +316,6 @@
     background: var(--text); color: var(--bg); font-size: .75rem; font-weight: 700;
   }
   .col-head .col-text { padding-top: 1px; }
-  .col-head .col-sub { display: block; margin-top: 1px; font-size: .82rem; font-weight: 400; color: var(--muted); }
 
   @media (max-width: 959.98px) {
     main { padding: 18px 16px 104px; }
@@ -363,8 +333,9 @@
     .flow {
       display: grid;
       grid-template-columns:
-        minmax(180px, 1.3fr) minmax(20px, .1fr) minmax(124px, .72fr) minmax(20px, .1fr)
-        minmax(170px, 3.3fr) minmax(48px, .3fr) minmax(160px, .95fr) minmax(32px, .15fr) minmax(136px, .85fr);
+        minmax(180px, 1.2fr) minmax(20px, .12fr) minmax(124px, .75fr) minmax(20px, .12fr)
+        minmax(170px, 1.3fr) minmax(48px, .5fr) minmax(160px, 1fr) minmax(32px, .2fr) minmax(136px, .9fr);
+      max-width: 1500px;
       row-gap: 22px;
       align-items: start;
       padding-bottom: 8px;
@@ -407,15 +378,6 @@
     main { padding: 28px 32px 104px; }
     .flow { row-gap: 26px; }
   }
-  /* Below this, the Data tables boxes are too narrow to put the dashboard panels beside the
-     table's name (they go under it), so the other columns get more of the width back. */
-  @media (min-width: 960px) and (max-width: 1599.98px) {
-    .flow {
-      grid-template-columns:
-        minmax(180px, 1.45fr) minmax(20px, .12fr) minmax(124px, .8fr) minmax(20px, .12fr)
-        minmax(170px, 2.4fr) minmax(48px, .35fr) minmax(160px, 1fr) minmax(32px, .2fr) minmax(136px, .9fr);
-    }
-  }
 
   /* ------- Details panel ------- */
   .panel {
@@ -456,16 +418,13 @@
   .from { padding: 14px 16px; border-radius: 12px; background: var(--f-soft); border-left: 4px solid var(--f); }
   .from p { margin: 6px 0 0; }
   .from p:first-child { margin-top: 0; }
-  .fills { margin-top: 16px; }
   .from .muted { color: var(--muted); font-size: .9rem; }
   .from.same { background: transparent; border: 1.5px dashed var(--f); }
   .from ol { margin: 6px 0 0; padding-left: 22px; }
   .from ol li + li { margin-top: 5px; }
-  .from .pbi { display: block; margin-top: 2px; color: var(--muted); font-size: .82rem; }
 
   /* A transformation, with real data: what comes in, each step done to one waterbody's rows, what goes out. */
   .panel.wide { width: min(960px, 100%); }
-  .xf-lead { margin: 10px 0 0; color: var(--muted); }
   .stage { margin-top: 22px; }
   .stage h3 { margin: 0 0 6px; }
   .stage h3 .num { flex: none; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%;
@@ -486,15 +445,11 @@
   .xf-steps { margin: 0; padding-left: 24px; }
   .xf-steps > li + li { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
   .xf-steps p { margin: 0; }
-  .xf-steps .pbi { display: block; margin-top: 4px; color: var(--muted); font-size: .82rem; }
   .eg { margin-top: 6px; padding: 6px 10px; border-radius: 6px; background: var(--card); font-size: .88rem;
     border: 1px solid var(--border); overflow-wrap: anywhere; }
   .eg-label { font-weight: 650; color: var(--f); margin-right: 6px; }
   .eg-value { font-weight: 650; }
   .eg-to { color: var(--muted); margin: 0 6px; }
-  .headings { display: flex; flex-wrap: wrap; gap: 4px 6px; list-style: none; margin: 6px 0 0; padding: 0; }
-  .steps .sheet-name { margin-top: 8px; font-weight: 700; }
-  .headings li { padding: 1px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); font-size: .82rem; }
   .cmd { display: flex; gap: 8px; align-items: stretch; margin-top: 8px; }
   .cmd code {
     flex: 1; min-width: 0; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
@@ -508,14 +463,15 @@
   .status { min-height: 1.2em; font-size: .82rem; color: var(--muted); }
   .btn {
     display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; padding: 9px 14px; border-radius: 8px;
-    background: var(--f); color: var(--on-solid); font-weight: 700; text-decoration: none;
+    background: var(--f); color: var(--on-solid); font-weight: 700; text-decoration: none; overflow-wrap: anywhere;
   }
+  .btn svg { flex: none; }
   .btn:hover { filter: brightness(1.08); }
   button.btn { border: 0; cursor: pointer; font: inherit; font-weight: 700; }
   .btn.ghost { background: transparent; color: var(--f); box-shadow: inset 0 0 0 1.5px var(--f); }
 
   /* Updating an Excel table */
-  .steps { list-style: none; margin: 0; padding: 0; counter-reset: step; display: grid; gap: 10px; }
+  .steps { list-style: none; margin: 0; padding: 0; counter-reset: step; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .steps > li {
     counter-increment: step; position: relative; padding: 12px 14px 14px 52px;
     border: 1px solid var(--border); border-radius: 10px;
@@ -543,13 +499,8 @@
   .get .btn { margin-top: 0; }
   .get p { flex: 1 1 220px; margin: 0; font-size: .88rem; color: var(--muted); }
   .a-head { display: block; font-weight: 700; }
-  #panel-body > .alert:first-child, #panel-body > .message:first-child, #panel-body > .from:first-child { margin-top: 14px; }  /* clear of the title's focus ring */
-  .uploads { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 10px; }
-  .uploads > li { padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: .9rem; overflow-wrap: anywhere; }
-  .uploads > li:last-child { border-bottom: 0; }
-  .u-when { font-weight: 650; }
-  .u-what { display: block; color: var(--muted); }
-  .u-what a { font-weight: 650; }
+  #panel-body > .alert:first-child, #panel-body > .message:first-child, #panel-body > .from:first-child,
+  #panel-body > .steps:first-child { margin-top: 14px; }  /* clear of the title's focus ring */
 
   .chip {
     display: inline-block; padding: 0 7px; border-radius: 6px; background: var(--quiet-soft); color: var(--text);
@@ -606,8 +557,6 @@
   .link-row .via { font-size: .85rem; color: var(--muted); }
   .none { color: var(--muted); font-size: .9rem; margin: 0; }
 
-  footer { margin-top: 40px; color: var(--muted); font-size: .85rem; }
-
   @media (max-width: 640px) {
     .panel-bar { padding: 12px 16px 10px; }
     .panel-inner { padding: 16px 16px 104px; }
@@ -659,27 +608,12 @@
 
   <p class="shots-link">
     <span class="tnum" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 17-5-5-9 8"/></svg></span>
-    <span>Looking at the dashboard? The <a href="/admin/screenshots">numbered screenshots</a> show which table each part of it comes from. Each table below has the same number.</span>
+    <a href="/admin/screenshots">Numbered screenshots</a>
   </p>
-
-  {% set data_tables = model.sections | selectattr("data") | first %}
-  {% if data_tables %}
-  <section class="split-note" aria-labelledby="split-title">
-    <h2 id="split-title">How the data tables are split</h2>
-    <p>{{ data_tables.description }}</p>
-    <p>Each table's box says what it holds:</p>
-    <dl>
-      {% for h in model.holds %}<dt>{{ h.label }}</dt><dd>{{ h.text }}</dd>
-      {% endfor %}
-    </dl>
-  </section>
-  {% endif %}
 
   <section class="flow" id="flow" aria-labelledby="flow-title">
     <h2 class="visually-hidden" id="flow-title">The tables, from where their data comes from to the dashboards</h2>
   </section>
-
-  <footer>Made from the database's own master file, so it always matches the database.</footer>
 </main>
 
 <aside class="panel" id="panel" role="dialog" aria-modal="false" aria-labelledby="panel-title">
@@ -706,7 +640,7 @@
 const FILLS = {
   api: { word: "Downloaded", long: "API", icon: "cloud" },
   input: { word: "Source file", long: "Source file", icon: "file" },
-  excel: { word: "Excel upload", long: "Uploaded in Excel", icon: "sheet", tag: "Excel" },
+  excel: { word: "Excel upload", long: "Excel", icon: "sheet", tag: "Excel" },
   command: { word: "Database command", long: "Changed with a database command", icon: "terminal" },
   admin: { word: "Admin page", long: "Kept by the admin page", icon: "window" },
 };
@@ -781,12 +715,6 @@ function link(cls, url, text) {
 function waitingUploads(t) {  // a table's, or a source file's
   const recent = t.update && Array.isArray(t.update.recent) ? t.update.recent : [];
   return recent.filter(r => r.status === "preview");
-}
-// Where a data table is shown on the dashboards: [{page, panels}], from diagram.yaml.
-function dashboardOf(t) {
-  return (Array.isArray(t.dashboard) ? t.dashboard : [])
-    .filter(p => p && Array.isArray(p.panels) && p.panels.length)
-    .map(p => ({ page: String(p.page), panels: p.panels.map(String) }));
 }
 function columnOf(t, name) { return (t.columns || []).find(c => c.name === name) || null; }
 function columnLabel(t, name) { const c = columnOf(t, name); return c ? (c.label || c.name) : name; }
@@ -1031,19 +959,14 @@ function start() {
   flow.appendChild(svg);
 
   // Every column after the transformation is tables, so the headings say so.
-  const heads = [["1", "Where the data comes from"], ["2", "Transformation", "Click one for a real example"], ["3", "Data tables", "And where each is on the dashboards"]];
-  if (plan.hub) heads.push(["4", titleOf(plan.hub) + " table", "Joins them up by " + plan.hubLabel]);
-  if (plan.dash.length) {
-    const name = plan.dash.length === 1 ? titleOf(plan.dash[0]) + " table" : "Dashboard tables";
-    heads.push(["5", name, "Picks the " + titleOf(plan.hub).toLowerCase() + " on each dashboard"]);
-  }
-  for (const [n, text, sub] of heads) {
+  const heads = [["1", "Where the data comes from"], ["2", "Transformation"], ["3", "Data tables"]];
+  if (plan.hub) heads.push(["4", titleOf(plan.hub) + " table"]);
+  if (plan.dash.length) heads.push(["5", plan.dash.length === 1 ? titleOf(plan.dash[0]) + " table" : "Dashboard tables"]);
+  for (const [n, text] of heads) {
     const h = el("div", "col-head wide-only");
     h.dataset.col = n;
     h.setAttribute("aria-hidden", "true");
-    const tx = el("span", "col-text", text);
-    if (sub) tx.appendChild(el("span", "col-sub", sub));
-    h.append(el("span", "num", n), tx);
+    h.append(el("span", "num", n), el("span", "col-text", text));
     flow.appendChild(h);
   }
   for (const g of plan.main) flow.appendChild(groupEl(g));
@@ -1070,7 +993,7 @@ function start() {
     di.appendChild(icon("dashboard", 20));
     const dt = el("span");
     dt.appendChild(el("strong", null, "Dashboards"));
-    dt.appendChild(el("span", "sub", "One for each row of " + joinWords(plan.dash.map(titleOf)) + ", showing only its catchments."));
+    dt.appendChild(el("span", "sub", "One per location"));
     card.append(di, dt);
     end.appendChild(card);
     col.appendChild(end);
@@ -1106,7 +1029,8 @@ function start() {
     const words = groupWords(g);
     const head = el("span", "src-head");  // the button goes on this line, beside the eyebrow
     head.appendChild(el("span", "src-eyebrow", words.eyebrow));
-    tx.append(head, el("span", "src-name", words.name));
+    tx.appendChild(head);
+    if (words.name) tx.appendChild(el("span", "src-name", words.name));
     b.append(ic, tx);
     // Each source opens how its tables are updated: for an Excel table or a source file, that's
     // where it's uploaded.
@@ -1158,7 +1082,7 @@ function start() {
   }
 
   // A table's transformation: its inputs and the steps that turn them into its columns (a source
-  // file's are the original Power BI dashboard's formulas; an Excel table's is 1 to 1).
+  // file's are its formulas; an Excel table's is 1 to 1).
   function transformEl(t) {
     const x = t.transform, key = plan.xfOf(t), same = x.kind === "excel";
     const b = el("button", "xf f-" + fillOf(t) + (same ? " same" : ""));
@@ -1181,7 +1105,7 @@ function start() {
 
   function groupWords(g) {
     if (g.fill === "api") return { eyebrow: FILLS.api.long, name: g.source || "A website" };
-    if (g.fill === "excel") return { eyebrow: FILLS.excel.long, name: "By you, here" };
+    if (g.fill === "excel") return { eyebrow: FILLS.excel.long, name: "" };
     if (g.fill === "input") return { eyebrow: FILLS.input.long, name: g.input ? g.input.title : "A file" };
     if (g.fill === "admin") return { eyebrow: "Housekeeping", name: "The admin page" };
     return { eyebrow: "Housekeeping", name: "A database command" };
@@ -1222,23 +1146,6 @@ function start() {
     const tx = el("span", "node-text");
     tx.append(el("span", "node-title", titleOf(t)), metaEl(t));
     b.append(ic, tx);
-    const places = dashboardOf(t);
-    if (places.length) {
-      b.classList.add("has-dash");
-      const d = el("span", "node-dash");
-      d.appendChild(el("span", "visually-hidden", "On the dashboards: "));
-      for (const p of places) {
-        const page = el("span", "nd-page", p.page);
-        page.appendChild(el("span", "visually-hidden", ":"));
-        const list = el("span", "nd-panels");
-        p.panels.forEach((name, i) => {
-          if (i) list.appendChild(el("span", "visually-hidden", ", "));  // read out between the chips, not shown
-          list.appendChild(el("span", "nd-panel", name));
-        });
-        d.append(page, list);
-      }
-      b.appendChild(d);
-    }
     return b;
   }
 
@@ -1251,7 +1158,6 @@ function start() {
     const port = el("span", "port", plan.hubLabel);
     anchors.set("port:tbl:" + t.name, port);
     b.append(top, port, metaEl(t));
-    if (t.summary) b.appendChild(el("span", "node-sum", t.summary));
     return b;
   }
 
@@ -1264,7 +1170,6 @@ function start() {
     const port = el("span", "port", plan.dashLabels.get(t.name) || plan.hubLabel);
     anchors.set("port:tbl:" + t.name, port);
     b.append(top, port, metaEl(t));
-    if (t.summary) b.appendChild(el("span", "node-sum", t.summary));
     return b;
   }
 
@@ -1442,7 +1347,7 @@ function start() {
 
     const out = [];
     const tech = el("p", "tech");
-    tech.append(document.createTextNode("In the database: "), el("code", null, t.name));
+    tech.appendChild(el("code", null, t.name));  // its name in the database
     out.push(tech);
     if (t.description || t.summary) out.push(el("p", "desc", t.description || t.summary));
     if (t.download && isLocal(t.download.url)) out.push(downloadBlock(t));
@@ -1455,17 +1360,8 @@ function start() {
     const t = g.members[0], f = g.fill;
     panelBadge.replaceChildren(badgeFor(f));
     panelBody.className = "f-" + f;
-    const many = g.members.length > 1;
     panelTitle.textContent = f === "api" && g.source ? g.source : "Where " + titleOf(t) + " comes from";
-    panelBody.replaceChildren(fromBox(t, f, many), fillsRow(g));
-  }
-
-  function fillsRow(g) {
-    const fills = el("div", "link-row fills");
-    const jumps = el("div", "jumps");
-    for (const m of g.members) jumps.appendChild(jumpButton(m));
-    fills.append(el("span", "via", g.members.length > 1 ? "Fills the tables" : "Fills the table"), jumps);
-    return fills;
+    panelBody.replaceChildren(fromBox(t, f));
   }
 
   // How a table is worked out, with real data: a few rows coming in, each step done to one waterbody's
@@ -1492,26 +1388,9 @@ function start() {
     panelBadge.replaceChildren(badge);
     panelBody.className = "f-" + f;
     panelTitle.textContent = (same ? "How " + titleOf(t) + " is filled" : "How " + titleOf(t) + " is worked out");
-    const lead = el("p", "xf-lead",
-      x.kind === "input" ? "Worked out from the " + x.from + " file, with the original Power BI dashboard's formulas. Here's real data going through it."
-        : x.kind === "api" ? "Downloaded from " + x.from + " by the importer, and changed on the way in. Here's real data going through it."
-          : "Uploaded here in Excel, in the table's own layout, so it goes in as it is. Here's real data going through it.");
     const body = el("div");
     body.appendChild(el("p", "muted stage", "Getting the example…"));
-    const out = [lead, body];
-    const g = plan.sources.get(t.name);
-    if (g && g.input) {
-      const back = el("button", "jump f-input");
-      back.type = "button";
-      const bi2 = el("span", "j-icon");
-      bi2.appendChild(icon("upload", 16));
-      back.append(bi2, el("span", null, "Upload " + g.input.title));
-      back.addEventListener("click", () => openPanel(t.name, "source"));
-      const r = el("div", "link-row stage");
-      r.append(el("span", "via", "Its source file"), back);
-      out.push(r);
-    }
-    panelBody.replaceChildren(...out);
+    panelBody.replaceChildren(body);
     const showing = () => current && current.name === t.name && current.view === "transform";
     exampleFor(t).then(ex => { if (showing()) body.replaceChildren(...drawExample(t, ex || {})); })
       .catch(e => { if (showing()) body.replaceChildren(el("p", "alert stage", "The example couldn't be got (" + e.message + "). Close this and open it again to try again.")); });
@@ -1528,17 +1407,16 @@ function start() {
       if (x.kind === "api") p.textContent = ex.about || "";
       else {
         const file = isLocal(ex.file_url) ? link(null, ex.file_url, ex.file) : el("strong", null, ex.file);
-        p.append(document.createTextNode("From "), file,
-          document.createTextNode(" (approved " + ex.when + ")" + (x.sheet ? ", the sheet " + x.sheet : "") + ": " +
-            someOf(ins) + (same ? "." : ", with only the columns used.")));
+        p.append(file, document.createTextNode((x.sheet ? ", sheet " + x.sheet : "") + ": " +
+          someOf(ins) + (same ? "." : ", only the columns used.")));
       }
       one.append(p, miniTable(ins.columns, ins, null));
     }
 
     const two = stage("2", "What's done");
-    if (same) two.appendChild(el("p", null, "Nothing: each column goes into the table's column with the same name, as it is (1 to 1). The upload is only checked first: the column names, each value's type, and that no row is there twice."));
+    if (same) two.appendChild(el("p", null, (x.steps || [{}])[0].text || "Nothing: each column goes in as it is."));
     else {
-      if (ex.waterbody && ins) two.appendChild(el("p", "muted", "Each step, with " + ex.waterbody + " (highlighted) as the example:"));
+      if (ex.waterbody && ins) two.appendChild(el("p", "muted", "Example: " + ex.waterbody + " (highlighted)."));
       const ol = el("ol", "xf-steps");
       (x.steps || []).forEach((step, i) => {
         const li = el("li");
@@ -1548,7 +1426,6 @@ function start() {
         li.appendChild(p);
         const eg = x.kind === "api" ? step.example : (ex.steps || [])[i];
         if (eg) li.appendChild(stepExample(t, eg, ex.waterbody));
-        if (step.power_bi) li.appendChild(el("span", "pbi", "In Power BI: " + step.power_bi));
         ol.appendChild(li);
       });
       two.appendChild(ol);
@@ -1556,8 +1433,7 @@ function start() {
 
     const three = stage("3", "Going out");
     if (outs) {
-      three.appendChild(el("p", null, (ex.missing ? "The table as it is now: " : same ? "The same rows, in the table: "
-        : "What they make, in the table: ") + someOf(outs) + "."));
+      three.appendChild(el("p", null, (ex.missing ? "The table now: " : "") + someOf(outs) + "."));
       three.appendChild(miniTable(outs.columns.map(c => columnLabel(t, c)), outs, t));
     } else three.appendChild(el("p", "muted", "The table has no rows yet."));
     return [one, two, three];
@@ -1570,12 +1446,12 @@ function start() {
     s.appendChild(h);
     return s;
   }
-  // e.g. "3 of its 92 rows", or "all 3 of its rows"
+  // e.g. "3 of 92 rows", or "All 3 rows"
   function someOf(part) {
     const n = (part.rows || []).length, total = part.total;
-    if (total == null) return n === 1 ? "1 row" : n + " rows";
-    if (n >= total) return n === 1 ? "its 1 row" : "all " + n + " of its rows";
-    return n + " of its " + Number(total).toLocaleString("en-GB") + " rows";
+    if (total == null || (n >= total && n === 1)) return n === 1 ? "1 row" : n + " rows";
+    if (n >= total) return "All " + n + " rows";
+    return n + " of " + Number(total).toLocaleString("en-GB") + " rows";
   }
 
   // A value as an example shows it: whole numbers as they are (they're often IDs or years), others to 2
@@ -1647,7 +1523,7 @@ function start() {
     return box;
   }
 
-  function fromBox(t, f, many) {
+  function fromBox(t, f) {
     const box = el("section", "from f-" + f);
     box.setAttribute("aria-label", "Where the data comes from");
     if (f === "api") {
@@ -1657,7 +1533,7 @@ function start() {
         a.setAttribute("href", t.url);
         a.setAttribute("target", "_blank");
         a.setAttribute("rel", "noopener noreferrer");
-        p.append(document.createTextNode("Website: "), a);
+        p.appendChild(a);
         box.appendChild(p);
       } else if (t.source) {
         const p = el("p");
@@ -1665,7 +1541,7 @@ function start() {
         box.appendChild(p);
       }
       if (t.command) {
-        box.appendChild(el("p", "muted", (many ? "They only change when someone downloads them" : "It only changes when someone downloads it") + " again, by running this command:"));
+        box.appendChild(el("p", "muted", "To update:"));
         const cmd = el("div", "cmd");
         const code = el("code", null, t.command);
         const copy = el("button", "copy");
@@ -1685,27 +1561,22 @@ function start() {
     return box;
   }
 
-  function lastUpdated(t) {
-    const last = t.update && t.update.last;
-    return last ? "Last updated " + last.when + " by " + last.who + "." : "Not uploaded yet.";
-  }
-
   function downloadBlock(t) {
     const box = el("div", "get");
     const dl = link("btn ghost", t.download.url, "Download as Excel");
     dl.prepend(icon("download", 16));
     box.appendChild(dl);
     const left = (t.download.left_out || []).map(name => columnLabel(t, name));
-    if (left.length) box.appendChild(el("p", null, "Leaves out " + joinWords(left) + ": " + (t.download.left_out_why || "") + "."));
+    if (left.length) box.appendChild(el("p", null, "Leaves out " + joinWords(left) + (t.download.left_out_why ? " (" + t.download.left_out_why + ")" : "") + "."));
     return box;
   }
 
   function problemsBox(p) {
     const box = el("div", "alert problems");
     box.setAttribute("role", "alert");
-    box.appendChild(el("strong", "a-head", (p.file || "The file") + " can't be used yet"));
+    box.appendChild(el("strong", "a-head", (p.file || "The file") + " can't be used"));
     const n = (p.items || []).length + (p.more || 0);
-    box.appendChild(el("p", null, "Nothing has been changed. Fix " + (n === 1 ? "this" : "these") + " in the file, then upload it again:"));
+    box.appendChild(el("p", null, "Nothing has been changed. Fix " + (n === 1 ? "this" : "these") + " and upload it again:"));
     const ul = el("ul");
     for (const item of p.items || []) ul.appendChild(el("li", null, item));
     box.appendChild(ul);
@@ -1713,207 +1584,84 @@ function start() {
     return box;
   }
 
-  // An Excel table's upload, opened from its source on the left of the diagram.
-  function renderUpload(t, u) {
-    panelBadge.replaceChildren(badgeFor("excel"));
-    panelBody.className = "f-excel";
-    panelTitle.textContent = "Upload data to " + titleOf(t);
-
-    const out = [];
-    if (problems && problems.uploaded_to === t.name) out.push(problemsBox(problems));
-    const intro = el("p", "desc");
-    intro.append(
-      document.createTextNode("Download the "), el("strong", null, titleOf(t)),
-      document.createTextNode(" table, change it in Excel, and upload it again. " + lastUpdated(t)),
-    );
-    out.push(intro);
-
-    for (const w of waitingUploads(t)) {
+  // An upload that's been previewed but not approved yet (a table's, or a source file's).
+  function waitingBoxes(x) {
+    return waitingUploads(x).map(w => {
       const box = el("div", "alert waiting");
-      box.appendChild(el("strong", "a-head", "An upload is waiting to be approved"));
-      box.appendChild(el("p", null, w.file + ", uploaded by " + w.who + ", " + w.when + ". Nothing changes until someone approves it."));
+      box.append(el("strong", "a-head", "Waiting to be approved"), el("p", null, w.file + " · " + w.who + " · " + w.when));
       box.appendChild(link("btn", w.url, "Check the changes →"));
-      out.push(box);
-    }
+      return box;
+    });
+  }
 
-    const steps = el("ol", "steps");
-
-    const download = el("li");
-    download.append(
-      el("span", "step-name", "Download it"),
-      el("p", null, "Always start from a fresh download, so you don't undo changes someone else has uploaded since your last one."),
-    );
-    const dl = link("btn ghost", u.download_url, "Download as Excel");
-    dl.prepend(icon("down", 16));
-    download.appendChild(dl);
-
-    const edit = el("li");
-    const rules = el("ul");
-    const replaces = el("li");
-    replaces.append(
-      document.createTextNode("Add, change or delete rows. The upload "),
-      el("strong", null, "replaces the whole table"),
-      document.createTextNode(", so a row you delete from the file is deleted from the table."),
-    );
-    rules.append(replaces, el("li", null, "Keep the column names in row 1 as they are, and the data on the first sheet."));
-    const key = Array.isArray(u.key) ? u.key : [];
-    if (key.length) {
-      const once = el("li");
-      once.appendChild(document.createTextNode(key.length > 1 ? "Each combination of " : "Each "));
-      key.forEach((name, i) => {
-        if (i > 0) once.appendChild(document.createTextNode(i === key.length - 1 ? " and " : ", "));
-        once.appendChild(el("code", null, name));
-      });
-      once.appendChild(document.createTextNode(" can only appear once."));
-      rules.appendChild(once);
-    }
-    const meaning = el("li");
-    meaning.append(document.createTextNode("To see what each column means, open the table: "), jumpButton(t));
-    rules.appendChild(meaning);
-    edit.append(el("span", "step-name", "Edit it in Excel"), rules);
-
-    const upload = el("li");
-    upload.append(
-      el("span", "step-name", "Upload it"),
-      el("p", null, "You'll see what will be added, changed and deleted before anything is saved."),
-    );
-    if (isLocal(u.upload_url)) {
+  // Step 2 of an upload: choose the file and upload it, to see what it changes before anything is saved.
+  function uploadStep(url, accept, label) {
+    const li = el("li");
+    li.appendChild(el("span", "step-name", "Upload it"));
+    if (isLocal(url)) {
       const form = el("form", "upload-form");
       form.method = "post";
       form.enctype = "multipart/form-data";
-      form.setAttribute("action", u.upload_url);
+      form.setAttribute("action", url);
       const file = el("input");
       file.type = "file";
       file.name = "file";
       file.required = true;
-      file.accept = ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-      file.setAttribute("aria-label", "Excel file to upload to " + titleOf(t));
+      file.accept = accept;
+      file.setAttribute("aria-label", label);
       const go = el("button", "btn", "Upload and preview");
       go.type = "submit";
       form.append(file, go);
-      upload.appendChild(form);
+      li.appendChild(form);
     }
-    steps.append(download, edit, upload);
-    out.push(steps);
+    return li;
+  }
 
-    out.push(...recentBlock(u, "Nothing has been uploaded to this table yet."));
+  // An Excel table's upload, opened from its source on the left of the diagram: the latest file is the
+  // table as it is now.
+  function renderUpload(t, u) {
+    panelBadge.replaceChildren(badgeFor("excel"));
+    panelBody.className = "f-excel";
+    panelTitle.textContent = "Upload " + titleOf(t);
+
+    const out = [];
+    if (problems && problems.uploaded_to === t.name) out.push(problemsBox(problems));
+    out.push(...waitingBoxes(t));
+    const get = el("li");
+    get.appendChild(el("span", "step-name", "Get the latest file"));
+    const dl = link("btn ghost", u.download_url, "Download as Excel");
+    dl.prepend(icon("download", 16));
+    get.appendChild(dl);
+    const steps = el("ol", "steps");
+    steps.append(get, uploadStep(u.upload_url, ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Excel file to upload to " + titleOf(t)));
+    out.push(steps);
     panelBody.replaceChildren(...out);
   }
 
-  function recentBlock(u, none) {
-    const out = [el("h3", null, "Recent uploads")];
-    const recent = Array.isArray(u.recent) ? u.recent : [];
-    if (!recent.length) return out.concat(el("p", "none", none));
-    const list = el("ul", "uploads");
-    for (const r of recent) {
-      const li = el("li");
-      li.append(el("span", "u-when", r.when), document.createTextNode(" · " + r.who + " · "), link(null, r.file_url, r.file));
-      const what = el("span", "u-what");
-      if (r.status === "approved") what.textContent = "Approved: " + r.added + " added, " + r.changed + " changed, " + r.removed + " deleted";
-      else if (r.status === "preview") what.appendChild(link(null, r.url, "Waiting to be checked and approved →"));
-      else what.textContent = "Cancelled";
-      li.appendChild(what);
-      list.appendChild(li);
-    }
-    return out.concat(list, el("p", "hint", "To go back to an earlier version, download its file here and upload it again."));
-  }
-
-  // A source file's upload, opened from its box on the left of the diagram.
+  // A source file's upload, opened from its box on the left of the diagram: the latest file is the last one
+  // approved, as an example of what to upload.
   function renderInputUpload(g) {
     const i = g.input, u = i.update || {};
-    const tables = g.members.map(titleOf);
     panelBadge.replaceChildren(badgeFor("input"));
     panelBody.className = "f-input";
     panelTitle.textContent = "Upload " + i.title;
 
     const out = [];
     if (problems && problems.uploaded_to === i.name) out.push(problemsBox(problems));
-    const intro = el("p", "desc");
-    const last = u.last ? "Last updated " + u.last.when + " by " + u.last.who + "." : "Not uploaded yet.";
-    intro.append(
-      document.createTextNode("Upload the file as it came, without changing it. The original Power BI dashboard read the same file, " +
-        "and its formulas work out "), el("strong", null, joinWords(tables)), document.createTextNode(" from it. " + last),
-    );
-    out.push(intro);
-
-    for (const w of waitingUploads(i)) {
-      const box = el("div", "alert waiting");
-      box.appendChild(el("strong", "a-head", "An upload is waiting to be approved"));
-      box.appendChild(el("p", null, w.file + ", uploaded by " + w.who + ", " + w.when + ". Nothing changes until someone approves it."));
-      box.appendChild(link("btn", w.url, "Check the changes →"));
-      out.push(box);
-    }
-
-    const steps = el("ol", "steps");
+    out.push(...waitingBoxes(i));
     const get = el("li");
-    get.append(el("span", "step-name", "Get the latest file"));
-    const from = el("p");
-    const provider = String(i.provider || "").replace(/^The /, "the ");  // "From the EA's …", not "From The …"
-    from.append(document.createTextNode("From " + provider + ". The original read "), el("strong", null, i.file), document.createTextNode("."));
-    if (isWebPage(i.url)) {
-      const a = el("a", null, i.url.replace(/^https:\/\//, "").replace(/\/$/, ""));
-      a.setAttribute("href", i.url);
-      a.setAttribute("target", "_blank");
-      a.setAttribute("rel", "noopener noreferrer");
-      from.append(document.createTextNode(" "), a);
-    }
-    get.appendChild(from);
-    const more = Array.isArray(i.more_sheets) ? i.more_sheets : [];
-    const sheets = [{ sheet: i.sheet, headings: i.headings }].concat(more);
-    if (more.length) {
-      get.appendChild(el("p", null, "It's read from the sheets " + joinWords(sheets.map(s => s.sheet)) +
-        ", by those names and the column names in row 1 of each. Each needs these, in any order; any others are left alone:"));
-    } else {
-      get.appendChild(el("p", null, "It's read from " + (i.sheet ? "the sheet " + i.sheet + " (or the first sheet with these columns)" : "its first sheet") +
-        ", by the column names in row 1. It needs these, in any order; any others are left alone:"));
-    }
-    for (const s of sheets) {
-      if (more.length) get.appendChild(el("p", "sheet-name", s.sheet));
-      const heads = el("ul", "headings");
-      for (const h of Array.isArray(s.headings) ? s.headings : []) heads.appendChild(el("li", null, h));
-      get.appendChild(heads);
-    }
-
-    const up = el("li");
-    up.append(
-      el("span", "step-name", "Upload it"),
-      el("p", null, "You'll see what will be added, changed and deleted in " + joinWords(tables) + " before anything is saved. " +
-        "Rows for waterbodies that aren't in the Catchments table are left out, and listed."),
-    );
-    if (isLocal(u.upload_url)) {
-      const form = el("form", "upload-form");
-      form.method = "post";
-      form.enctype = "multipart/form-data";
-      form.setAttribute("action", u.upload_url);
-      const file = el("input");
-      file.type = "file";
-      file.name = "file";
-      file.required = true;
-      file.accept = ".xlsx,.xls,.csv";
-      file.setAttribute("aria-label", "The " + i.title + " file to upload");
-      const go = el("button", "btn", "Upload and preview");
-      go.type = "submit";
-      form.append(file, go);
-      up.appendChild(form);
-    }
-    steps.append(get, up);
+    get.appendChild(el("span", "step-name", "Get the latest file"));
+    if (u.last && isLocal(u.last.file_url)) {
+      const row = el("div", "get");
+      const a = link("btn ghost", u.last.file_url, u.last.file);
+      a.prepend(icon("download", 16));
+      row.append(a, el("p", null, "Uploaded " + u.last.when));
+      get.appendChild(row);
+    } else get.appendChild(el("p", "none", "Nothing uploaded yet."));
+    const steps = el("ol", "steps");
+    steps.append(get, uploadStep(u.upload_url, ".xlsx,.xls,.csv", "The " + i.title + " file to upload"));
     out.push(steps);
-
-    const howRow = el("div", "link-row");
-    const hows = el("div", "jumps");
-    for (const m of g.members) {
-      const how = el("button", "jump f-input");
-      how.type = "button";
-      const hi = el("span", "j-icon");
-      hi.appendChild(icon("reshape", 16));
-      how.append(hi, el("span", null, "How " + titleOf(m) + " is worked out"));
-      how.addEventListener("click", () => openPanel(m.name, "transform"));
-      hows.appendChild(how);
-    }
-    howRow.append(el("span", "via", "The formulas"), hows);
-    out.push(howRow);
-
-    out.push(...recentBlock(u, "Nothing has been uploaded from this source file yet."), fillsRow(g));
     panelBody.replaceChildren(...out);
   }
 
@@ -1941,7 +1689,7 @@ function start() {
     const cols = t.columns || [];
     const h = el("h3");
     h.append(document.createTextNode("Columns"), el("span", "n", cols.length));
-    const hint = el("p", "hint", "Row 2 is a made-up example, not real data. Choose a column to see what it means.");
+    const hint = el("p", "hint", "Row 2 is a made-up example.");
 
     const wrap = el("div", "sheet-wrap");
     wrap.setAttribute("role", "region");

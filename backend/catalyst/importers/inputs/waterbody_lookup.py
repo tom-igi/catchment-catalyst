@@ -106,8 +106,8 @@ STEPS = {
     TABLE: (
         Step(
             ("ranking",), (RANKING,),
-            "As typed. (It's worked out outside the Power BI, in the EA Standardised Scoring workbook.) The dashboard "
-            "shows it as e.g. Catchment Ranking: 68/92.",
+            "As typed (it's worked out in the EA Standardised Scoring workbook). The dashboard shows it as e.g. "
+            "Catchment Ranking: 68/92.",
             "Waterbody Lookup[Biosphere Ranking], shown by the measure Biosphere Ranking Display",
         ),
         Step(

@@ -71,10 +71,11 @@ def test_the_model_says_what_each_table_holds():
     # As downloaded (an importer's), worked out (a source file's, or an importer's that adds them up) or typed in (Excel).
     assert (tables["ea_classifications"]["holds"], tables["catchments"]["holds"]) == ("downloaded", "downloaded")
     assert tables["sewage_overflow_pressure"]["holds"] == "worked_out"  # added up from the storm overflow returns
-    assert (tables["waterbody_figures"]["holds"], tables["river_status_text"]["holds"]) == ("worked_out", "worked_out")
+    assert tables["waterbody_figures"]["holds"] == "worked_out"
     assert (tables["location_text"]["holds"], tables["datasets"]["holds"]) == ("typed", "typed")
+    assert (tables["river_status_text"]["fill"], tables["river_status_text"]["holds"]) == ("excel", "typed")  # written by the Biosphere
     assert tables["locations"]["holds"] is None  # no data comes into it
-    assert [h["label"] for h in model["holds"]] == ["As downloaded", "Worked out", "Typed in"]
+    assert [h["label"] for h in model["holds"]] == ["As downloaded", "Worked out", "Typed in"]  # each box says which
     assert all(t["holds"] for t in tables.values() if t["kind"] == "data")
 
 
@@ -95,16 +96,16 @@ def test_the_model_says_what_happens_to_the_data_on_the_way_in():
 
 def test_each_table_has_its_own_transformation():
     tables = {t["name"]: t for t in diagram.model(load_schema())["tables"]}
-    # A source file's: its inputs (the file's columns it reads), and a step for each of its columns, as the Power BI did.
+    # A source file's: its inputs (the file's columns it reads), and a step for each of its columns.
     pressure = tables["livestock_pressure"]["transform"]
-    assert (pressure["kind"], pressure["name"], pressure["sub"]) == ("input", "Power BI's formulas", "5 steps")
+    assert (pressure["kind"], pressure["name"], pressure["sub"]) == ("input", "Formulas", "5 steps")
     assert (pressure["file"], pressure["sheet"]) == ("APHA Livestock Data Feb 2026.xlsx", "Appendix 1 EIR2026_00630")
     assert pressure["inputs"][0] == "Catchment Name" and "Pig Density Per SqKm" in pressure["inputs"]
     assert [step["columns"] for step in pressure["steps"]] == [
         ["catchment_id"], ["nitrogen_load"], ["phosphate_load"], ["nitrogen_and_phosphate_load"], ["pressure"],
     ]
     assert pressure["steps"][3]["inputs"] == ["nitrogen_load", "phosphate_load"]  # columns worked out before
-    assert "Very High above 40,000" in pressure["steps"][-1]["text"] and pressure["steps"][-1]["power_bi"]
+    assert "Very High above 40,000" in pressure["steps"][-1]["text"] and "power_bi" not in pressure["steps"][-1]
     assert tables["phosphate_point_diffuse"]["transform"]["sheet"] == "Phosphate Point vs Diffuse"  # its own sheet
     # An importer's: what it downloads, and its steps.
     rnags = tables["ea_rnags"]["transform"]
@@ -267,11 +268,9 @@ def test_the_admin_page_is_the_diagram(app, client):
     assert set(rows) == set(app.state.schema.metadata.tables) - {"uploads", "publishes"}
     assert rows["catchments"] == 2
     assert {t["name"]: t["number"] for t in page_model(page.text)["tables"]}["catchments"] == 1  # each box shows it
-    # How the data tables are split, from diagram.yaml, and what each box's label (e.g. Worked out) means.
-    assert '<h2 id="split-title">How the data tables are split</h2>' in page.text
-    assert "<p>Each table is filled from one place only: a download, a source file or an Excel upload." in page.text
-    assert "<dt>Worked out</dt><dd>Only what the dashboards show," in page.text
-    assert 'href="/admin/screenshots"' in page.text
+    # Few words: a link to the numbered screenshots, and no Power BI (the page's own words, or the model's).
+    assert '<a href="/admin/screenshots">Numbered screenshots</a>' in page.text
+    assert "split-title" not in page.text and "power bi" not in page.text.lower()
 
 
 # --- The numbered screenshots of the dashboards ------------------------------------
@@ -293,14 +292,11 @@ def test_the_screenshots_have_each_tables_number_now():
 def test_the_screenshots_page(app, client):
     page = client.get("/admin/screenshots")
     assert page.status_code == 200
-    assert "<h1>Where each part of the dashboard comes from</h1>" in page.text
+    assert "<h1>Numbered screenshots</h1>" in page.text
     assert 'src="/admin/screenshots/1-river-status.webp"' in page.text and "These screenshots are out of date" not in page.text
-    # Under each one, each number: its table (on the diagram) and where to update it.
-    assert '<a class="key-table" href="/admin#waterbody_figures"><span class="visually-hidden">Table 13: </span>Waterbody Figures</a>' in page.text
-    assert '<a class="key-update" href="/admin#upload-waterbody_lookup">Upload file: Waterbody Lookup</a>' in page.text
-    assert '<a class="key-update" href="/admin#upload-location_text">Upload data (in Excel)</a>' in page.text
-    assert '<a class="key-update" href="/admin#from-ea_rnags">Downloaded from EA Catchment Data Explorer</a>' in page.text
-    assert '<a class="key-update" href="/admin#locations">Changed with a database command</a>' in page.text
+    # Just the screenshots: the numbers on them are found on the diagram, so no list of tables under each.
+    assert "The table's box on <a href=\"/admin\">Your data</a> has the same number" in " ".join(page.text.split())
+    assert "Waterbody Figures" not in page.text and "Upload file" not in page.text
 
     image = client.get("/admin/screenshots/1-river-status.webp")
     assert (image.status_code, image.headers["content-type"]) == (200, "image/webp")
@@ -320,4 +316,3 @@ def test_the_screenshots_page_says_when_theyre_out_of_date(app, client, tmp_path
     }))
     page = client.get("/admin/screenshots").text
     assert "These screenshots are out of date." in page and "Number 40 on them" in page
-    assert "Taken 18 November 2026 from http://localhost:8080/north-devon/, showing Somewhere." in page

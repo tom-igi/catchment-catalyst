@@ -35,15 +35,13 @@ from .common import Example, Input, Result, SourceRow, Step, figure, read_sheet,
 from .ea_classification_facts import EA_CLASSIFICATION_FACTS
 from .esme import ESME
 from .habitat import HABITAT_FILE
-from .improvement_information import IMPROVEMENT_INFORMATION
 from .sagis_phosphate import SAGIS_PHOSPHATE
 from .water_company_plans import WATER_COMPANY_PLANS
 from .waterbody_lookup import WATERBODY_LOOKUP
 
 INPUTS: dict[str, Input] = {
     i.name: i for i in (
-        WATERBODY_LOOKUP, APHA_LIVESTOCK, ESME, HABITAT_FILE, IMPROVEMENT_INFORMATION, SAGIS_PHOSPHATE, WATER_COMPANY_PLANS,
-        EA_CLASSIFICATION_FACTS,
+        WATERBODY_LOOKUP, APHA_LIVESTOCK, ESME, HABITAT_FILE, SAGIS_PHOSPHATE, WATER_COMPANY_PLANS, EA_CLASSIFICATION_FACTS,
     )
 }
 

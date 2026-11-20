@@ -88,8 +88,7 @@ WATER_COMPANY_PLANS = Input(
         Step(
             ("site_name",), (SITE, ID),
             f"{SITE}. Where a site has several overflows into one waterbody, each keeps its own row, named with its {ID}, "
-            "e.g. OKEHAMPTON STW (SWW0562). The original's table added them together into one row, with their years "
-            "added up too.",
+            "e.g. OKEHAMPTON STW (SWW0562).",
             f"The Scorecard's table of {SHEET}: EA site name and Improvements List",
         ),
         Step(("improvements",), (IMPROVEMENTS,), "As it is.", f"{SHEET}[Improvements List]"),

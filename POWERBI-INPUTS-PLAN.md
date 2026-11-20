@@ -61,7 +61,7 @@ from the same numbers.
 | 3 | `ESME/ESME_River_water_bodies_Phase_4_….csv` | ESME_River_water_bodies_Phase_4_-8564305916099105313 | new `esme_risk_levels` (Runoff, Modification, Invasive Species, Overheating, Running Dry tiles) | **Built 18 Nov 2026** |
 | 4 | (storm overflows importer, kept) | EDM 2021 to 2025 … Biosphere area | new `sewage_overflow_pressure` (the Untreated Sewage tile); `risk_levels` gone | **Built 18 Nov 2026** |
 | 5 | `Habitats/Nat Eng Simplified Habitat.csv` | Nat Eng Simplified Habitat | `habitat_land_use` (+ `percent_of_catchment`) | **Built 18 Nov 2026** |
-| 6 | `Improvement Information/Improvement Information.xlsx` | Improvement Information | `river_status_text` | **Built 18 Nov 2026** |
+| 6 | `Improvement Information/Improvement Information.xlsx` | Improvement Information | `river_status_text` | Built 18 Nov 2026, **undone 20 Nov 2026** (an Excel table again) |
 | 7 | `EA Phosphate data/SAGIS Phosphate source.xlsx` | Phosphate Source breakdown, Phosphate Point vs Diffuse | `phosphate_sources`, new `phosphate_point_diffuse` | **Built 18 Nov 2026** |
 | 8 | `SWW Asset Upgrades/National Plan Data - updated.xlsx` | Water Company Asset Plans | `sewerage_improvements` | **Built 18 Nov 2026** |
 | 9 | `EA WFD Data/North Devon WB Classification Facts Data.xlsx` | EA Classification Data | `ea_scores`, `ea_thresholds` | **Built 18 Nov 2026** |
@@ -147,7 +147,11 @@ of this step is as it was built.
 - Checked against the data before: every relative coverage the same for all 459 rows. Areas now keep every
   decimal (they were rounded to 2), and the % of catchment moves by at most 0.1 of a point.
 
-### 6. Improvement Information (built)
+### 6. Improvement Information (built, then undone)
+
+**Undone 20 November 2026** (Tom): the North Devon Biosphere writes it, so it isn't a source file. River Status
+Text is an Excel table again, uploaded 1 to 1 (PROGRESS.md). What follows is how it was read until then.
+
 
 - Why = "Why general statement" and bullets 1–3; What = "What general statement" and bullets 1–4;
   hypothesis = "Intervention Hypothesis" and "Projects bullet" 1–4; confidence. Blank bullets left out (as

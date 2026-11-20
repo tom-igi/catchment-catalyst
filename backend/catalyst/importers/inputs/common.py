@@ -108,8 +108,7 @@ class Input:
     @property
     def match_step(self) -> Step:
         """How each row's catchment_id is found: the first step for every table."""
-        area = (f" and its {self.area_heading} (as waterbody names repeat across England; the original matched by "
-                "name alone)") if self.area_heading else ""
+        area = f" and its {self.area_heading} (as waterbody names repeat across England)" if self.area_heading else ""
         return Step(
             ("catchment_id",), (self.waterbody_heading, *([self.area_heading] if self.area_heading else [])),
             f"Matched to a catchment by its waterbody {'ID' if self.by_id else 'name'}{area}. Rows for anywhere else "

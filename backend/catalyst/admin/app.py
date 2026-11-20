@@ -186,7 +186,7 @@ def _render_home(request: Request, status_code: int = 200, problems: dict | None
 
 @router.get("/screenshots")
 def screenshots_page(request: Request, user: User):
-    """Each screenshot, and under it each number on it: its table, what it is on the screenshot, and how it's updated."""
+    """Each screenshot, with the number of each part's table on it (as on that table's box on the diagram)."""
     try:
         model = diagram.model(request.app.state.schema)
     except ValueError as e:
@@ -203,38 +203,16 @@ def screenshot(request: Request, name: str, user: User):
 
 
 def _screenshots(folder: Path, model: dict) -> dict:
-    """screenshots.json (written by screenshots/take.mjs), with each number's table and how it's updated, and any
-    number that isn't its table's number any more (diagram.yaml changed since they were taken)."""
+    """screenshots.json (written by screenshots/take.mjs), and any number on them that isn't its table's number any
+    more (diagram.yaml changed since they were taken)."""
     try:
         taken = json.loads((folder / "screenshots.json").read_text(encoding="utf-8"))
     except FileNotFoundError:
-        return {"taken": None, "taken_on": None, "shots": [], "out_of_date": []}
-    tables = {t["name"]: t for t in model["tables"]}
-    files = {i["name"]: i["title"] for i in model["inputs"]}
-    shots, out_of_date = [], set()
-    for shot in taken["shots"]:
-        numbers = []
-        for n in shot["numbers"]:
-            t = tables.get(n["table"])
-            if t is None or t["number"] != n["number"]:
-                out_of_date.add(n["number"])
-            numbers.append({**n, "title": t["title"] if t else n["table"], "how": _how_updated(t, files) if t else None})
-        shots.append({**shot, "id": shot["file"].rsplit(".", 1)[0], "numbers": numbers})
-    day = datetime.date.fromisoformat(taken["taken"])
-    return {"taken": taken, "taken_on": f"{day.day} {day:%B %Y}", "shots": shots, "out_of_date": sorted(out_of_date)}
-
-
-def _how_updated(t: dict, files: dict[str, str]) -> dict:
-    """How a table's data is changed, and the link that opens it on the diagram."""
-    name = t["name"]
-    if t["fill"] == "input":
-        return {"text": f"Upload file: {files.get(t['input'], t['input'])}", "link": f"/admin#upload-{t['input']}"}
-    if t["fill"] == "excel":
-        return {"text": "Upload data (in Excel)", "link": f"/admin#upload-{name}"}
-    if t["fill"] == "api":
-        return {"text": f"Downloaded from {t['source']}", "link": f"/admin#from-{name}"}
-    return {"text": "Changed with a database command" if t["fill"] == "command" else "Changed by the admin page",
-            "link": f"/admin#{name}"}
+        return {"shots": [], "out_of_date": []}
+    numbers = {t["name"]: t["number"] for t in model["tables"]}
+    out_of_date = {n["number"] for shot in taken["shots"] for n in shot["numbers"] if numbers.get(n["table"]) != n["number"]}
+    shots = [{**shot, "id": shot["file"].rsplit(".", 1)[0]} for shot in taken["shots"]]
+    return {"shots": shots, "out_of_date": sorted(out_of_date)}
 
 
 def _publish_details(conn: sa.Connection, schema) -> dict:
@@ -265,7 +243,7 @@ def _left_out_why(columns: list[sa.Column]) -> str | None:
     """Why columns are left out of a table's download, in words."""
     why = []
     if any(isinstance(c.type, Geometry) for c in columns):
-        why.append("map shapes, thousands of coordinates long")
+        why.append("map shapes")
     if any(isinstance(c.type, sa.LargeBinary) for c in columns):
         why.append("the files themselves (each can be downloaded from its upload)")
     return "; ".join(why) or None
@@ -288,7 +266,8 @@ def _input_details(conn: sa.Connection, state, name: str, last: sa.Row | None) -
 
 def _recent_uploads(conn: sa.Connection, state, uploaded_to: str, last: sa.Row | None) -> dict:
     return {
-        "last": {"when": _when(last.approved_at), "who": last.uploaded_by} if last else None,
+        "last": {"when": _when(last.approved_at), "who": last.uploaded_by, "file": last.file_name,
+                 "file_url": f"/admin/uploads/{last.id}/file"} if last else None,
         "recent": [
             {
                 "id": u.id,
@@ -364,7 +343,7 @@ def table_example(request: Request, table: AnyTable):
         kept = (uploads.examples(conn, schema, last.id) or {}).get(table.name) if last else None
     if last is None:
         what = inputs.INPUTS[uploaded_to].title if fill == "input" else "Excel"
-        return JSONResponse({"missing": f"No {what} file has been approved here yet, so there's no example from it.",
+        return JSONResponse({"missing": f"No {what} file approved yet, so no example.",
                              "out": _first_rows(state, table)})
     if examples.out_of_date(kept, steps):
         try:
@@ -373,7 +352,7 @@ def table_example(request: Request, table: AnyTable):
                 uploads.keep_examples(conn, schema, last.id, made)
         except excel.UploadError:
             return JSONResponse({"missing": f"The last approved file, {last.file_name}, can't be read as the table is "
-                                            "now, so there's no example from it.", "out": _first_rows(state, table)})
+                                            "now, so no example.", "out": _first_rows(state, table)})
         kept = made.get(table.name)
     return JSONResponse({
         **examples.shown(kept or {}, steps),

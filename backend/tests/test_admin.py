@@ -202,7 +202,7 @@ def test_every_table_can_be_downloaded(app, client):
         assert response.status_code == 200, name
         assert response.headers["content-disposition"].startswith(f'attachment; filename="{name}_')
     assert tables["catchments"]["download"]["left_out"] == ["boundary", "river_line"]  # map shapes
-    assert tables["catchments"]["download"]["left_out_why"] == "map shapes, thousands of coordinates long"
+    assert tables["catchments"]["download"]["left_out_why"] == "map shapes"
     uploads_sheet = load_workbook(io.BytesIO(client.get("/admin/tables/uploads/download").content)).active
     assert "file" not in [c.value for c in uploads_sheet[1]]  # the files themselves: each from its upload
     assert tables["ea_scores"]["download"]["left_out"] == [] and tables["ea_scores"]["download"]["left_out_why"] is None
@@ -235,6 +235,8 @@ def test_download_upload_preview_and_approve(app, client):
     assert "Done. Intervention Waterbodies now matches October plans.xlsx: 2 added, 0 changed, 0 deleted." in page.text
     details = next(t for t in page_model(page.text)["tables"] if t["name"] == TABLE)
     assert (details["rows"], details["update"]["last"]["who"], details["update"]["recent"][0]["status"]) == (2, "tom", "approved")
+    # The last approved file, as the example of what to upload (a source file's upload offers it).
+    assert (details["update"]["last"]["file"], details["update"]["last"]["file_url"]) == ("October plans.xlsx", "/admin/uploads/1/file")
     assert saved(app.state.engine) == SAVED
     assert uploads_table(app) == [(1, TABLE, "tom", "approved", 2, 0, 0)]
     assert kept_file(app, 1) == PLANS  # kept in the database, so it's in its backups
@@ -374,7 +376,7 @@ def test_a_transformations_example_is_from_its_last_approved_file(app, client):
     make in the table. (A downloaded table's is in diagram.yaml: test_diagram.py.)"""
     add_named_catchments(app)
     example = client.get("/admin/tables/livestock_pressure/example").json()
-    assert example["missing"] == "No APHA livestock data file has been approved here yet, so there's no example from it."
+    assert example["missing"] == "No APHA livestock data file approved yet, so no example."
     assert (example["out"]["rows"], example["out"]["total"]) == ([], 0)  # the table as it is now
     assert client.get("/admin/tables/catchments/example").status_code == 404
 

@@ -146,7 +146,7 @@ def test_duplicate_names_are_rejected(tmp_path):
 
 def test_which_tables_are_filled_by_excel():
     schema = load_schema()
-    assert schema.excel_tables[:3] == ["datasets", "intervention_types", "intervention_waterbodies"]  # in the order of schema.yaml
+    assert schema.excel_tables[:3] == ["datasets", "river_status_text", "intervention_types"]  # in the order of schema.yaml
     assert {"intervention_waterbodies", "location_text"} <= set(schema.excel_tables)
     assert not {"catchments", "ea_classifications", "storm_overflows"} & set(schema.excel_tables)
     assert schema.metadata.tables["catchments"].info["filled_by"] == "api"
@@ -189,7 +189,7 @@ def test_tables_worked_out_from_a_source_file_say_which():
     assert schema.input_tables == {
         "waterbody_figures": "waterbody_lookup", "livestock": "apha_livestock", "livestock_pressure": "apha_livestock",
         "esme_risk_levels": "esme", "habitat_land_use": "habitat",
-        "river_status_text": "improvement_information", "phosphate_sources": "sagis_phosphate",
+        "phosphate_sources": "sagis_phosphate",
         "phosphate_point_diffuse": "sagis_phosphate", "sewerage_improvements": "water_company_plans",
         "ea_scores": "ea_classification_facts", "ea_thresholds": "ea_classification_facts",
     }

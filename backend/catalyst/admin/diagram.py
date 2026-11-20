@@ -7,8 +7,8 @@ web page and command), what's done to its data on the way in (its
 transformation, with a downloaded table's example), where each data table is
 shown on the dashboards and the extra links from diagram.yaml, each table's
 number (as on the numbered screenshots of the dashboards), and each source file
-(catalyst.importers.inputs) with the tables it fills and the original Power BI
-dashboard's formulas it uses. The admin page adds the row counts and the
+(catalyst.importers.inputs) with the tables it fills and the formulas it uses.
+The admin page adds the row counts and the
 uploads, and templates/home.html draws the diagram from them. (A source file's
 or Excel table's example is made from its last approved file: examples.py.)
 
@@ -38,12 +38,7 @@ FILLS = {"api", "input", "excel", "command", "admin"}
 # What a table holds, shown in its box (where it comes from is in the column on its left). An importer's tables
 # are as downloaded, unless their `filled` entry in diagram.yaml says `worked_out: true`; a source file's are
 # worked out; an Excel table's are typed in. Tables no data comes into (e.g. Uploads) have none.
-HOLDS = {
-    "downloaded": ("As downloaded", "The download's own columns, including some the dashboards don't show."),
-    "worked_out": ("Worked out", "Only what the dashboards show, taken from a download or source file, or worked out from "
-                                 "it with the original Power BI dashboard's formulas."),
-    "typed": ("Typed in", "Written by hand, and uploaded here in Excel."),
-}
+HOLDS = {"downloaded": "As downloaded", "worked_out": "Worked out", "typed": "Typed in"}
 
 MAP_SHAPES = {
     "POINT": "Map point", "MULTIPOINT": "Map points",
@@ -94,7 +89,7 @@ def model(schema: Schema | None = None, counts: dict[str, int] | None = None,
             for s in sections for t in s.tables
         ],
         "links": [l for l in _links(schema, config.get("links") or []) if not {l["from"], l["to"]} & left_off],
-        "holds": [{"key": key, "label": label, "text": text} for key, (label, text) in HOLDS.items()],
+        "holds": [{"key": key, "label": label} for key, label in HOLDS.items()],
         "inputs": [_input(source) for source in inputs.INPUTS.values() if source.name in schema.input_tables.values()],
     }
 
@@ -124,18 +119,18 @@ def _transform(table: sa.Table, filled: dict) -> dict | None:
         source = inputs.INPUTS[table.info["input"]]
         read = source.file_columns(table.name)
         steps = [
-            {"columns": list(step.columns), "inputs": list(step.inputs), "text": step.text, "power_bi": step.power_bi}
+            {"columns": list(step.columns), "inputs": list(step.inputs), "text": step.text}
             for step in source.table_steps(table.name)
         ]
         return {
-            "kind": "input", "name": "Power BI's formulas", "sub": _steps(len(steps)),
+            "kind": "input", "name": "Formulas", "sub": _steps(len(steps)),
             "from": source.title, "input": source.name, "file": source.file, "sheet": source.table_sheet(table.name),
             "inputs": read, "steps": steps,
         }
     if fill == "api":
         read = filled.get("inputs") or []
         steps = [
-            {"columns": [], "inputs": [], "text": _step_text(step), "power_bi": "", "example": _step_example(step)}
+            {"columns": [], "inputs": [], "text": _step_text(step), "example": _step_example(step)}
             for step in filled.get("transformation") or []
         ]
         return {
@@ -148,9 +143,9 @@ def _transform(table: sa.Table, filled: dict) -> dict | None:
             "kind": "excel", "name": "1 to 1", "sub": "No change", "from": "An Excel file in the table's layout",
             "file": None, "sheet": None, "inputs": columns,
             "steps": [{
-                "columns": columns, "inputs": columns, "power_bi": "",
-                "text": "Each column from the file's column with the same name, as it is. The upload is only checked: "
-                        "the column names, each value's type, and that no row is there twice.",
+                "columns": columns, "inputs": columns,
+                "text": "Each column goes in as it is. The upload is only checked for its column names, each value's "
+                        "type, and rows that are there twice.",
             }],
         }
     return None

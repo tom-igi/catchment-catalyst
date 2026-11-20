@@ -13,7 +13,7 @@ from catalyst.db.sync import apply_changes
 from catalyst.importers import inputs
 from catalyst.importers.excel import UploadError
 from catalyst.importers.inputs import (
-    apha_livestock, ea_classification_facts, esme, habitat, improvement_information, read_sheet, read_sheets, waterbody_lookup,
+    apha_livestock, ea_classification_facts, esme, habitat, read_sheet, read_sheets, waterbody_lookup,
 )
 from catalyst.importers.inputs.common import banded
 
@@ -22,7 +22,6 @@ APHA = inputs.INPUTS["apha_livestock"]
 LOOKUP = inputs.INPUTS["waterbody_lookup"]
 ESME = inputs.INPUTS["esme"]
 HABITAT = inputs.INPUTS["habitat"]
-IMPROVEMENT = inputs.INPUTS["improvement_information"]
 SAGIS = inputs.INPUTS["sagis_phosphate"]
 PLANS = inputs.INPUTS["water_company_plans"]
 FACTS = inputs.INPUTS["ea_classification_facts"]
@@ -338,55 +337,6 @@ def test_habitats_share_says_its_example_in_words(database):
 ])
 def test_relative_coverage_is_at_or_above_its_bands(name, share, level):
     assert habitat.coverage(name, share) == level
-
-
-# --- Improvement Information --------------------------------------------------------
-
-IMPROVEMENT_HEADINGS = (
-    "Catchment", "EA_Area", "WBID", "WATER_BODY", "Why general statement", "Why bullet 1", "Why bullet 2", "Why bullet 3",
-    "What general statement", "What bullet 1", "What bullet 2", "What bullet 3", "What bullet 4", "Intervention Hypothesis",
-    "Confidence", "Projects bullet 1", "Projects bullet 2", "Projects bullet 3", "Projects bullet 4",
-)
-
-
-def improvement_row(wbid, name, why="", why_bullets=(), what="", what_bullets=(), hypothesis="", confidence=None, projects=()):
-    def four(bullets, n):
-        return list(bullets) + [None] * (n - len(bullets))
-    return ("North Devon", "Devon and Cornwall", wbid, name, why, *four(why_bullets, 3), what, *four(what_bullets, 4),
-            hypothesis, confidence, *four(projects, 4))
-
-
-def test_improvement_information_puts_each_statement_with_its_bullets(database):
-    data = workbook(("Improvement Information", [
-        IMPROVEMENT_HEADINGS,
-        improvement_row(ABBEY, "Abbey River", why="Abbey River is at Moderate. \nThe failing elements are phosphate. ",
-                        what="Current activity includes farm visits.", hypothesis="Nutrient enrichment.",
-                        confidence="(confidence: High)"),
-        improvement_row(BADGWORTHY, "Badgworthy Water", why="Fish are poor.", why_bullets=(" Barriers ", "", "Mine water"),
-                        what=None, hypothesis=None, confidence=None, projects=("Fish pass",)),
-    ]))
-    result = run(database, data, "Improvement Information.xlsx", source=IMPROVEMENT)
-    rows = {r.values["catchment_id"]: r.values for r in result.tables["river_status_text"]}
-    assert rows[ABBEY] == {
-        "catchment_id": ABBEY,
-        "why_failing": "Abbey River is at Moderate.\nThe failing elements are phosphate.",  # trimmed, lines and all
-        "happening_now": "Current activity includes farm visits.",
-        "intervention_hypothesis": "Nutrient enrichment.",
-        "hypothesis_confidence": "High",  # the dashboard adds "(confidence: …)" back
-    }
-    assert rows[BADGWORTHY] == {
-        "catchment_id": BADGWORTHY,
-        "why_failing": "Fish are poor.\n- Barriers\n- Mine water",  # the empty bullet left out
-        "happening_now": None,
-        "intervention_hypothesis": "- Fish pass",  # bullets with no statement
-        "hypothesis_confidence": None,
-    }
-
-
-@pytest.mark.parametrize("typed, shown", [("(confidence: High)", "High"), ("(Confidence:Med-High )", "Med-High"),
-                                           ("Medium", "Medium"), ("", None)])
-def test_the_confidence_is_kept_without_its_brackets(typed, shown):
-    assert improvement_information.confidence(typed) == shown
 
 
 # --- SAGIS phosphate (two sheets) -------------------------------------------------
