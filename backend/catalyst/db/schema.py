@@ -39,6 +39,7 @@ BOOLEAN_OPTIONS = {"required", "primary_key", "identity", "unique", "index"}
 INDEX_OPTIONS = {"columns", "unique", "using"}
 ON_DELETE = {"cascade": "CASCADE", "set null": "SET NULL", "restrict": "RESTRICT"}
 INDEX_METHODS = {"btree", "gist", "gin"}
+EXAMPLE_VALUE = (str, int, float, bool, datetime.date, type(None))  # a column's example (one per row)
 
 # Every data table must link each row to a catchment with this column, or (for
 # data about a whole location, such as its text) to a location with the second.
@@ -230,6 +231,9 @@ def _build_table(where, name, spec, known_columns, schema: Schema, problems: lis
 
     if not columns:
         return
+    rows = {len(c.info["example"]) for c in columns if isinstance(c.info["example"], list)}
+    if len(rows) > 1 or (rows and any(not isinstance(c.info["example"], list | None) for c in columns)):
+        problems.append(f"{where}: every column's 'example' needs the same number of values (one for each example row)")
     if "title" in spec and not isinstance(spec["title"], str):
         problems.append(f"{where}: 'title' must be text, e.g. title: EA Scores")
     filled_by = spec.get("filled_by")
@@ -314,8 +318,8 @@ def _build_column(table_where, table, name, spec, known_columns, schema: Schema,
             schema.column_renames[(table, name)] = old
 
     example = spec.get("example")
-    if not isinstance(example, (str, int, float, bool, datetime.date, type(None))):
-        problems.append(f"{where}: 'example' must be a single value")
+    if not all(isinstance(v, EXAMPLE_VALUE) for v in (example if isinstance(example, list) else [example])):
+        problems.append(f"{where}: 'example' must be a value, or a list of them (one for each example row)")
 
     return sa.Column(
         name,

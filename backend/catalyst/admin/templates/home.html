@@ -142,6 +142,22 @@
   .publish-button:hover { filter: brightness(1.08); }
   .publish-button:disabled { cursor: progress; opacity: .7; filter: none; }
 
+  /* Input for AI, at the bottom: choose a waterbody, download its data as a text file (ai_input.py). */
+  .ai-input {
+    max-width: 760px; margin: 40px 0 0; padding: 14px 16px 16px; border: 1px solid var(--border); border-radius: 12px;
+    background: var(--card); box-shadow: var(--shadow);
+  }
+  .ai-input h2 { margin: 0; font-size: 1rem; }
+  .ai-input p { margin: 2px 0 0; font-size: .92rem; }
+  .ai-input form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 12px 0 0; }
+  .ai-input label { font-weight: 650; font-size: .92rem; }
+  .ai-input select {
+    flex: 1 1 260px; min-width: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--card); color: var(--text); font: inherit; font-size: .95rem;
+  }
+  .ai-input .ai-includes { margin-top: 8px; color: var(--muted); font-size: .85rem; }
+  .ai-input .ai-includes:empty { display: none; }
+
   /* ------- The diagram (narrow first: a stacked flow) ------- */
   .flow { position: relative; }
   .wires { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; z-index: 0; }
@@ -614,6 +630,31 @@
   <section class="flow" id="flow" aria-labelledby="flow-title">
     <h2 class="visually-hidden" id="flow-title">The tables, from where their data comes from to the dashboards</h2>
   </section>
+
+  <section class="ai-input" id="ai-input" aria-labelledby="ai-input-title">
+    <h2 id="ai-input-title">Input for AI</h2>
+    <p>A waterbody's data, with the waterbodies just upstream and downstream, as a text file for an AI to write its River Status Text from.</p>
+    <form method="get" action="/admin/ai-input">
+      <label for="ai-catchment">Waterbody</label>
+      <select id="ai-catchment" name="catchment" required aria-describedby="ai-includes">
+        <option value="">Choose a waterbody</option>
+        {% for c in ai_choices %}<option value="{{ c.id }}" data-includes="{{ c.includes }}">{{ c.name }}</option>
+        {% endfor %}
+      </select>
+      <button class="publish-button">Download input for AI</button>
+    </form>
+    <p class="ai-includes" id="ai-includes" aria-live="polite"></p>
+  </section>
+  <script>
+    /* Says which waterbodies upstream and downstream the chosen one's file has too. */
+    (function () {
+      const select = document.getElementById("ai-catchment");
+      const includes = document.getElementById("ai-includes");
+      const show = () => { includes.textContent = select.selectedOptions[0]?.dataset.includes || ""; };
+      select.addEventListener("change", show);
+      show();  // e.g. after going back to the page, with a waterbody still chosen
+    })();
+  </script>
 </main>
 
 <aside class="panel" id="panel" role="dialog" aria-modal="false" aria-labelledby="panel-title">
@@ -1689,11 +1730,13 @@ function start() {
     const cols = t.columns || [];
     const h = el("h3");
     h.append(document.createTextNode("Columns"), el("span", "n", cols.length));
-    const hint = el("p", "hint", "Row 2 is a made-up example.");
+    // Example rows: each column's examples from schema.yaml, one a row (rows 2, 3, …, as in Excel).
+    const examples = Math.max(1, ...cols.map(c => (c.examples || []).length));
+    const hint = el("p", "hint", examples === 1 ? "Row 2 is an example." : "Rows 2 to " + (examples + 1) + " are examples.");
 
     const wrap = el("div", "sheet-wrap");
     wrap.setAttribute("role", "region");
-    wrap.setAttribute("aria-label", "Columns of " + titleOf(t) + ", with an example row");
+    wrap.setAttribute("aria-label", "Columns of " + titleOf(t) + ", with example rows");
     wrap.tabIndex = 0;
     const table = el("table", "sheet");
     const thead = el("thead");
@@ -1705,10 +1748,14 @@ function start() {
     r1.setAttribute("aria-hidden", "true");
     labels.appendChild(r1);
     const tbody = el("tbody");
-    const exRow = el("tr", "example");
-    const r2 = el("th", "rownum", "2");
-    r2.setAttribute("aria-hidden", "true");
-    exRow.appendChild(r2);
+    const exRows = [];
+    for (let r = 0; r < examples; r++) {
+      const tr = el("tr", "example");
+      const num = el("th", "rownum", String(r + 2));
+      num.setAttribute("aria-hidden", "true");
+      tr.appendChild(num);
+      exRows.push(tr);
+    }
 
     const card = el("div", "col-card");
     card.setAttribute("aria-live", "polite");
@@ -1718,7 +1765,7 @@ function start() {
       if (i === chosen) return;
       chosen = i;
       buttons.forEach((b, j) => b.setAttribute("aria-pressed", String(j === i)));
-      cells.forEach((c, j) => c.classList.toggle("on", j === i));
+      cells.forEach((column, j) => column.forEach(td => td.classList.toggle("on", j === i)));
       card.replaceChildren(...columnCard(t, cols[i]));
     };
 
@@ -1739,12 +1786,16 @@ function start() {
       buttons.push(b);
       th.appendChild(b);
       labels.appendChild(th);
-      const td = el("td", c.catchment_id ? "cid" : null, c.example ? c.example : "–");
-      cells.push(td);
-      exRow.appendChild(td);
+      cells.push(exRows.map((tr, r) => {
+        const value = (c.examples || [])[r] || "–";
+        const td = el("td", c.catchment_id ? "cid" : null, value);
+        if (value.length > 30) td.title = value;  // a long one is cut short
+        tr.appendChild(td);
+        return td;
+      }));
     });
     thead.append(letters, labels);
-    tbody.appendChild(exRow);
+    tbody.append(...exRows);
     table.append(thead, tbody);
     wrap.appendChild(table);
     choose(0);
@@ -1760,9 +1811,14 @@ function start() {
     if (c.type) head.appendChild(el("span", "chip", c.type));
     out.push(head);
     if (c.meaning) out.push(el("p", null, c.meaning));
-    if (c.example) {
+    const shown = [...new Set((c.examples || []).filter(v => v && v !== "–"))];  // each different one, in full
+    if (shown.length) {
       const ex = el("p", "ex");
-      ex.append(document.createTextNode("Example: "), el("code", null, c.example));
+      ex.appendChild(document.createTextNode(shown.length === 1 ? "Example: " : "Examples: "));
+      shown.forEach((v, i) => {
+        if (i) ex.appendChild(document.createTextNode(" · "));
+        ex.appendChild(el("code", null, v));
+      });
       out.push(ex);
     }
     const flags = [];

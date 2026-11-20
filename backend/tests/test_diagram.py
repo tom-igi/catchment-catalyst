@@ -41,6 +41,16 @@ def test_the_model_has_every_table_and_column():
         assert [c["name"] for c in tables[table.name]["columns"]] == [c.name for c in table.columns]
 
 
+def test_each_table_has_a_few_example_rows():
+    # Rows 2 to 5 of each table's columns on the page, a value for each column (schema.yaml's examples).
+    tables = {t["name"]: {c["name"]: c["examples"] for c in t["columns"]} for t in diagram.model(load_schema())["tables"]}
+    for name, columns in tables.items():
+        assert {len(examples) for examples in columns.values()} == {4}, name
+    assert tables["catchments"]["upstream_ids"][0] == "(none)"
+    assert tables["catchments"]["area_ha"][0] == "3174.75"  # as text, as the page shows it
+    assert tables["livestock"]["number_note"][:2] == ["–", "–"]  # an empty cell
+
+
 def test_sections_come_in_the_order_of_diagram_yaml():
     sections = [s["title"] for s in diagram.model(load_schema())["sections"]]
     assert sections == ["Locations", "Catchments", "Datasets", "Data tables"]  # every core table on the page has a section

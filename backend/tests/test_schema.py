@@ -131,6 +131,46 @@ def test_all_mistakes_are_reported_together():
         assert expected in problems
 
 
+def test_examples_are_a_row_each():
+    schema = make_schema("""
+        tables:
+          things:
+            columns:
+              id: {type: integer, primary_key: true, example: [1, 2, 3]}
+              name: {type: text, example: [Farmland, null, Urban]}
+              note: {type: text}
+          others:
+            columns:
+              id: {type: integer, primary_key: true, example: 7}
+    """)
+    things = schema.metadata.tables["things"]
+    assert (things.c.id.info["example"], things.c.name.info["example"]) == ([1, 2, 3], ["Farmland", None, "Urban"])
+    assert schema.metadata.tables["others"].c.id.info["example"] == 7  # one value: one row
+
+    with pytest.raises(SchemaError) as error:
+        make_schema("""
+            tables:
+              things:
+                columns:
+                  id: {type: integer, primary_key: true, example: [1, 2, 3]}
+                  name: {type: text, example: [Farmland, Urban]}
+              others:
+                columns:
+                  id: {type: integer, primary_key: true, example: [1, 2]}
+                  name: {type: text, example: Farmland}
+              more:
+                columns:
+                  id: {type: integer, primary_key: true, example: [[1], {a: 2}]}
+        """)
+    problems = "\n".join(error.value.problems)
+    for expected in [
+        "tables.things: every column's 'example' needs the same number of values",
+        "tables.others: every column's 'example' needs the same number of values",
+        "more.columns.id: 'example' must be a value, or a list of them (one for each example row)",
+    ]:
+        assert expected in problems
+
+
 def test_duplicate_names_are_rejected(tmp_path):
     path = tmp_path / "schema.yaml"
     path.write_text(

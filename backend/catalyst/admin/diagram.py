@@ -315,7 +315,7 @@ def _column(column: sa.Column, key_size: int) -> dict:
         "label": _label(column),
         "type": _type_label(column.type),
         "meaning": _plain(column.comment) or ("The catchment this row belongs to" if _is_catchment_id(column) and links_to else ""),
-        "example": _example(column.info.get("example")),
+        "examples": [_example(v) for v in _examples(column)],
         "key": bool(column.primary_key),
         "unique_id": bool(column.primary_key and key_size == 1),
         "required": not column.nullable and column.identity is None,
@@ -387,6 +387,12 @@ def _label(column: sa.Column) -> str:
 
 def _title(table: sa.Table) -> str:
     return table.info.get("title") or table.name.replace("_", " ").capitalize()
+
+
+def _examples(column: sa.Column) -> list:
+    """A column's example values from schema.yaml, one for each example row (a single value is one row)."""
+    value = column.info.get("example")
+    return value if isinstance(value, list) else [] if value is None else [value]
 
 
 def _example(value) -> str:

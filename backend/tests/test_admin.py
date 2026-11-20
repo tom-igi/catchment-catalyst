@@ -520,3 +520,145 @@ def test_a_problem_publishing_is_shown_and_nothing_changes(app, client, tmp_path
     page = client.post("/admin/publish")
     assert "The dashboard&#39;s pages couldn&#39;t all be written" in page.text
     assert published_by(app) == []
+
+
+# --- Input for AI ------------------------------------------------------------------
+
+# Hole Water flows into Bray (Mole to Hole Water), as do Nadrid Water and Ash Brook (not imported). Bray flows into
+# Mole (Taw to Bray), then the Taw, then the estuary (not imported).
+BRAY, HOLE, NADRID, ASH, MOLE, TAW, ESTUARY = (
+    "GB108050019910", "GB108050019930", "GB108050013950", "GB108050099999", "GB108050014380", "GB108050014220",
+    "GB540805015500",
+)
+
+
+def add_river(app):
+    rows = [
+        (BRAY, "Bray (Mole to Hole Water)", [NADRID, HOLE, ASH], [MOLE]),
+        (HOLE, "Hole Water", [], [BRAY]),
+        (NADRID, "Nadrid Water", [], [BRAY]),
+        (MOLE, "Mole (Taw to Bray)", [BRAY], [TAW]),
+        (TAW, "Taw (River Mole to Estuary)", [MOLE], [ESTUARY]),
+    ]
+    with app.state.engine.begin() as conn:
+        for catchment_id, name, up, down in rows:
+            conn.execute(sa.text(
+                "INSERT INTO catchments (id, name, waterbody_type, upstream_ids, downstream_ids, area_ha)"
+                " VALUES (:id, :name, 'River', :up, :down, 4212.6)"
+            ), {"id": catchment_id, "name": name, "up": up, "down": down})
+        location = conn.scalar(sa.text("INSERT INTO locations (name, catchment_ids) VALUES ('North Devon', :ids) RETURNING id"),
+                               {"ids": [r[0] for r in rows]})
+        for catchment_id, why in ((BRAY, "Bray fails on **phosphate**.\n### Not a section of the file"), (HOLE, "Hole Water's own text")):
+            conn.execute(sa.text(
+                "INSERT INTO river_status_text (catchment_id, why_failing, hypothesis_confidence) VALUES (:id, :why, 'High')"
+            ), {"id": catchment_id, "why": why})
+        conn.execute(sa.text(
+            "INSERT INTO ea_classifications (catchment_id, item, year, cycle, level, status, certainty) VALUES"
+            " (:id, 'Ecological', 2019, 2, 'Ecological, chemical or quantitative status', 'Good', 'Uncertain'),"
+            " (:id, 'Ecological', 2019, 3, 'Ecological, chemical or quantitative status', 'Moderate', 'Very Certain'),"
+            " (:id, 'Phosphate', 2019, 3, 'Element', 'Poor', 'Quite Certain'),"
+            " (:id, 'Fish', 2013, 2, 'Element', 'High', 'No Information')"
+        ), {"id": BRAY})
+        conn.execute(sa.text("INSERT INTO waterbody_figures (catchment_id, ranking) VALUES (:id, 68)"), {"id": BRAY})
+        conn.execute(sa.text("INSERT INTO postcodes (postcode, catchment_id) VALUES ('EX36 3AA', :id)"), {"id": BRAY})
+        conn.execute(sa.text(
+            "INSERT INTO storm_overflows (catchment_id, year, site_name, latitude, spill_hours) VALUES"
+            " (:id, 2025, 'BRAY STW', 50.987654, 12.3456)"
+        ), {"id": HOLE})
+        conn.execute(sa.text(
+            "INSERT INTO intervention_types (location_id, number, name, summary_group) VALUES (:loc, 3, 'Farm advice', 'Priority')"
+        ), {"loc": location})
+        conn.execute(sa.text(
+            "INSERT INTO intervention_waterbodies (catchment_id, intervention, group_number, size) VALUES (:id, 3, 1, 'c.6 farms | more')"
+        ), {"id": BRAY})
+
+
+def ai_input(client, catchment_id) -> str:
+    response = client.get("/admin/ai-input", params={"catchment": catchment_id})
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/plain; charset=utf-8"
+    return response.text
+
+
+def section(text: str, heading: str) -> str:
+    """The part of the file under a ## heading, up to the next one."""
+    return text.split(f"\n## {heading}", 1)[1].split("\n## ", 1)[0]
+
+
+def test_input_for_ai_has_the_waterbody_and_its_neighbours(app, client):
+    add_river(app)
+    response = client.get("/admin/ai-input", params={"catchment": BRAY})
+    assert re.fullmatch(r"attachment; filename\*=utf-8''AI%20input%20-%20Bray%20%28Mole%20to%20Hole%20Water%29%20-%20\d{4}-\d\d-\d\d\.txt",
+                        response.headers["content-disposition"])
+    text = ai_input(client, BRAY)
+    assert text.startswith("# Input for AI: Bray (Mole to Hole Water)\n")
+    assert "one waterbody in North Devon: **Bray (Mole to Hole Water)** (the Environment Agency's ID GB108050019910)" in text
+    assert "3 waterbodies that flow straight into it (upstream) and 1 waterbody it flows straight into (downstream)" in text
+
+    # The waterbodies: the chosen one, upstream by name (one not imported), downstream, then further downstream by name.
+    assert section(text, "The waterbodies in this file").split("\n\n")[1].splitlines()[2:] == [
+        f"| Bray (Mole to Hole Water) | {BRAY} | The waterbody the text is for |",
+        f"| {ASH} | {ASH} | Upstream: flows straight into Bray (Mole to Hole Water). It isn't in Catchment Catalyst, so there's no data for it here |",
+        f"| Hole Water | {HOLE} | Upstream: flows straight into Bray (Mole to Hole Water) |",
+        f"| Nadrid Water | {NADRID} | Upstream: flows straight into Bray (Mole to Hole Water) |",
+        f"| Mole (Taw to Bray) | {MOLE} | Downstream: Bray (Mole to Hole Water) flows straight into it |",
+    ]
+    assert (f"After Mole (Taw to Bray), the river goes on to (names only, not in this file): "
+            f"Taw (River Mole to Estuary) → {ESTUARY} (not in Catchment Catalyst).") in text
+    assert [line for line in text.splitlines() if line.startswith("## ")] == [
+        "## About this file", "## The waterbodies in this file", "## What the text is for", "## What the tables hold",
+        "## 1. Bray (Mole to Hole Water): the waterbody the text is for",
+        f"## 2. {ASH}: upstream, flows straight into Bray (Mole to Hole Water)",
+        "## 3. Hole Water: upstream, flows straight into Bray (Mole to Hole Water)",
+        "## 4. Nadrid Water: upstream, flows straight into Bray (Mole to Hole Water)",
+        "## 5. Mole (Taw to Bray): downstream, Bray (Mole to Hole Water) flows straight into it",
+    ]
+
+    # Its current text, fenced so its marks are its own; not the neighbours'.
+    assert "```text\nBray fails on **phosphate**.\n### Not a section of the file\n```" in section(text, "What the text is for")
+    assert "**Intervention hypothesis (confidence: High)**\n\n```text\n(empty)\n```" in text
+    assert "Hole Water's own text" not in text
+    assert "### River Status Text" not in text and "### Postcodes" not in text and "EX36" not in text
+
+    chosen = section(text, "1. Bray")
+    assert "- Ecological status: Moderate (2019)\n- Failing elements (2019): Phosphate\n" in chosen
+    assert "- Ranking: 68 of 5 rivers" in chosen
+    assert "- Area (ha): 4212.6" in chosen
+    # EA Classifications as a grid: the latest cycle's status each year, broadest level first.
+    assert (
+        "| Item | Level | 2013 | 2019 | Certainty (latest) |\n|---|---|---|---|---|\n"
+        "| Ecological | Ecological, chemical or quantitative status |  | Moderate | Very Certain |\n"
+        "| Fish | Element | High |  | No Information |\n"
+        "| Phosphate | Element |  | Poor | Quite Certain |"
+    ) in chosen
+    # An intervention has its type's name; a | in a cell can't split it.
+    assert "| 3 (Farm advice) | 1 |  | c.6 farms \\| more |" in chosen
+    assert "### Storm Overflows\n\nNone." in chosen
+
+    # A neighbour's rows: coordinates left out, numbers rounded.
+    hole = section(text, "3. Hole Water")
+    assert "| Year | Company | Site name |" in hole and "| 2025 |  | BRAY STW |" in hole and "12.35 |" in hole
+    assert "Latitude" not in text and "50.98" not in text
+    assert section(text, f"2. {ASH}").strip().endswith(f"{ASH} isn't in Catchment Catalyst, so there's no data for it here.")
+
+
+def test_input_for_ai_is_chosen_at_the_bottom_of_the_admin_page(app, client):
+    add_river(app)
+    page = client.get("/admin").text
+    box = page.split('<section class="ai-input"', 1)[1].split("</section>", 1)[0]
+    assert '<form method="get" action="/admin/ai-input">' in box
+    assert (f'<option value="{BRAY}" data-includes="Upstream: {ASH} (no data), Hole Water, Nadrid Water. '
+            f'Downstream: Mole (Taw to Bray).">Bray (Mole to Hole Water)</option>') in box
+    assert f'<option value="{HOLE}" data-includes="Upstream: none. Downstream: Bray (Mole to Hole Water).">Hole Water</option>' in box
+
+
+def test_input_for_ai_needs_a_waterbody_that_exists(app, client):
+    assert client.get("/admin/ai-input").status_code == 400
+    assert client.get("/admin/ai-input", params={"catchment": "GB000"}).status_code == 404
+    assert TestClient(app).get(f"/admin/ai-input?catchment={WEST}", follow_redirects=False).headers["location"] == "/admin/login"
+    # A waterbody that's in no location, with no neighbours or data.
+    text = ai_input(client, WEST)
+    assert "one waterbody: **GB108050008080**" in text and "There's no text for it yet." in text
+    assert "no waterbodies that flow straight into it (upstream) and no waterbodies it flows straight into" in text
+    assert "- Ecological status: none\n- Failing elements: no classification from the EA" in text
+    assert "the river goes on to" not in text

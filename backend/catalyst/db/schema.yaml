@@ -46,8 +46,12 @@
 #                  deleted: cascade (delete this row too) | set null |
 #                  restrict. If left out, the delete is refused.
 #    renamed_from  The column's previous name (see RENAMING above).
-#    example       An example value, shown on the admin page when the table
-#                  is clicked (catalyst/admin/diagram.py). Not stored in the database.
+#    example       Example values, shown on the admin page as rows 2, 3, …
+#                  of the table's columns when it's clicked
+#                  (catalyst/admin/diagram.py). A list, one value a row, e.g.
+#                    example: [Farmland, Woodland, Urban]
+#                  Every column in a table needs as many (null for an empty
+#                  cell); a single value is one row. Not stored in the database.
 #
 #  Table options:  title, description, filled_by, input, columns, indexes, renamed_from
 #    title         Friendly name, e.g. EA Scores. Shown on the admin page.
@@ -108,83 +112,95 @@ tables:
     columns:
       id:
         type: text
-        example: GB108050008080
+        example: [GB108050008080, GB108050008110, GB108050014460, GB108050014340]
         primary_key: true
         description: Catchment ID, which is the EA WFD waterbody ID
       name:
         type: text
-        example: West Okement
+        example: [West Okement, Middle River Okement, Langham Lake, Lower Little River Dart]
         required: true
         description: EA name. Names are not unique nationally, so data is always linked by Catchment ID.
       waterbody_type:
         type: text
-        example: River
+        example: [River, River, River, River]
         required: true
         description: River, Lake, Transitional (estuary), Coastal or Groundwater
       river_basin_district_id:
         type: integer
-        example: 8
+        example: [8, 8, 8, 8]
         description: EA ID of the river basin district
       river_basin_district:
         type: text
-        example: South West
+        example: [South West, South West, South West, South West]
         description: EA river basin district the catchment is in
       management_catchment_id:
         type: integer
-        example: 3062
+        example: [3062, 3062, 3062, 3062]
         index: true
         description: EA ID of the management catchment. Can be used to choose a location's catchments.
       management_catchment:
         type: text
-        example: North Devon
+        example: [North Devon, North Devon, North Devon, North Devon]
         description: EA management catchment name
       operational_catchment_id:
         type: integer
-        example: 3468
+        example: [3468, 3468, 3441, 3441]
         description: EA ID of the operational catchment
       operational_catchment:
         type: text
-        example: Torridge
+        example: [Torridge, Torridge, Taw and North Devon Streams, Taw and North Devon Streams]
         description: EA operational catchment, a smaller grouping within the management catchment
       hydromorphological_designation:
         type: text
-        example: not designated artificial or heavily modified
+        example:
+          - not designated artificial or heavily modified
+          - not designated artificial or heavily modified
+          - not designated artificial or heavily modified
+          - not designated artificial or heavily modified
         description: Whether the EA designates the waterbody as artificial or heavily modified
       area_ha:
         type: double
-        example: 3174.75
+        example: [3174.75, 3993.15, 2752.27, 6134.91]
         description: Catchment area in hectares, calculated from the boundary (matches the EA's figure)
       river_length_km:
         type: double
-        example: 21.13
+        example: [21.13, 23.86, 15.53, 20.52]
         description: River length in kilometres, as shown on the EA's Catchment Data Explorer page
       boundary:
         type: geometry(MultiPolygon, 4326)
-        example: "(outline on the map)"
+        example:
+          - "(outline on the map)"
+          - "(outline on the map)"
+          - "(outline on the map)"
+          - "(outline on the map)"
         index: true
         description: >-
           Catchment boundary as latitude/longitude (WGS84). Converted from
           British National Grid on import.
       river_line:
         type: geometry(MultiLineString, 4326)
-        example: "(line on the map)"
+        example: ["(line on the map)", "(line on the map)", "(line on the map)", "(line on the map)"]
         description: River line(s) as latitude/longitude (WGS84)
       upstream_ids:
         type: text[]
-        example: "(none)"
+        example:
+          - "(none)"
+          - "GB108050008100, GB108050008080"
+          - GB108050014490
+          - "GB108050013980, GB108050013960, GB108050013990"
         description: >-
           Catchment IDs of the waterbodies that flow into this one, from the
           EA. Look their names up in this table.
       downstream_ids:
         type: text[]
-        example: GB108050008110
+        example: [GB108050008110, GB108050008130, GB108050014530, GB108050014280]
         description: >-
           Catchment IDs of the waterbodies this one flows into, from the EA.
           Look their names up in this table. Some (e.g. estuaries) aren't
           imported yet, so have no row.
       imported_at:
         type: timestamptz
-        example: 2026-10-28 09:00
+        example: ["2026-10-29 14:38", "2026-10-29 14:38", "2026-10-29 14:38", "2026-10-29 14:38"]
         required: true
         default: now()
         description: When this catchment was last imported from the EA
@@ -198,19 +214,23 @@ tables:
     columns:
       id:
         type: integer
-        example: 1
+        example: [1, 2, 3, 4]
         primary_key: true
         identity: true
         description: Location ID
       name:
         type: text
-        example: North Devon
+        example: [North Devon, Exe, Tamar, South Devon]
         required: true
         unique: true
         description: Name of the location
       catchment_ids:
         type: text[]
-        example: "GB108050008080, GB108050008100, …"
+        example:
+          - "GB108050008080, GB108050008100, …"
+          - "(the Exe's waterbody IDs)"
+          - "(the Tamar's waterbody IDs)"
+          - "(South Devon's waterbody IDs)"
         required: true
         index: true
         description: >-
@@ -232,7 +252,7 @@ tables:
     columns:
       table_name:
         type: text
-        example: livestock
+        example: [livestock, habitat_land_use, phosphate_sources, sewerage_improvements]
         primary_key: true
         description: >-
           The data table, by its name in the database (shown under its title
@@ -241,7 +261,11 @@ tables:
           Ranking panel
       info_text:
         type: text
-        example: "Risk levels assessed by the catchment partnership in 2026. Source: …"
+        example:
+          - "Livestock data via FoIR to the Animal and Plant Health …"
+          - "Habitat mapping from Natural England 22/23. Habitat types …"
+          - "Phosphate source data is from EA SAGIS modelling. Due to …"
+          - "From Water UK's national storm overflows plan …"
         required: true
         description: What the "i" button shows, e.g. where the data comes from, how up to date it is, and any caveats
 
@@ -256,21 +280,25 @@ tables:
     columns:
       id:
         type: integer
-        example: 12
+        example: [39, 43, 44, 45]
         primary_key: true
         identity: true
         description: Upload ID
       uploaded_to:
         renamed_from: table_name
         type: text
-        example: ea_scores
+        example: [apha_livestock, habitat, sagis_phosphate, ea_classification_facts]
         required: true
         description: >-
           The table the file was uploaded to, or for a source file, its code
           (e.g. apha_livestock), as it can fill several tables
       file_name:
         type: text
-        example: EA scores October.xlsx
+        example:
+          - APHA Livestock Data Feb 2026.xlsx
+          - Nat Eng Simplified Habitat.csv
+          - SAGIS Phosphate source.xlsx
+          - North Devon WB Classification Facts Data.xlsx
         required: true
         description: Name of the file that was uploaded
       file:
@@ -279,17 +307,17 @@ tables:
         description: The file, exactly as it was uploaded
       uploaded_by:
         type: text
-        example: tom
+        example: [admin, admin, admin, admin]
         required: true
         description: Who uploaded it (their admin login name)
       uploaded_at:
         type: timestamptz
-        example: 2026-10-29 14:30
+        example: ["2026-11-18 13:50", "2026-11-18 15:09", "2026-11-18 15:25", "2026-11-18 15:53"]
         required: true
         default: now()
       status:
         type: text
-        example: approved
+        example: [approved, approved, approved, approved]
         required: true
         default: "'preview'"
         description: >-
@@ -297,37 +325,45 @@ tables:
           table's rows were replaced with the file's) or cancelled
       rows_in_file:
         type: integer
-        example: 830
+        example: [92, 459, 910, 96402]
         required: true
       rows_added:
         type: integer
-        example: 12
+        example: [93, 0, 364, 0]
         required: true
         description: Rows in the file that weren't in the table
       rows_changed:
         type: integer
-        example: 3
+        example: [459, 459, 401, 10]
         required: true
         description: Rows in both, with different values
       rows_removed:
         type: integer
-        example: 0
+        example: [0, 0, 0, 0]
         required: true
         description: Rows in the table that weren't in the file, so are deleted
       changes:
         type: jsonb
-        example: '{"livestock": [0, 3, 0], "livestock_pressure": [0, 1, 0]}'
+        example:
+          - '{"livestock": [1, 459, 0], "livestock_pressure": [92, 0, 0]}'
+          - '{"habitat_land_use": [0, 459, 0]}'
+          - '{"phosphate_sources": [0, 401, 0], "phosphate_point_diffuse": [364, 0, 0]}'
+          - '{"ea_scores": [0, 10, 0], "ea_thresholds": [0, 0, 0]}'
         description: >-
           For a source file: the rows added, changed and deleted in each table
           it fills (the three columns above are their totals). Empty for an
           upload to one table.
       approved_at:
         type: timestamptz
-        example: 2026-10-29 14:32
+        example: ["2026-11-18 13:51", "2026-11-18 15:10", "2026-11-18 15:25", "2026-11-18 15:53"]
         description: When it was approved and the table's rows were replaced
       examples:
         type: jsonb
-        example: '{"livestock_pressure": {"waterbody": "Hole Brook", "in": {...}, "out": {...}, "steps": {...}}}'
+        example:
+          - '{"livestock": {"waterbody": "Abbey River", "in": {...}, "out": {...}, "steps": {...}}}'
+          - '{"habitat_land_use": {"waterbody": "Abbey River", "in": {...}, "out": {...}, "steps": {...}}}'
+          - '{"phosphate_sources": {"waterbody": "Lower River Lew (Torridge)", "in": {...}, "out": {...}, "steps": {...}}}'
+          - '{"ea_scores": {"waterbody": "Waldon", "in": {...}, "out": {...}, "steps": {...}}}'
         description: >-
           A few of the file's rows, and what each table it fills makes of
           them, for the admin page's Transformation panels (see
@@ -344,19 +380,19 @@ tables:
     columns:
       id:
         type: integer
-        example: 3
+        example: [20, 21, 22, 23]
         primary_key: true
         identity: true
         description: Publish ID
       published_at:
         type: timestamptz
-        example: 2026-11-11 15:02
+        example: ["2026-11-18 15:10", "2026-11-18 15:25", "2026-11-18 15:54", "2026-11-20 11:25"]
         required: true
         default: now()
         description: When the publish started. Everything approved before then is on the dashboards.
       published_by:
         type: text
-        example: tom
+        example: [admin, admin, null, admin]
         description: Who pressed Publish (their admin login name). Empty if it was the publish command.
 
 
@@ -377,29 +413,29 @@ data_tables:
     columns:
       catchment_id:
         type: text
-        example: GB108050014460
+        example: [GB108050014460, GB108050014460, GB108050014460, GB108050014460]
         primary_key: true
         references: catchments.id
       measure:
         type: text
-        example: Fish (EQR)
+        example: [Fish (EQR), Fish (EQR), Phosphate (mg/l), Phosphate (mg/l)]
         primary_key: true
         description: The measure, named as on the EA Data page, e.g. Fish (EQR), Phosphate (mg/l), pH Lower
       year:
         type: integer
-        example: 2022
+        example: [2019, 2022, 2016, 2022]
         primary_key: true
         description: Classification year, e.g. 2022
       status:
         type: text
-        example: Moderate
+        example: [Moderate, Moderate, Good, Moderate]
         description: >-
           The value's status (High, Good, Moderate, Poor or Bad) from its
           thresholds, which colours it. Where the EA classifies the item itself
           (e.g. Fish), the dashboard uses the EA's status instead.
       value:
         type: double
-        example: 0.36
+        example: [0.382, 0.363, 0.048, 0.057]
         description: The measured value, e.g. Fish EQR 0.36 or phosphate 0.057 mg/l
 
   habitat_land_use:
@@ -412,26 +448,26 @@ data_tables:
     columns:
       catchment_id:
         type: text
-        example: GB108050008080
+        example: [GB108050014460, GB108050014460, GB108050014460, GB108050014460]
         primary_key: true
         references: catchments.id
       habitat:
         type: text
-        example: Farmland
+        example: [Farmland, Woodland, Not Farmed, Urban]
         primary_key: true
         description: Farmland, Not Farmed, Urban, Wetland or Woodland
       area_ha:
         type: double
-        example: 1082.4
+        example: [1710.55, 439.26, 423.15, 91.29]
         required: true
         description: Area in hectares
       percent_of_catchment:
         type: double
-        example: 72.1
+        example: [62.16, 15.96, 15.38, 3.32]
         description: The habitat's share of all the catchment's habitat areas added up, in %
       relative_coverage:
         type: text
-        example: High
+        example: [High, Medium, Medium, Medium]
         description: >-
           Low, Medium or High, from the % of catchment, with bands for each
           habitat (shown on the admin page)
@@ -445,37 +481,37 @@ data_tables:
     columns:
       catchment_id:
         type: text
-        example: GB108050008080
+        example: [GB108050014460, GB108050014460, GB108050014460, GB108050014460]
         primary_key: true
         references: catchments.id
       item:
         type: text
-        example: Fish
+        example: [Ecological, Biological quality elements, Fish, Phosphate]
         primary_key: true
         description: The EA's classification item, e.g. Ecological, Fish, Phosphate, Chemical
       year:
         type: integer
-        example: 2022
+        example: [2022, 2022, 2022, 2022]
         primary_key: true
         description: Classification year
       cycle:
         type: integer
-        example: 3
+        example: [3, 3, 3, 3]
         primary_key: true
         description: >-
           River basin planning cycle. Some years were classified in two cycles
           (e.g. 2019 in cycles 2 and 3): the dashboard uses the later one.
       level:
         type: text
-        example: Element
+        example: ["Ecological, chemical or quantitative status", Component, Element, Element]
         description: Where the item sits, e.g. Ecological, chemical or quantitative status, Component, Element, Sub Element
       status:
         type: text
-        example: Moderate
+        example: [Moderate, Moderate, Moderate, Moderate]
         description: e.g. High, Good, Moderate, Poor, Bad, Fail, Supports Good, Not High
       certainty:
         type: text
-        example: Quite Certain
+        example: [Very Certain, Very Certain, Uncertain, Uncertain]
         description: How certain the EA is of the result (Very Certain, Quite Certain, Uncertain, No Information)
 
   ea_rnags:
@@ -487,48 +523,64 @@ data_tables:
     columns:
       id:
         type: integer
-        example: 570748
+        example: [570997, 570996, 570995, 570994]
         primary_key: true
         description: The EA's ID for this reason
       catchment_id:
         type: text
-        example: GB108050014460
+        example: [GB108050014460, GB108050014460, GB108050014460, GB108050014460]
         required: true
         index: true
         references: catchments.id
       cycle:
         type: integer
-        example: 3
+        example: [3, 3, 3, 3]
         description: River basin planning cycle
       element:
         type: text
-        example: Macrophytes and Phytobenthos Combined
+        example:
+          - Macrophytes and Phytobenthos Combined
+          - Macrophytes and Phytobenthos Combined
+          - Macrophytes and Phytobenthos Combined
+          - Macrophytes and Phytobenthos Combined
         description: The classification element that isn't Good
       element_status:
         type: text
-        example: Moderate
+        example: [Moderate, Moderate, Moderate, Moderate]
         description: That element's status
       activity:
         type: text
-        example: Poor Livestock Management
+        example:
+          - Poor Livestock Management
+          - Poor soil management
+          - Poor nutrient management
+          - Sewage discharge (continuous)
         description: What the EA thinks is causing it (shown on the dashboard as the EA RNAGs)
       activity_certainty:
         type: text
-        example: Probable
+        example: [Probable, Probable, Probable, Probable]
         description: How sure the EA is (Suspect, Probable, Confirmed)
       business_sector:
         type: text
-        example: Agriculture - Livestock
+        example: [Agriculture - Livestock, Agriculture - Arable, Agriculture - Livestock, Water supply]
       category:
         type: text
-        example: Agriculture and rural land management
+        example:
+          - Agriculture and rural land management
+          - Agriculture and rural land management
+          - Agriculture and rural land management
+          - Water Industry
       source_type:
         type: text
-        example: Diffuse source
+        example: [Diffuse source, Diffuse source, Diffuse source, Point source]
         description: e.g. Diffuse source, Point source, Physical modification
       national_issue:
         type: text
-        example: Pollution from rural areas
+        example:
+          - Pollution from rural areas
+          - Pollution from rural areas
+          - Pollution from rural areas
+          - Pollution from waste water
         description: The national significant water management issue it comes under
 
   storm_overflows:
@@ -541,74 +593,82 @@ data_tables:
     columns:
       id:
         type: integer
-        example: 1
+        example: [1258, 1361, 1353, 1440]
         primary_key: true
         identity: true
       catchment_id:
         type: text
-        example: GB108050014460
+        example: [GB108050014460, GB108050014460, GB108050014460, GB108050014460]
         required: true
         index: true
         references: catchments.id
         description: The WFD waterbody the overflow discharges into, as given in the return
       year:
         type: integer
-        example: 2025
+        example: [2024, 2025, 2024, 2025]
         required: true
         description: The year the return covers
       company:
         type: text
-        example: South West Water
+        example: [South West Water, South West Water, South West Water, South West Water]
       site_name:
         type: text
-        example: HIGH BICKINGTON STW_SO_HIGH BICKINGTON
+        example:
+          - HIGH BICKINGTON STW_SO_HIGH BICKINGTON
+          - HIGH BICKINGTON STW_SO_HIGH BICKINGTON
+          - YARNSCOMBE STW_SSO_YARNSCOMBE
+          - YARNSCOMBE STW_SSO_YARNSCOMBE
         description: The water company's name for the overflow
       unique_id:
         type: text
-        example: SBB00568
+        example: [SBB00568, SBB00568, SBB01383, SBB01383]
         description: The return's ID for the overflow (only from 2023, and it changed format in 2024)
       permit_reference:
         type: text
-        example: 202194/CS/01
+        example: ["202194/CS/01", "202194/CS/01", "200402", "200402"]
         description: The EA's permit reference
       activity_reference:
         type: text
-        example: A2
+        example: [A2, A2, A3, A3]
         description: The activity on the permit
       asset_type:
         type: text
-        example: Storm tank at WwTW
+        example: [Inlet SO at WwTW, Inlet SO at WwTW, Storm tank at WwTW, Storm tank at WwTW]
       receiving_water:
         type: text
-        example: Langham Lake
+        example:
+          - TRIBUTARY OF LANGHAM LAKE(S)
+          - TRIBUTARY OF LANGHAM LAKE(S)
+          - TRIBUTARY OF LANGHAM LAKE(S)
+          - TRIBUTARY OF LANGHAM LAKE(S)
       grid_reference:
         type: text
-        example: SS 5916 2017
+        example: [SS59162017, SS59162017, SS55782367, SS55782367]
         description: The outlet's Ordnance Survey grid reference, as given in the return
       easting:
         type: integer
-        example: 259160
+        example: [259160, 259160, 255780, 255780]
         description: Worked out from the grid reference (British National Grid, metres)
       northing:
         type: integer
-        example: 120170
+        example: [120170, 120170, 123670, 123670]
       latitude:
         type: double
-        example: 50.96
+        example: [50.96369, 50.96369, 50.9943, 50.9943]
         description: Worked out from the easting and northing, for the maps
       longitude:
         type: double
-        example: -4.0
+        example: [-4.00697, -4.00697, -4.05646, -4.05646]
       spill_hours:
         type: double
-        example: 1911.98
+        example: [2656.98, 1911.98, 4.61, 273.68]
         description: >-
           Total duration of all spills in the year, in hours, before the 12-24h
           counting. Empty when there's no figure (e.g. no monitor yet), which
           isn't the same as zero.
       spill_count:
         type: integer
-        example: 173
+        example: [233, 173, 3, 29]
         description: Spills, counted with the 12-24h count method
 
 
@@ -621,22 +681,22 @@ data_tables:
     columns:
       catchment_id:
         type: text
-        example: GB108050014460
+        example: [GB108050014460, GB108050014340, GB108050013950, GB108050008080]
         primary_key: true
         references: catchments.id
       year:
         type: integer
-        example: 2025
+        example: [2025, 2025, 2025, 2025]
         required: true
         description: The year of the returns the hours are from (the latest)
       spill_hours:
         type: double
-        example: 281.5
+        example: [2185.66, 5301.33, 41.82, 4.47]
         required: true
         description: The hours all the catchment's storm overflows spilled that year. 0 if it has none.
       pressure:
         type: text
-        example: Medium
+        example: [Very High, Very High, Very Low, Very Low]
         required: true
         description: Very Low, Low, Medium, High or Very High, from the spill hours
   river_obstacles:
@@ -648,39 +708,47 @@ data_tables:
     columns:
       id:
         type: text
-        example: 444d6377-dbeb-4ce7-a3f6-07241b6d5f22
+        example:
+          - "444d6377-dbeb-4ce7-a3f6-07241b6d5f22"
+          - "86786b41-a2a1-4eed-a45c-40e7a0adbdba"
+          - b42508b3-8e81-4d4d-97fc-e45702784261
+          - "7cb9a349-8cdd-483a-9a5a-ae4e08477f43"
         primary_key: true
         description: River Obstacles' ID for the obstacle
       ea_id:
         type: integer
-        example: 39245
+        example: [39245, 757, 762, 719]
         description: The EA's ID for the obstacle
       catchment_id:
         type: text
-        example: GB108050014460
+        example: [GB108050014460, GB108050014210, GB108050014660, GB108050014660]
         required: true
         index: true
         references: catchments.id
       site_name:
         type: text
-        example: Sticklepath Weir
+        example: [null, Rashleigh Weir, Taddiport Weir, Beam Weir]
       obstacle_type:
         type: text
-        example: culvert
+        example: [culvert, weir, weir, weir]
         description: e.g. culvert, weir, ford, waterfall, sluice, dam
       origin:
         type: text
-        example: artificial
+        example: [artificial, artificial, artificial, artificial]
         description: artificial, natural or unknown
       status:
         type: text
-        example: operational
+        example:
+          - null
+          - fish_passage_solution_technical
+          - fish_passage_solution_technical
+          - fish_passage_solution_technical
       latitude:
         type: double
-        example: 50.95765
+        example: [50.95765, 50.90285, 50.94792, 50.96464]
       longitude:
         type: double
-        example: -3.99751
+        example: [-3.99751, -3.88569, -4.15586, -4.17358]
 
   postcodes:
     title: Postcodes
@@ -692,22 +760,22 @@ data_tables:
     columns:
       postcode:
         type: text
-        example: EX36 3AA
+        example: [EX19 8TE, EX31 3HP, EX31 3LB, EX31 3LL]
         primary_key: true
         description: With a space before the last three characters
       catchment_id:
         type: text
-        example: GB108050013950
+        example: [GB108050014460, GB108050014460, GB108050014460, GB108050014460]
         required: true
         index: true
         references: catchments.id
       latitude:
         type: double
-        example: 51.01742
+        example: [50.94487, 50.99449, 50.99415, 51.00067]
         description: The postcode's centre (Code-Point Open's point for it)
       longitude:
         type: double
-        example: -3.8358
+        example: [-4.00857, -4.05058, -4.05081, -4.05255]
 
   # ---------------------------------------------------------------------------
   #  Waterbody Dashboard: the hand-written analysis, one catchment at a time
@@ -723,24 +791,36 @@ data_tables:
     columns:
       catchment_id:
         type: text
-        example: GB108050014460
+        example: [GB108050014460, GB108050014340, GB108050013950, GB108050008080]
         primary_key: true
         references: catchments.id
       why_failing:
         type: text
-        example: Langham Lake is currently at Moderate Ecological Status …
+        example:
+          - "Langham Lake is currently at Moderate Ecological Status and …"
+          - "Lower Little River Dart is currently at Moderate Ecological …"
+          - "Nadrid Water is currently at Moderate Ecological Status …"
+          - "West Okement is currently at Poor Ecological Status. The …"
         description: Shown under "Why is the river failing?"
       happening_now:
         type: text
-        example: Current activity includes investigations into the causes of failure …
+        example:
+          - "Current activity includes investigations into the causes of …"
+          - "Current activity includes Northern Devon Natural Solutions …"
+          - "Current activity includes Northern Devon Natural Solutions …"
+          - "Current activity includes investigations into the causes of …"
         description: Shown under "What is happening now?"
       intervention_hypothesis:
         type: text
-        example: Langham Lake appears relatively close to recovery …
+        example:
+          - "Langham Lake appears relatively close to recovery. Both …"
+          - "The evidence points towards a classic mixed-source nutrient …"
+          - "Nadrid Water differs from several neighbouring Bray and …"
+          - "The evidence does not support a nutrient-led diagnosis …"
         description: Shown under "Intervention hypothesis"
       hypothesis_confidence:
         type: text
-        example: Med-High
+        example: [Med-High, Med-High, Med-High, Medium]
         description: How confident the hypothesis is, shown after its heading, e.g. Low, Medium, Med-High, High
 
   esme_risk_levels:
@@ -755,48 +835,48 @@ data_tables:
     columns:
       catchment_id:
         type: text
-        example: GB108050014460
+        example: [GB108050014460, GB108050014340, GB108050013950, GB108050008080]
         primary_key: true
         references: catchments.id
       habitat_quality:
         type: integer
-        example: 3
+        example: [4, 3, 3, 3]
         description: ESME's R1 River Habitat Quality Index, 1 (very low) to 5 (very high)
       modification:
         type: text
-        example: Medium
+        example: [Low, Medium, Medium, Medium]
         description: The Modification tile, from the habitat quality
       runoff_and_infiltration:
         type: integer
-        example: 2
+        example: [2, 3, 2, 3]
         description: ESME's R24 Runoff and Infiltration, 1 to 5 (5 holds the most rain back)
       runoff:
         type: text
-        example: High
+        example: [High, Medium, High, Medium]
         description: The Runoff tile, from runoff and infiltration
       abstraction_sustainability:
         type: integer
-        example: 5
+        example: [5, 5, 5, 2]
         description: ESME's R27 Abstraction sustainability, 1 to 5 (5 is the most sustainable)
       running_dry:
         type: text
-        example: Very Low
+        example: [Very Low, Very Low, Very Low, High]
         description: The Running Dry tile, from abstraction sustainability
       invasive_species_found:
         type: text
-        example: One species
+        example: ["No", One species, "No", "No"]
         description: ESME's R17 Invasive non-native species, e.g. No or One species
       invasive_species:
         type: text
-        example: High
+        example: [Low, High, Low, Low]
         description: The Invasive Species tile
       river_shade:
         type: text
-        example: Shaded
+        example: [Shaded, Shaded, Shaded, Medium shade]
         description: ESME's R10 River shade, e.g. Shaded, Medium shade or No shade
       overheating:
         type: text
-        example: Low
+        example: [Low, Low, Low, Medium]
         description: The Overheating tile, from the river shade
 
   waterbody_figures:
@@ -812,66 +892,70 @@ data_tables:
     columns:
       catchment_id:
         type: text
-        example: GB108050014460
+        example: [GB108050014460, GB108050014340, GB108050013950, GB108050008080]
         primary_key: true
         references: catchments.id
       ranking:
         type: integer
-        example: 68
+        example: [68, 58, 47, 86]
         description: >-
           The catchment's ranking, shown as e.g. "Catchment Ranking: 68/92" on
           every Waterbody Dashboard page (the 92 is the location's number of
           river waterbodies)
       ecological_class_year:
         type: integer
-        example: 2025
+        example: [2025, 2025, 2025, 2025]
         description: The year of its ecological class, one the EA's Catchment Data Explorer doesn't have yet
       ecological_class:
         type: text
-        example: Moderate
+        example: [Moderate, Moderate, Moderate, Poor]
         description: >-
           High, Good, Moderate, Poor or Bad. The maps' colours, the class
           counts and that year in EA Ecological Classification use it in place
           of the EA's own
       catchment_area_ha:
         type: double
-        example: 1698.1
+        example: [2752.02, 6134.36, 1097.57, 3172.4]
         description: The catchment's area in hectares (River Information, on the Land Use Data page)
       river_length_km:
         type: double
-        example: 9.6
+        example: [13.85, 19.84, 8.05, 20.36]
         description: The river's length in km
       river_system:
         type: text
-        example: Taw
+        example: [Taw, Taw, Taw, Torridge]
         description: e.g. Taw, Torridge, Lyn or Coastal
       upstream_rivers:
         type: text
-        example: Hole Water, Nadrid Water
+        example: [Newton Tracey Stream, "Upper Little Dart, Huntacott Water, Sturcombe River", None, None]
         description: The rivers upstream, by name, separated by commas, or None
       downstream_rivers:
         type: text
-        example: Mole (Taw to Bray)
+        example:
+          - Taw (River Mole to Estuary)
+          - Taw (Little Dart to River Mole)
+          - Bray (Mole to Hole Water)
+          - Middle River Okemont
         description: The rivers (or e.g. Sea) downstream, by name, separated by commas
       number_of_farms:
         type: integer
-        example: 68
+        example: [68, 115, 21, 13]
         description: Shown on the Land Use Data page, and added up on the Catchment Dashboard
       public_sewerage_properties:
         type: integer
-        example: 310
+        example: [310, 998, 1394, 784]
         description: Properties on the water company's sewerage (e.g. SWW), shown on the Sewerage Data page and added up on the Catchment Dashboard
       private_sewerage_properties:
         type: integer
-        example: 467
+        example: [467, 1295, 1428, 826]
         description: Properties on private sewerage (e.g. septic tanks)
       private_sewerage_per_ha:
         type: double
-        example: 0.36
+        example: [0.17, 0.211, 1.3, 0.26]
         description: Properties on private sewerage per hectare of the catchment (its area in the Waterbody Lookup)
       private_sewerage_rating:
         type: text
-        example: High
+        example: [Medium, Medium, Very High, Medium]
         description: Very Low, Low, Medium, High or Very High, from private sewerage per hectare. The Sewage (Private) tile in Risk Levels
 
   ea_thresholds:
@@ -885,26 +969,26 @@ data_tables:
     columns:
       catchment_id:
         type: text
-        example: GB108050014460
+        example: [GB108050014460, GB108050014460, GB108050014460, GB108050014460]
         primary_key: true
         references: catchments.id
       measure:
         type: text
-        example: Fish (EQR)
+        example: [Fish (EQR), Inverts NTAXA (EQR), Phosphate (mg/l), "Dissolved Oxygen (%)"]
         primary_key: true
         description: The measure, named as on the EA Data page and in EA Scores
       poor:
         type: double
-        example: 0.03
+        example: [0.03, 0.47, 0.927, 50]
       moderate:
         type: double
-        example: 0.2
+        example: [0.2, 0.56, 0.143, 64]
       good:
         type: double
-        example: 0.4
+        example: [0.4, 0.68, 0.054, 75]
       high:
         type: double
-        example: 0.7
+        example: [0.7, 0.8, 0.027, 80]
 
   # ---------------------------------------------------------------------------
   #  Waterbody Dashboard: land use and sewerage, one catchment at a time
@@ -921,31 +1005,31 @@ data_tables:
     columns:
       catchment_id:
         type: text
-        example: GB108050014460
+        example: [GB108050014460, GB108050014460, GB108050014460, GB108050014150]
         primary_key: true
         references: catchments.id
       livestock:
         type: text
-        example: Dairy cattle
+        example: [Beef cattle, Dairy cattle, Sheep, Dairy cattle]
         primary_key: true
         description: Beef cattle, Dairy cattle, Pigs, Poultry or Sheep
       number:
         type: integer
-        example: 1137
+        example: [815, 1137, 5558, null]
         description: >-
           How many there are. 0 where APHA gives none. Empty where APHA gives
           only a range instead (see Number note).
       number_note:
         type: text
-        example: Less than 5
+        example: [null, null, null, Less than 5]
         description: What APHA gives instead of a number, as it doesn't give small numbers, e.g. Less than 5
       density:
         type: double
-        example: 73.27
+        example: [29.67, 41.4, 202.37, 0.0694]
         description: Number per square kilometre (100 ha), as APHA gives it. 0 where APHA gives none.
       density_rating:
         type: text
-        example: Medium
+        example: [Low, Medium, Medium, Low]
         required: true
         description: Low, Medium or High, from the density (the bands for each kind of livestock are on the admin page)
 
@@ -960,27 +1044,27 @@ data_tables:
     columns:
       catchment_id:
         type: text
-        example: GB108050014460
+        example: [GB108050014460, GB108050014340, GB108050013950, GB108050008080]
         primary_key: true
         references: catchments.id
       nitrogen_load:
         type: double
-        example: 13544.7
+        example: [11877.59, 18086.25, 11376.2, 7078.46]
         required: true
         description: Nitrogen from livestock, in kg per year per square kilometre
       phosphate_load:
         type: double
-        example: 2722.3
+        example: [3240.13, 5779.71, 3921.91, 1405.88]
         required: true
         description: Phosphate from livestock, in kg per year per square kilometre
       nitrogen_and_phosphate_load:
         type: double
-        example: 16267.0
+        example: [15117.73, 23865.96, 15298.11, 8484.34]
         required: true
         description: The two added up, in kg per year per square kilometre
       pressure:
         type: text
-        example: Medium
+        example: [Medium, High, Medium, Low]
         required: true
         description: Very Low, Low, Medium, High or Very High, from the nitrogen and phosphate load
 
@@ -995,22 +1079,22 @@ data_tables:
     columns:
       catchment_id:
         type: text
-        example: GB108050014460
+        example: [GB108050014460, GB108050014460, GB108050014460, GB108050014460]
         primary_key: true
         references: catchments.id
       source:
         type: text
-        example: STW (SWW)
+        example: [STW (SWW), Livestock, Arable, STW (Private)]
         primary_key: true
         description: e.g. Arable, CSOs (SWW), Highways, Industry, Livestock, STW (Private), STW (SWW), Urban
       year:
         type: integer
-        example: 2025
+        example: [2025, 2025, 2025, 2025]
         primary_key: true
         description: The year the estimate is for, 2025 or 2030
       percent:
         type: double
-        example: 60.9
+        example: [60.89, 29.13, 5, 4.82]
         required: true
         description: The source's share of the catchment's phosphate, in %
 
@@ -1026,22 +1110,22 @@ data_tables:
     columns:
       catchment_id:
         type: text
-        example: GB108050014460
+        example: [GB108050014460, GB108050014460, GB108050014460, GB108050014460]
         primary_key: true
         references: catchments.id
       source:
         type: text
-        example: Continuous
+        example: [Continuous, Diffuse, Continuous, Diffuse]
         primary_key: true
         description: Continuous or Diffuse
       year:
         type: integer
-        example: 2025
+        example: [2025, 2025, 2030, 2030]
         primary_key: true
         description: The year the estimate is for, 2025 or 2030
       percent:
         type: double
-        example: 61.0
+        example: [61.05, 38.95, 61.05, 38.95]
         required: true
         description: Its share of the catchment's phosphate, in %
 
@@ -1056,22 +1140,30 @@ data_tables:
     columns:
       catchment_id:
         type: text
-        example: GB108050014460
+        example: [GB108050014460, GB108050014460, GB108050008100, GB108050008100]
         primary_key: true
         references: catchments.id
       site_name:
         type: text
-        example: HIGH BICKINGTON STW
+        example:
+          - HIGH BICKINGTON STW
+          - YARNSCOMBE SEWAGE TREATMENT WORKS
+          - NORTH STREET CSO
+          - OLD GATEWAY 1 COMBINED SEWER OF
         primary_key: true
       improvements:
         type: text
-        example: Storage, New screen, Operational (e.g. blockages)
+        example:
+          - "Storage, New screen, Operational (e.g. blockages) …"
+          - New screen. Other improvements to be confirmed
+          - "Storage, New screen, Operational (e.g. blockages), Bespoke …"
+          - "Storage, New screen, Operational (e.g. blockages) …"
       completion_year:
         type: integer
-        example: 2035
+        example: [2035, 2040, 2040, 2040]
       predicted_spills_per_year:
         type: integer
-        example: 10
+        example: [10, 10, 9, 10]
         description: Predicted number of spills a year once the work is done
 
   # ---------------------------------------------------------------------------
@@ -1092,26 +1184,38 @@ data_tables:
     columns:
       location_id:
         type: integer
-        example: 1
+        example: [1, 1, 1, 1]
         primary_key: true
         references: locations.id
         description: The location (see the Locations table), e.g. 1 for North Devon
       number:
         type: integer
-        example: 1
+        example: [1, 2, 3, 4]
         primary_key: true
         description: Its number on the page, e.g. 1 for "1. Investment in STWs (phosphate reduction)"
       name:
         type: text
-        example: Investment in STWs (phosphate reduction)
+        example:
+          - Investment in STWs (phosphate reduction)
+          - Investment in storm overflows (reduction in spills)
+          - "Regulatory enforcement to drive compliance with Farming …"
+          - Dairy/beef cattle slurry management support
         required: true
       button:
         type: text
-        example: Sewage treatment works investment
+        example:
+          - Sewage treatment works investment
+          - Storm overflow investment
+          - Farming rules enforcement
+          - Farm slurry management
         description: Its button in Interventions Detail, after its number (the name if empty)
       summary_group:
         type: text
-        example: Priority interventions (not in order of priority)
+        example:
+          - Priority interventions (not in order of priority)
+          - Priority interventions (not in order of priority)
+          - Priority interventions (not in order of priority)
+          - Priority interventions (not in order of priority)
         required: true
         description: >-
           The part of the Intervention Summary table it's in, by the part's
@@ -1119,67 +1223,99 @@ data_tables:
           and the parts are in the order of their lowest number.
       summary_rwbs:
         type: integer
-        example: 40
+        example: [40, 33, 48, 14]
         description: Intervention Summary, No. of RWBs (river water bodies)
       summary_cost:
         type: double
-        example: 120000000
+        example: [120000000, 231000000, 1300000, 7300000]
         description: Intervention Summary, Estimated Cost, in £ (e.g. 120000000 for £120m)
       percent_available:
         type: integer
-        example: 100
+        example: [100, 100, 100, 20]
         description: Intervention Summary, % Available (of the estimated cost); also used for the totals
       percent_delivered:
         type: integer
-        example: 0
+        example: [0, 0, null, 0]
         description: Intervention Summary, % Delivered. Empty shows "Data to follow".
       summary_lead:
         type: text
-        example: SWW
+        example: [SWW, SWW, EA, "?"]
         description: Intervention Summary, Lead (short, e.g. SWW, EA or ?)
       description:
         type: text
-        example: Reduce phosphorus and other pollutant discharges from sewage treatment works …
+        example:
+          - "Reduce phosphorus and other pollutant discharges from …"
+          - "Reduce the frequency and duration of storm overflow …"
+          - "Environment Agency inspections, investigation and …"
+          - "Support farms to improve slurry handling, storage …"
         description: Interventions Detail, Description
       lead_organisation:
         type: text
-        example: South West Water
+        example:
+          - South West Water
+          - South West Water
+          - Environment Agency
+          - "Farmers, advisers, Environment Agency, grant programmes and …"
         description: Interventions Detail, Lead delivery organisation
       river_water_bodies:
         type: text
-        example: 13 highest priority, 27 secondary priority
+        example: ["13 highest priority, 27 secondary priority", "33", "48 (21 priority, 27 secondary)", "14"]
         description: Interventions Detail, No. of river water bodies, as written
       estimated_cost:
         type: text
-        example: £120m
+        example:
+          - "£120m"
+          - "£231 million"
+          - "£1.3 million (equivalent to inspecting & engaging 645 farms)"
+          - "£7.3 million"
         description: Interventions Detail, Estimated total cost, as written
       funding_available:
         type: text
-        example: £120m (£42m already secured in AMP8 & AMP9)
+        example:
+          - "£120m (£42m already secured in AMP8 & AMP9)"
+          - "£231 million"
+          - "£1.3 million"
+          - "£1.5 million"
         description: Interventions Detail, Funding available, as written
       funding_gap:
         type: text
-        example: £0m
+        example: ["£0m", "£0", "£0", "£5.8 million"]
         description: Interventions Detail, Funding gap, as written
       funding_route:
         type: text
-        example: Water company investment (AMP programmes)
+        example:
+          - Water company investment (AMP programmes)
+          - AMP 8-10
+          - Included within existing statutory activity
+          - Not yet clear
         description: Interventions Detail, Funding route / source
       ecological_benefit:
         type: text
-        example: Reduce phosphorus loading from wastewater, improve phosphate and phytobenthos status.
+        example:
+          - "Reduce phosphorus loading from wastewater, improve …"
+          - "Reduced wastewater pollution from storm overflow spills …"
+          - "Reduced nutrient, sediment and faecal pollution from …"
+          - "Reduce phosphorus losses from livestock farming and improve …"
         description: Interventions Detail, Ecological benefit
       cost_confidence:
         type: text
-        example: Medium (£3m is a very broad average)
+        example: ["Medium (£3m is a very broad average)", Medium, Medium-high, Low-medium]
         description: Interventions Detail, Confidence in costings
       progress:
         type: text
-        example: "- South West Water have plans to invest in sewage treatment works …"
+        example:
+          - "- South West Water have plans to invest in sewage treatment …"
+          - "- South West Water have plans invest in all storm overflows …"
+          - "- The Environment Agency currently has 2 regulatory …"
+          - "- There are generalist farm advisory programmes active …"
         description: Interventions Detail, under Progress
       groups:
         type: text
-        example: Highest Priority, as Predominantly Waste Water Issue
+        example:
+          - "Highest Priority, as Predominantly Waste Water Issue …"
+          - "Priority Because of Impact on Shellfish Waters, Bathing …"
+          - "Priority as Predominantly Agricultural Issue Secondary …"
+          - Priority Farms Capital Improvements
         description: >-
           The headings its waterbodies are grouped under in Interventions
           Detail, one per line (Alt+Enter between them): the first is group 1,
@@ -1195,46 +1331,46 @@ data_tables:
     columns:
       catchment_id:
         type: text
-        example: GB108050014050
+        example: [GB108050008080, GB108050008210, GB108050008110, GB108050008110]
         primary_key: true
         references: catchments.id
       intervention:
         type: integer
-        example: 1
+        example: [9, 9, 2, 3]
         primary_key: true
         description: The intervention type, by its number in Intervention Types
       group_number:
         type: integer
-        example: 2
+        example: [1, 1, 2, 1]
         required: true
         description: Which of the intervention type's groups it's listed in, e.g. 1 for the first heading in its groups
       note:
         type: text
-        example: active mine impacts
+        example: ["abandoned mine, natural mineralisation", "low flow, trade/industry discharge", null, null]
         description: Shown after the waterbody's name, e.g. what makes it a special case
       size:
         type: text
-        example: AMP8
+        example: [null, null, AMP9, c.20 priority farms]
         description: Size of Intervention, e.g. AMP8, c.6 priority farms or 2.4km (9.6km)
       estimated_cost:
         type: double
-        example: 3000000
+        example: [250000, 250000, 7000000, 40000]
         description: Estimated Cost, in £
       funding_available:
         type: double
-        example: 3000000
+        example: [0, 0, 7000000, 40000]
         description: Funding Available, in £. Empty shows nothing; 0 shows £0.
       started_delivery:
         type: text
-        example: 2025-2030
+        example: ["No", "No", "2030", "Yes"]
         description: Started Delivery, as written, e.g. 2025-2030, Yes or No
       finished_delivery:
         type: text
-        example: 2030-2035
+        example: ["No", "No", "2035", "No"]
         description: Finished Delivery, as written, e.g. 2030-2035, Yes or No
       lead:
         type: text
-        example: SWW
+        example: [To establish, To establish, SWW, EA]
 
   intervention_unit_costs:
     title: Intervention Unit Costs
@@ -1247,42 +1383,62 @@ data_tables:
     columns:
       location_id:
         type: integer
-        example: 1
+        example: [1, 1, 1, 1]
         primary_key: true
         references: locations.id
         description: The location (see the Locations table), e.g. 1 for North Devon
       number:
         type: integer
-        example: 1
+        example: [1, 2, 3, 4]
         primary_key: true
         description: Its number on the page, as in Intervention Types
       title:
         type: text
-        example: Investment in Sewage Treatment Works (phosphate reduction)
+        example:
+          - Investment in Sewage Treatment Works (phosphate reduction)
+          - Investment in Storm Overflows
+          - Regulatory Enforcement
+          - Dairy & Beef Slurry Management Support
         required: true
       intervention:
         type: text
-        example: reduce phosphorus and other pollutant discharges from sewage treatment works …
+        example:
+          - "reduce phosphorus and other pollutant discharges from …"
+          - "reduce the frequency and duration of storm overflow spills …"
+          - "Environment Agency inspections, investigation and …"
+          - "Support farms to improve slurry handling, storage …"
         description: Shown after "Intervention:"
       delivery_lead:
         type: text
-        example: South West Water
+        example:
+          - South West Water
+          - South West Water
+          - Environment Agency
+          - "farmers, advisers, Environment Agency, grant programmes and …"
         description: Shown after "Delivery lead:"
       typical_cost:
         type: text
-        example: "- Small works: £1m"
+        example:
+          - "- Small works: £1m - Medium works: £3m - Large works: £8m+ …"
+          - "- £1m for small project - £10m for large project - Average …"
+          - "- 1 dedicated agricultural regulatory officer: £80,000 per …"
+          - "- 1 dedicated farm adviser: £80,000 per year (fully loaded …"
         description: Shown under "Typical cost:", usually as bullets, ending with the average assumption used
       funding_route:
         type: text
-        example: water company investment (AMP programmes)
+        example:
+          - water company investment (AMP programmes)
+          - water company investment (AMP programmes)
+          - included within existing statutory activity
+          - "farmer investment, DEFRA slurry infrastructure grants …"
         description: Shown after "Funding route:"
       cost_confidence:
         type: text
-        example: medium
+        example: [medium, medium, medium-high, medium]
         description: Shown after "Cost confidence:"
       notes:
         type: text
-        example: "Note: the £30,000 assumption reflects …"
+        example: [null, null, null, "**Notes:** the £30,000 assumption reflects the average …"]
         description: Shown last, e.g. a note about the assumption
 
   # ---------------------------------------------------------------------------
@@ -1304,55 +1460,99 @@ data_tables:
     columns:
       location_id:
         type: integer
-        example: 1
+        example: [1, 2, 3, 4]
         primary_key: true
         references: locations.id
         description: The location (see the Locations table), e.g. 1 for North Devon
       why_failing:
         type: text
-        example: 80 of North Devon's 92 river water bodies are currently failing …
+        example:
+          - "80 of North Devon's 92 river water bodies are currently failing …"
+          - "(the Exe's text)"
+          - "(the Tamar's text)"
+          - "(South Devon's text)"
         description: Catchment Dashboard, under "Why is the river system failing?"
       happening_now:
         type: text
-        example: Partners across the catchment are …
+        example:
+          - "Partners across the catchment are …"
+          - "(the Exe's text)"
+          - "(the Tamar's text)"
+          - "(South Devon's text)"
         description: Catchment Dashboard, under "What is happening now?"
       intervention_hypothesis:
         type: text
-        example: Most failing waterbodies need action on both …
+        example:
+          - "Most failing waterbodies need action on both …"
+          - "(the Exe's text)"
+          - "(the Tamar's text)"
+          - "(South Devon's text)"
         description: Catchment Dashboard, under "Intervention hypothesis"
       intermittent_discharges:
         type: text
-        example: Intermittent Discharges occur when the sewers are overwhelmed …
+        example:
+          - "Intermittent Discharges occur when the sewers are overwhelmed …"
+          - "(the Exe's text)"
+          - "(the Tamar's text)"
+          - "(South Devon's text)"
         description: Sewerage Data page, what intermittent discharges are (the same for every catchment)
       continuous_discharge:
         type: text
-        example: Continuous Discharge is the release of treated sewage …
+        example:
+          - "Continuous Discharge is the release of treated sewage …"
+          - "(the Exe's text)"
+          - "(the Tamar's text)"
+          - "(South Devon's text)"
         description: Sewerage Data page, what continuous discharge is (the same for every catchment)
       about_waterbody_dashboard:
         type: text
-        example: What needs to happen to bring each waterbody up to "Good" ecological status? …
+        example:
+          - 'What needs to happen to bring each waterbody up to "Good" ecological status? …'
+          - "(the Exe's text)"
+          - "(the Tamar's text)"
+          - "(South Devon's text)"
         description: >-
           Shown under every Waterbody Dashboard tab: an introduction, then
           "## Understanding the dashboard" and a ### section for each part
       about_catchment_dashboard:
         type: text
-        example: The Catchment Dashboard brings together …
+        example:
+          - "The Catchment Dashboard brings together …"
+          - "(the Exe's text)"
+          - "(the Tamar's text)"
+          - "(South Devon's text)"
         description: Shown under the Catchment Dashboard, written in the same way
       critical_path:
         type: text
-        example: "**Starting Position (2025)** …"
+        example:
+          - "**Starting Position (2025)** …"
+          - "(the Exe's text)"
+          - "(the Tamar's text)"
+          - "(South Devon's text)"
         description: >-
           Intervention Management, Critical Path: everything under its heading.
           A line of just --- starts a new box.
       unit_costs_purpose:
         type: text
-        example: "**Purpose** This section provides indicative costs …"
+        example:
+          - "**Purpose** This section provides indicative costs …"
+          - "(the Exe's text)"
+          - "(the Tamar's text)"
+          - "(South Devon's text)"
         description: Intervention Management, Unit Cost of Interventions, the box above the costs (which are in Intervention Unit Costs)
       intervention_summary:
         type: text
-        example: "**What the analysis tells us** …"
+        example:
+          - "**What the analysis tells us** …"
+          - "(the Exe's text)"
+          - "(the Tamar's text)"
+          - "(South Devon's text)"
         description: Intervention Management, Intervention Summary, the text above the table (which is from Intervention Types)
       community_action:
         type: text
-        example: Biosphere Partnership organisations are leading on many community engagement projects …
+        example:
+          - "Biosphere Partnership organisations are leading on many community engagement projects …"
+          - "(the Exe's text)"
+          - "(the Tamar's text)"
+          - "(South Devon's text)"
         description: "Intervention Management, Community Action: everything under its heading"

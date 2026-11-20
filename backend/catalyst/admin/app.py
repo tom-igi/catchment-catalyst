@@ -11,6 +11,8 @@
     /admin/inputs/<input>/upload      upload a source file as it came (see catalyst.importers.inputs)
     /admin/uploads/<id>               preview what an upload will change; approve or cancel
     /admin/publish                    publish the dashboards (the Publish button at the top of /admin)
+    /admin/ai-input?catchment=<ID>    a waterbody's data, and its neighbours' up and downstream, as a text file
+                                      for an AI to write its River Status Text from (see ai_input.py)
     /admin/screenshots                numbered screenshots of the dashboards: each part's table, by its
                                       number in the diagram (taken by screenshots/take.mjs)
 
@@ -47,7 +49,7 @@ from catalyst import publish
 from catalyst.db import load_schema
 from catalyst.importers import excel, inputs
 
-from . import diagram, examples, passwords, uploads
+from . import ai_input, diagram, examples, passwords, uploads
 from .settings import Settings
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -177,9 +179,29 @@ def _render_home(request: Request, status_code: int = 200, problems: dict | None
         for i in model["inputs"]:
             i["update"] = _input_details(conn, state, i["name"], last.get(i["name"]))
         publishing = _publish_details(conn, schema)
+        ai_choices = ai_input.choices(conn, schema)
     if problems:
         model["problems"] = problems
-    return _render(request, "home.html", model=model, publishing=publishing, status_code=status_code)
+    return _render(request, "home.html", model=model, publishing=publishing, ai_choices=ai_choices, status_code=status_code)
+
+
+# --- Input for AI (at the bottom of /admin) ----------------------------------------------
+
+@router.get("/ai-input")
+def ai_input_download(request: Request, user: User, catchment: str = ""):
+    """A waterbody's data, and its neighbours' up and downstream, as a text file to give an AI."""
+    if not catchment:
+        raise HTTPException(400, "Choose a waterbody first.")
+    with request.app.state.engine.connect() as conn:
+        try:
+            file = ai_input.write(conn, request.app.state.schema, catchment, datetime.datetime.now(UK))
+        except ai_input.NotFound:
+            raise HTTPException(404, "There's no waterbody with that ID.") from None
+    return Response(
+        file.text.encode("utf-8"),
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": _attachment(file.name)},
+    )
 
 
 # --- The numbered screenshots of the dashboards --------------------------------------
