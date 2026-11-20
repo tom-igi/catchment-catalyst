@@ -1,8 +1,13 @@
 """The uploads table, and the uploaded files.
 
-Every file that gets as far as a preview is kept exactly as it was uploaded, in
-a folder per table (or per source file) inside the raw files folder
-(RAW_FILES_DIR, by default imports/raw), and gets a row in the uploads table.
+Every file that gets as far as a preview gets a row in the uploads table, with
+the file kept exactly as it was uploaded (its `file` column), so it's in the
+database's backups. (Until 20 November 2026 they were kept in imports/raw/.)
+The file is only read when it's needed: the lists here leave it out.
+
+A source file can also be worked out again from an earlier upload's file, with
+its formulas as they are now: that's a new upload of the same file, with
+`worked_out_again_from` saying which.
 
 An upload is either an Excel file for one table (1 to 1), or a source file,
 which can fill several tables. Either way its changes are a Comparison per
@@ -12,7 +17,6 @@ table: `comparisons`, by table name.
 from __future__ import annotations
 
 import datetime
-from pathlib import Path, PurePath
 
 import sqlalchemy as sa
 
@@ -20,13 +24,11 @@ from catalyst.db import Schema
 from catalyst.importers.excel import Comparison
 
 PREVIEW, APPROVED, CANCELLED = "preview", "approved", "cancelled"
-SUFFIXES = {".xlsx", ".xls", ".csv"}  # kept as they came; anything else is kept as .xlsx, as before
 
 
 def create(
     conn: sa.Connection,
     schema: Schema,
-    raw_files_dir: Path,
     uploaded_to: str,
     file_name: str,
     data: bytes,
@@ -34,39 +36,38 @@ def create(
     rows_in_file: int,
     comparisons: dict[str, Comparison],
     source_file: bool = False,
+    worked_out_again_from: int | None = None,
 ) -> int:
-    """Record the upload and keep the file. Returns the upload's ID.
+    """Record the upload, with its file. Returns the upload's ID.
 
     `uploaded_to` is the table, or for a source file (`source_file`), its input's name.
     """
     uploads = _table(schema)
-    upload_id, uploaded_at = conn.execute(
+    return conn.execute(
         uploads.insert()
         .values(
-            uploaded_to=uploaded_to, file_name=file_name, stored_as="", uploaded_by=user,
-            rows_in_file=rows_in_file, **_counts(comparisons, source_file),
+            uploaded_to=uploaded_to, file_name=file_name, file=data, uploaded_by=user, rows_in_file=rows_in_file,
+            worked_out_again_from=worked_out_again_from, **_counts(comparisons, source_file),
         )
-        .returning(uploads.c.id, uploads.c.uploaded_at)
-    ).one()
-    suffix = PurePath(file_name).suffix.lower()
-    stored_as = f"{uploaded_to}/{uploaded_at:%Y-%m-%d_%H%M%S}_{upload_id}{suffix if suffix in SUFFIXES else '.xlsx'}"
-    path = raw_files_dir / stored_as
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(data)
-    conn.execute(uploads.update().where(uploads.c.id == upload_id).values(stored_as=stored_as))
-    return upload_id
+        .returning(uploads.c.id)
+    ).scalar_one()
 
 
 def get(conn: sa.Connection, schema: Schema, upload_id: int, *, for_update: bool = False) -> sa.Row | None:
-    uploads = _table(schema)
-    query = sa.select(uploads).where(uploads.c.id == upload_id)
+    query = _select(schema).where(_table(schema).c.id == upload_id)
     return conn.execute(query.with_for_update() if for_update else query).one_or_none()
+
+
+def file(conn: sa.Connection, schema: Schema, upload_id: int) -> bytes:
+    """The upload's file, as it was uploaded."""
+    uploads = _table(schema)
+    return bytes(conn.execute(sa.select(uploads.c.file).where(uploads.c.id == upload_id)).scalar_one())
 
 
 def recent(conn: sa.Connection, schema: Schema, uploaded_to: str, limit: int = 10) -> list[sa.Row]:
     uploads = _table(schema)
     return conn.execute(
-        sa.select(uploads).where(uploads.c.uploaded_to == uploaded_to).order_by(uploads.c.id.desc()).limit(limit)
+        _select(schema).where(uploads.c.uploaded_to == uploaded_to).order_by(uploads.c.id.desc()).limit(limit)
     ).all()
 
 
@@ -74,7 +75,7 @@ def last_approved(conn: sa.Connection, schema: Schema) -> dict[str, sa.Row]:
     """The most recent approved upload for each table (or source file)."""
     uploads = _table(schema)
     rows = conn.execute(
-        sa.select(uploads).where(uploads.c.status == APPROVED)
+        _select(schema).where(uploads.c.status == APPROVED)
         .order_by(uploads.c.uploaded_to, uploads.c.approved_at.desc())
         .distinct(uploads.c.uploaded_to)
     )
@@ -85,7 +86,7 @@ def approved_since(conn: sa.Connection, schema: Schema, since: datetime.datetime
     """The uploads approved after a time (e.g. the last publish), oldest first."""
     uploads = _table(schema)
     return conn.execute(
-        sa.select(uploads).where(uploads.c.status == APPROVED, uploads.c.approved_at > since)
+        _select(schema).where(uploads.c.status == APPROVED, uploads.c.approved_at > since)
         .order_by(uploads.c.approved_at, uploads.c.id)
     ).all()
 
@@ -105,10 +106,6 @@ def cancel(conn: sa.Connection, schema: Schema, upload_id: int) -> None:
     conn.execute(uploads.update().where(uploads.c.id == upload_id).values(status=CANCELLED))
 
 
-def file_path(raw_files_dir: Path, upload: sa.Row) -> Path:
-    return raw_files_dir / upload.stored_as
-
-
 def _counts(comparisons: dict[str, Comparison], source_file: bool) -> dict:
     """The rows added, changed and deleted, in all; and for a source file, in each of its tables."""
     each = {name: [len(c.added), len(c.changed), len(c.removed)] for name, c in comparisons.items()}
@@ -122,3 +119,9 @@ def _counts(comparisons: dict[str, Comparison], source_file: bool) -> dict:
 
 def _table(schema: Schema) -> sa.Table:
     return schema.metadata.tables["uploads"]
+
+
+def _select(schema: Schema) -> sa.Select:
+    """The uploads' rows without their files, which are only read when needed (see `file`)."""
+    uploads = _table(schema)
+    return sa.select(*(c for c in uploads.columns if c.name != "file"))

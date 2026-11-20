@@ -7,11 +7,21 @@ columns it reads, the original's formulas, and the tables they fill. Its steps
 say what's worked out in words, with where each is in the Power BI file, for
 the admin page's Transformation column.
 
+What's worked out here is anything that turns the one file into each
+waterbody's figures (unit changes, densities, ratings, pressures), so the
+preview shows the figures themselves changing. Anything that needs more than
+one table, or a whole location, is worked out when the dashboards are
+published (catalyst.publish.figures; README.md, "Where the figures are worked
+out").
+
 1. Someone uploads the file as it came, in the admin page.
 2. Its input reads it and works out the rows of each of its tables (Input.run).
 3. Each table is compared with its new rows, as an Excel upload is
    (catalyst.importers.excel), and every change is previewed.
 4. Once approved, every table it fills is changed at once.
+5. If a formula changes later, "Work it out again" (on its upload in the admin
+   page) runs its last approved file through the formulas as they are now, as
+   a new upload of the same file, previewed and approved in the same way.
 
 To add one: write its module (apha_livestock.py is an example), list it in
 INPUTS below, and mark its tables in schema.yaml with `filled_by: input` and

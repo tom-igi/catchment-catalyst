@@ -26,10 +26,11 @@
 #                    text, varchar(N), integer, bigint, smallint,
 #                    numeric, numeric(P,S), double, real, boolean,
 #                    date, timestamptz, jsonb, uuid,
+#                    bytea (a file, kept as it came),
 #                    geometry(<Point | LineString | Polygon | MultiPoint |
 #                             MultiLineString | MultiPolygon>, <SRID>)
 #                  Add [] for a list of values, e.g. text[] (not for
-#                  geometry or jsonb).
+#                  geometry, jsonb or bytea).
 #    description   What the column holds. Saved as a comment in the database.
 #    required      true = must always have a value. Default: false.
 #    primary_key   true = part of the table's primary key (always required).
@@ -252,9 +253,10 @@ tables:
     title: Uploads
     description: >-
       One row for each file uploaded in the admin page: which table or source
-      file it was for, who uploaded it and when, and what it changed. The file
-      itself is kept, so an earlier version can be downloaded from the admin
-      page and uploaded again.
+      file it was for, who uploaded it and when, what it changed, and the file
+      itself, so an earlier version can be downloaded from the admin page and
+      uploaded again, and a source file can be worked out again. Being in the
+      database, the files are in its backups too.
     columns:
       id:
         type: integer
@@ -275,11 +277,10 @@ tables:
         example: EA scores October.xlsx
         required: true
         description: Name of the file that was uploaded
-      stored_as:
-        type: text
-        example: ea_scores/2026-10-29_143000_12.xlsx
+      file:
+        type: bytea
         required: true
-        description: Where the file is kept, inside the folder of uploaded and downloaded files
+        description: The file, exactly as it was uploaded
       uploaded_by:
         type: text
         example: tom
@@ -328,6 +329,13 @@ tables:
         type: timestamptz
         example: 2026-10-29 14:32
         description: When it was approved and the table's rows were replaced
+      worked_out_again_from:
+        type: integer
+        example: 42
+        references: uploads.id
+        description: >-
+          For a source file worked out again (with the formulas as they are
+          now) rather than uploaded again: the earlier upload whose file it is
 
   publishes:
     title: Publishes

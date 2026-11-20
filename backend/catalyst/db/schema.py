@@ -84,6 +84,7 @@ SIMPLE_TYPES = {
     "timestamptz": lambda: sa.DateTime(timezone=True),
     "jsonb": postgresql.JSONB,
     "uuid": sa.Uuid,
+    "bytea": postgresql.BYTEA,  # a file, e.g. an upload's, as it came
 }
 GEOMETRY_TYPES = {
     "point", "linestring", "polygon", "multipoint", "multilinestring",
@@ -172,7 +173,7 @@ def build_schema(data: Any) -> Schema:
 def parse_type(spec: str) -> sa.types.TypeEngine:
     if spec.strip().endswith("[]"):
         item_type = parse_type(spec.strip()[:-2])
-        if isinstance(item_type, (Geometry, postgresql.JSONB, postgresql.ARRAY)):
+        if isinstance(item_type, (Geometry, postgresql.JSONB, postgresql.ARRAY, postgresql.BYTEA)):
             raise ValueError(f"bad type '{spec}': lists of this type aren't supported")
         return postgresql.ARRAY(item_type)
     match = TYPE_RE.match(spec.strip().lower())

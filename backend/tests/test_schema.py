@@ -52,6 +52,19 @@ def test_list_types():
         make_schema(CATCHMENTS.replace("{type: text, primary_key: true}", '{type: "jsonb[]", primary_key: true}'))
 
 
+def test_a_file_column():
+    """bytea: a file, kept as it came (e.g. each upload's, in the uploads table)."""
+    from sqlalchemy.dialects import postgresql
+    schema = make_schema(CATCHMENTS.replace(
+        "id: {type: text, primary_key: true}",
+        "id: {type: text, primary_key: true}\n          photo: {type: bytea}",
+    ))
+    assert isinstance(schema.metadata.tables["catchments"].c.photo.type, postgresql.BYTEA)
+    assert isinstance(load_schema().metadata.tables["uploads"].c.file.type, postgresql.BYTEA)
+    with pytest.raises(SchemaError, match="lists of this type aren't supported"):
+        make_schema(CATCHMENTS.replace("{type: text, primary_key: true}", '{type: "bytea[]", primary_key: true}'))
+
+
 def test_data_tables_must_link_every_row_to_a_catchment():
     schema = make_schema(data_table("catchment_id: {type: text, required: true, references: catchments.id}"))
     assert schema.data_tables == ["scores"]

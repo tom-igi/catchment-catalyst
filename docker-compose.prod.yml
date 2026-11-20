@@ -72,8 +72,7 @@ services:
       # added. Until then, open it through an SSH tunnel (see README.md).
       - "127.0.0.1:8000:8000"
     volumes:
-      # Uploaded files are kept in imports/raw/<table>/ (moving to Azure storage later).
-      - ./imports:/app/imports
+      # (Uploaded files are kept in the database's uploads table, so it needs no imports/ folder.)
       # The Publish button writes the dashboards' pages here, as the publish command does.
       - ./published:/app/published
     logging: *logging

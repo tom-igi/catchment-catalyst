@@ -8,6 +8,8 @@
     /admin/tables/<table>/download    any table as an Excel file
     /admin/tables/<table>/upload      upload an edited copy (Excel tables only)
     /admin/inputs/<input>/upload      upload a source file as it came (see catalyst.importers.inputs)
+    /admin/inputs/<input>/work-out-again   work its tables out again from its last approved file, with the
+                                      formulas as they are now: a new upload of the same file, to preview
     /admin/uploads/<id>               preview what an upload will change; approve or cancel
     /admin/publish                    publish the dashboards (the Publish button at the top of /admin)
     /admin/screenshots                numbered screenshots of the dashboards: each part's table, by its
@@ -31,12 +33,14 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated, Any
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
+from geoalchemy2 import Geometry
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -253,8 +257,19 @@ def _download_details(table: sa.Table) -> dict:
     included = excel.downloadable_columns(table)
     return {
         "url": f"/admin/tables/{table.name}/download",
-        "left_out": [c.name for c in table.columns if c not in included],  # map shapes
+        "left_out": [c.name for c in table.columns if c not in included],  # map shapes and files
+        "left_out_why": _left_out_why([c for c in table.columns if c not in included]),
     }
+
+
+def _left_out_why(columns: list[sa.Column]) -> str | None:
+    """Why columns are left out of a table's download, in words."""
+    why = []
+    if any(isinstance(c.type, Geometry) for c in columns):
+        why.append("map shapes, thousands of coordinates long")
+    if any(isinstance(c.type, sa.LargeBinary) for c in columns):
+        why.append("the files themselves (each can be downloaded from its upload)")
+    return "; ".join(why) or None
 
 
 def _excel_details(conn: sa.Connection, state, table: sa.Table, last: sa.Row | None) -> dict:
@@ -268,8 +283,16 @@ def _excel_details(conn: sa.Connection, state, table: sa.Table, last: sa.Row | N
 
 
 def _input_details(conn: sa.Connection, state, name: str, last: sa.Row | None) -> dict:
-    """What a source file's upload needs: where to upload it, and its recent uploads."""
-    return {"upload_url": f"/admin/inputs/{name}/upload", **_recent_uploads(conn, state, name, last)}
+    """What a source file's upload needs: where to upload it, its recent uploads, and the file it can be worked out
+    again from (its last approved one)."""
+    return {
+        "upload_url": f"/admin/inputs/{name}/upload",
+        "again": {
+            "url": f"/admin/inputs/{name}/work-out-again", "file": last.file_name, "when": _when(last.uploaded_at),
+            "file_url": f"/admin/uploads/{last.id}/file",
+        } if last else None,
+        **_recent_uploads(conn, state, name, last),
+    }
 
 
 def _recent_uploads(conn: sa.Connection, state, uploaded_to: str, last: sa.Row | None) -> dict:
@@ -287,6 +310,7 @@ def _recent_uploads(conn: sa.Connection, state, uploaded_to: str, last: sa.Row |
                 "added": u.rows_added,
                 "changed": u.rows_changed,
                 "removed": u.rows_removed,
+                "again_from": u.worked_out_again_from,  # worked out again from that upload's file, not uploaded
             }
             for u in uploads.recent(conn, state.schema, uploaded_to, RECENT_UPLOADS)
         ],
@@ -361,19 +385,44 @@ def _upload(request: Request, user: str, uploaded_to: str, file: UploadFile | No
     if len(data) > MAX_UPLOAD_MB * 1024 * 1024:
         problems = [f"The file is bigger than {MAX_UPLOAD_MB} MB, which is too big to upload here."]
         return _upload_problems(request, uploaded_to, file.filename, problems)
+    same = f"{file.filename} is the same as {{tables}}, so there's nothing to change."
+    return _keep_for_preview(request, user, uploaded_to, file.filename, data, same)
+
+
+@router.post("/inputs/{input_name}/work-out-again")
+def work_out_again(request: Request, user: User, source: SourceInput):
+    """Work a source file's tables out again from its last approved file, with the formulas as they are now (e.g.
+    after a formula or a table changed), as a new upload of the same file: previewed, then approved or cancelled."""
+    state = request.app.state
+    with state.engine.connect() as conn:
+        last = uploads.last_approved(conn, state.schema).get(source.name)
+        data = uploads.file(conn, state.schema, last.id) if last else None
+    if last is None:
+        request.session["message"] = f"No {source.title} file has been approved yet, so there's nothing to work out again."
+        return RedirectResponse(_upload_panel(source.name), 303)
+    same = (f"Worked out again from {last.file_name} (uploaded {_when(last.uploaded_at)}): it gives the same "
+            "figures as the tables have now, so there's nothing to change.")
+    return _keep_for_preview(request, user, source.name, last.file_name, data, same, worked_out_again_from=last.id)
+
+
+def _keep_for_preview(request: Request, user: str, uploaded_to: str, file_name: str, data: bytes, same: str,
+                      worked_out_again_from: int | None = None):
+    """Compare a file with the table(s) it fills, and keep it as an upload to preview if it changes anything.
+    `same` is the message if it doesn't, with {tables} for "the table" or "the tables it fills"."""
+    state = request.app.state
     try:
         with state.engine.begin() as conn:
-            changes = _changes(conn, state, uploaded_to, data, file.filename)
+            changes = _changes(conn, state, uploaded_to, data, file_name)
             if not changes.has_changes:
-                same = "the table" if len(changes.comparisons) == 1 else "the tables it fills"
-                request.session["message"] = f"{file.filename} is the same as {same}, so there's nothing to change."
+                tables = "the table" if len(changes.comparisons) == 1 else "the tables it fills"
+                request.session["message"] = same.format(tables=tables)
                 return RedirectResponse(_upload_panel(uploaded_to), 303)
             upload_id = uploads.create(
-                conn, state.schema, state.settings.raw_files_dir, uploaded_to, file.filename, data, user,
-                changes.rows_in_file, changes.comparisons, source_file=changes.source_file,
+                conn, state.schema, uploaded_to, file_name, data, user, changes.rows_in_file, changes.comparisons,
+                source_file=changes.source_file, worked_out_again_from=worked_out_again_from,
             )
     except excel.UploadError as e:
-        return _upload_problems(request, uploaded_to, file.filename, e.problems)
+        return _upload_problems(request, uploaded_to, file_name, e.problems)
     return RedirectResponse(f"/admin/uploads/{upload_id}", 303)
 
 
@@ -478,10 +527,15 @@ def upload_file(request: Request, user: User, upload_id: int):
     state = request.app.state
     with state.engine.connect() as conn:
         upload = _get_upload(conn, state, upload_id)
-    path = uploads.file_path(state.settings.raw_files_dir, upload)
-    if not path.is_file():
-        raise HTTPException(404, f"The file for upload {upload_id} isn't there any more ({upload.stored_as}).")
-    return FileResponse(path, media_type=MEDIA_TYPES.get(path.suffix.lower(), XLSX), filename=upload.file_name)
+        data = uploads.file(conn, state.schema, upload_id)
+    suffix = Path(upload.file_name).suffix.lower()
+    return Response(data, media_type=MEDIA_TYPES.get(suffix, XLSX), headers={"Content-Disposition": _attachment(upload.file_name)})
+
+
+def _attachment(file_name: str) -> str:
+    """A download under the name it was uploaded with, written as FileResponse does."""
+    quoted = quote(file_name)
+    return f"attachment; filename*=utf-8''{quoted}" if quoted != file_name else f'attachment; filename="{file_name}"'
 
 
 # --- What an upload changes ----------------------------------------------------------
@@ -519,7 +573,7 @@ def _changes(conn: sa.Connection, state, uploaded_to: str, data: bytes, file_nam
 
 def _kept_changes(conn: sa.Connection, state, upload: sa.Row) -> Changes:
     """Read the kept file again and compare it with the table(s) as they are now."""
-    data = uploads.file_path(state.settings.raw_files_dir, upload).read_bytes()
+    data = uploads.file(conn, state.schema, upload.id)
     return _changes(conn, state, upload.uploaded_to, data, upload.file_name)
 
 

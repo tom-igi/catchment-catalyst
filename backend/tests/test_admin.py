@@ -54,7 +54,6 @@ def app(engine, tmp_path):
         database_url=engine.url.render_as_string(hide_password=False),
         users={"tom": passwords.hash_password(PASSWORD)},
         secret_key="test secret",
-        raw_files_dir=tmp_path,
         published_dir=tmp_path / "published",
     ))
     yield app
@@ -87,6 +86,12 @@ def page_model(page: str) -> dict:
 def table_details(client, table=TABLE) -> dict:
     """What the admin page knows about a table."""
     return next(t for t in page_model(client.get("/admin").text)["tables"] if t["name"] == table)
+
+
+def kept_file(app, upload_id: int) -> bytes:
+    """An upload's file, as kept in the uploads table."""
+    with app.state.engine.connect() as conn:
+        return bytes(conn.scalar(sa.text("SELECT file FROM uploads WHERE id = :id"), {"id": upload_id}))
 
 
 def uploads_table(app) -> list[tuple]:
@@ -196,7 +201,9 @@ def test_every_table_can_be_downloaded(app, client):
         assert response.status_code == 200, name
         assert response.headers["content-disposition"].startswith(f'attachment; filename="{name}_')
     assert tables["catchments"]["download"]["left_out"] == ["boundary", "river_line"]  # map shapes
-    assert tables["ea_scores"]["download"]["left_out"] == []
+    assert tables["catchments"]["download"]["left_out_why"] == "map shapes, thousands of coordinates long"
+    assert tables["uploads"]["download"]["left_out"] == ["file"]  # the files themselves: each from its upload
+    assert tables["ea_scores"]["download"]["left_out"] == [] and tables["ea_scores"]["download"]["left_out_why"] is None
 
     sheet = load_workbook(io.BytesIO(client.get("/admin/tables/catchments/download").content)).active
     assert [c.value for c in sheet["A"]] == ["id", "GB108050008080", "GB108050008100"]
@@ -209,7 +216,7 @@ def test_old_addresses_go_to_the_admin_page(client):
     assert client.get("/admin/data-map", follow_redirects=False).headers["location"] == "/admin"
 
 
-def test_download_upload_preview_and_approve(app, client, tmp_path):
+def test_download_upload_preview_and_approve(app, client):
     download = client.get(f"/admin/tables/{TABLE}/download")
     assert [c.value for c in load_workbook(io.BytesIO(download.content)).active[1]] == list(HEADINGS)
 
@@ -228,9 +235,9 @@ def test_download_upload_preview_and_approve(app, client, tmp_path):
     assert (details["rows"], details["update"]["last"]["who"], details["update"]["recent"][0]["status"]) == (2, "tom", "approved")
     assert saved(app.state.engine) == SAVED
     assert uploads_table(app) == [(1, TABLE, "tom", "approved", 2, 0, 0)]
-    (kept,) = (tmp_path / TABLE).iterdir()
-    assert kept.read_bytes() == PLANS
-    assert client.get("/admin/uploads/1/file").content == PLANS
+    assert kept_file(app, 1) == PLANS  # kept in the database, so it's in its backups
+    file = client.get("/admin/uploads/1/file")
+    assert (file.content, file.headers["content-disposition"]) == (PLANS, "attachment; filename*=utf-8''October%20plans.xlsx")
 
     # Uploading the same file again changes nothing, so there's nothing to approve.
     page = upload(client, PLANS)
@@ -238,14 +245,13 @@ def test_download_upload_preview_and_approve(app, client, tmp_path):
     assert "is the same as the table, so there&#39;s nothing to change" in client.get(page.headers["location"]).text
 
 
-def test_problems_are_shown_and_nothing_is_kept(app, client, tmp_path):
+def test_problems_are_shown_and_nothing_is_kept(app, client):
     response = upload(client, xlsx(HEADINGS, plan("GB999", "soon", 1, None)))
     assert response.status_code == 422
     problems = page_model(response.text)["problems"]  # shown in the table's upload, opened by the page
     assert (problems["uploaded_to"], problems["file"], problems["more"]) == (TABLE, "plans.xlsx", 0)
     assert "Row 2, intervention: 'soon' isn't a whole number." in problems["items"]
     assert uploads_table(app) == []
-    assert list(tmp_path.iterdir()) == []
 
 
 def test_deleting_rows_is_warned_about(client):
@@ -305,7 +311,7 @@ def rows_in(app, table) -> list[tuple]:
         return [tuple(r) for r in conn.execute(sa.text(f"SELECT * FROM {table} ORDER BY 1, 2"))]
 
 
-def test_a_source_file_fills_its_tables(app, client, tmp_path):
+def test_a_source_file_fills_its_tables(app, client):
     add_named_catchments(app)
     with app.state.engine.begin() as conn:  # published before, so the Publish box counts what's approved since
         conn.execute(sa.text("INSERT INTO publishes (published_at) VALUES (now() - interval '1 hour')"))
@@ -334,9 +340,9 @@ def test_a_source_file_fills_its_tables(app, client, tmp_path):
     assert uploads_table(app) == [(1, "apha_livestock", "tom", "approved", 12, 0, 0)]
     with app.state.engine.connect() as conn:
         assert conn.scalar(sa.text("SELECT changes FROM uploads")) == {"livestock": [10, 0, 0], "livestock_pressure": [2, 0, 0]}
-    (kept,) = (tmp_path / "apha_livestock").iterdir()
-    assert kept.read_bytes() == data and kept.suffix == ".xlsx"
-    assert client.get("/admin/uploads/1/file").content == data
+    assert kept_file(app, 1) == data
+    file = client.get("/admin/uploads/1/file")
+    assert (file.content, file.headers["content-type"]) == (data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     assert "1 upload approved since the last publish, so not on it yet: APHA livestock data." in publish_box(client.get("/admin").text)
 
     # The same file again changes nothing.
@@ -348,7 +354,7 @@ def source_details(client) -> dict:
     return next(i for i in page_model(client.get("/admin").text)["inputs"] if i["name"] == "apha_livestock")
 
 
-def test_a_source_files_problems_are_shown_in_its_upload(app, client, tmp_path):
+def test_a_source_files_problems_are_shown_in_its_upload(app, client):
     add_named_catchments(app)
     response = upload_source(client, apha_file(ABBEY_ROW, ABBEY_ROW), name="twice.xlsx")
     assert response.status_code == 422
@@ -356,9 +362,46 @@ def test_a_source_files_problems_are_shown_in_its_upload(app, client, tmp_path):
     assert (problems["uploaded_to"], problems["file"]) == ("apha_livestock", "twice.xlsx")
     assert problems["items"] == ["Rows 2 and 3 are both for Abbey River. Each can only appear once."]
     assert upload_source(client, b"x", name="old.xls").status_code == 422
-    assert uploads_table(app) == [] and list(tmp_path.iterdir()) == []
+    assert uploads_table(app) == []
     assert upload_source(client, b"x", source="nope").status_code == 404
     assert upload_source(client, b"x", source="livestock").status_code == 404  # a table, not a source file
+
+
+def test_a_source_file_can_be_worked_out_again(app, client):
+    """From its last approved file, with the formulas as they are now: e.g. after a formula or a table changed."""
+    add_named_catchments(app)
+    again = "/admin/inputs/apha_livestock/work-out-again"
+    page = client.post(again)
+    assert "No APHA livestock data file has been approved yet, so there&#39;s nothing to work out again." in page.text
+    assert source_details(client)["update"]["again"] is None
+
+    data = apha_file(ABBEY_ROW, BADGWORTHY_ROW)
+    upload_source(client, data, name="APHA February.xlsx")
+    approve(client, 1)
+    details = source_details(client)["update"]["again"]
+    assert (details["url"], details["file"], details["file_url"]) == (again, "APHA February.xlsx", "/admin/uploads/1/file")
+    page = client.post(again)  # the tables already match it
+    assert page.history[-1].headers["location"] == "/admin#upload-apha_livestock"
+    assert "Worked out again from APHA February.xlsx (uploaded " in page.text
+    assert "it gives the same figures as the tables have now, so there&#39;s nothing to change." in page.text
+    assert len(uploads_table(app)) == 1  # nothing kept
+
+    before = rows_in(app, "livestock_pressure")
+    with app.state.engine.begin() as conn:  # as if a formula had changed since
+        conn.execute(sa.text("UPDATE livestock_pressure SET pressure = 'Something else'"))
+    response = client.post(again, follow_redirects=False)
+    assert response.headers["location"] == "/admin/uploads/2"
+    preview = client.get("/admin/uploads/2").text
+    assert "worked out again with the formulas as they are now, from" in preview and "upload 1</a>'s file, by tom" in preview
+    assert "<strong>0</strong> to add" in preview and "<strong>2</strong> to change" in preview
+    approve(client, 2)
+    assert rows_in(app, "livestock_pressure") == before
+    assert uploads_table(app)[1] == (2, "apha_livestock", "tom", "approved", 0, 2, 0)
+    assert kept_file(app, 2) == data
+    recent = source_details(client)["update"]["recent"]
+    assert [(r["id"], r["file"], r["again_from"]) for r in recent] == [(2, "APHA February.xlsx", 1), (1, "APHA February.xlsx", None)]
+    assert source_details(client)["update"]["again"]["file_url"] == "/admin/uploads/2/file"  # the last approved
+    assert client.post("/admin/inputs/livestock/work-out-again").status_code == 404  # a table, not a source file
 
 
 def test_a_source_file_cancelled_or_out_of_date(app, client):

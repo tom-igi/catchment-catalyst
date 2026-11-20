@@ -325,6 +325,8 @@ def _type_label(t) -> str:
         return "Date"
     if isinstance(t, postgresql.JSONB):
         return "Settings"
+    if isinstance(t, sa.LargeBinary):
+        return "File"
     return "Text"
 
 

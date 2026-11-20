@@ -7,6 +7,7 @@ and is read from its first sheet.
 Any table can be downloaded, but only Excel tables can be uploaded. Map shapes
 are left out of downloads: each is thousands of coordinates, no use in Excel,
 and a large one can be longer than an Excel cell holds (32,767 characters).
+So are files (the uploads' own files): each can be downloaded from its upload.
 """
 
 from __future__ import annotations
@@ -67,8 +68,8 @@ def type_label(column: sa.Column) -> str:
 # --- Writing the download ----------------------------------------------------
 
 def downloadable_columns(table: sa.Table) -> list[sa.Column]:
-    """The columns in the table's download: all but map shapes."""
-    return [c for c in table.columns if not isinstance(c.type, Geometry)]
+    """The columns in the table's download: all but map shapes and files."""
+    return [c for c in table.columns if not isinstance(c.type, (Geometry, sa.LargeBinary))]
 
 
 def write_table(table: sa.Table, rows: Iterable[Mapping[str, Any]]) -> bytes:

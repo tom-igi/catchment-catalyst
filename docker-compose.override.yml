@@ -77,8 +77,7 @@ services:
       - "127.0.0.1:${ADMIN_PORT:-8000}:8000"
     volumes:
       - ./backend/catalyst:/app/catalyst:ro
-      # Uploaded files are kept in imports/raw/<table>/.
-      - ./imports:/app/imports
+      # (Uploaded files are kept in the database's uploads table, so it needs no imports/ folder.)
       # The Publish button writes the dashboards' pages here, as the publish command does.
       - ./published:/app/published
 

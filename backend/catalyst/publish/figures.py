@@ -1,10 +1,18 @@
 """What the dashboard works out from a location's data: each catchment's
 ecological status, the counts on the Overview, the EA scoring grid (with its
-values and thresholds), the failing elements and reasons, each habitat's share
-of its catchment, livestock densities, the phosphate sources, the storm
-overflow spills, the points on the small maps, the Catchment Dashboard's
-totals for the whole location or one of its operational catchments, and
-Intervention Management's summary totals and lists of waterbodies.
+values and thresholds), the failing elements and reasons, the phosphate
+sources, the storm overflow spills, the points on the small maps, the
+Catchment Dashboard's totals for the whole location or one of its
+operational catchments, and Intervention Management's summary totals and lists
+of waterbodies.
+
+Where each figure is worked out (README.md, "Where the figures are worked
+out"): anything that turns one file into each waterbody's figures (e.g. a
+density, a rating, a habitat's share) is worked out when the data comes in, by
+its source file or importer, and kept in its table. This works out only what
+needs more than one table, a whole location, or chooses what to show (e.g.
+the latest year, or the failing elements picked from the EA's
+classifications).
 
 Like collect.py, this knows nothing about web pages. Each figure copes with its
 table not existing (it's simply empty), so the dashboard shows an empty panel

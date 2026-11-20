@@ -91,6 +91,27 @@ Each table is filled in one way, set by `filled_by` in `schema.yaml`:
 | `input` | Someone uploads a source file as it came, in the admin page; the original Power BI dashboard's formulas work out its tables (`backend/catalyst/importers/inputs/`, see [POWERBI-INPUTS-PLAN.md](POWERBI-INPUTS-PLAN.md)) | Livestock, Livestock Pressure (from APHA's livestock data); Waterbody Figures (from the Waterbody Lookup); ESME Risk Levels (from ESME); Habitat & Land Use (from Natural England's habitats); River Status Text (from Improvement Information); Phosphate Sources, Phosphate Continuous and Diffuse (from SAGIS); Sewerage Improvements (from Water UK's storm overflow plans); EA Scores, EA Thresholds (from the EA's classification facts) |
 | `excel` | Someone uploads an Excel file in the table's layout, in the admin page (`backend/catalyst/importers/excel/`) | Datasets, Location Text and Intervention Management's three tables |
 
+### Where the figures are worked out
+
+Two places, by one rule:
+
+- **When the data comes in** (a source file's upload, or an importer): anything that turns one
+  file into each waterbody's figures. For example: unit changes (m² to hectares), densities,
+  ratings and pressures (the Risk Levels tiles), each habitat's share of its waterbody, and
+  each waterbody's storm overflow hours added up. The upload's preview then shows the figures
+  themselves changing before anyone approves them, and each table holds what the dashboards
+  show, so its Excel download matches them.
+- **When the dashboards are published** (`backend/catalyst/publish/figures.py`): anything
+  that needs more than one table, a whole location, or chooses what to show. For example:
+  each waterbody's latest ecological status (the EA's classifications, with the Waterbody
+  Lookup's 2025 class), the EA Data page's grid (scores, thresholds and statuses together),
+  the failing elements and reasons picked from the EA's tables, the storm overflows' last five
+  years, the Catchment Dashboard's totals, and Intervention Management's summary.
+
+Downloads are kept as they came ("As downloaded" on the admin page), and the publish step picks
+from them. If a formula used when the data comes in changes, use the source file's **Work it out
+again** on the admin page rather than uploading its file again.
+
 ### From an API
 
 Import the catchments first: the other importers fetch data for every catchment in the
@@ -106,8 +127,8 @@ docker compose run --rm importer postcodes                            # the post
 
 Each downloads and checks everything first, shows what it will change, and asks before saving
 (add `--yes` to skip the question). Running one again is safe: catchments are updated, and the
-other tables are replaced. Everything downloaded is kept in `imports/raw/`. See
-`imports/README.md`.
+other tables are replaced. Everything downloaded is kept in `imports/raw/` (not in the
+database: it can always be downloaded again). See `imports/README.md`.
 
 ### From a source file (the admin page)
 
@@ -117,6 +138,10 @@ other tables are replaced. Everything downloaded is kept in `imports/raw/`. See
 3. The preview shows what will be added, changed and deleted in each table it fills, and
    any rows left out (waterbodies that aren't in the Catchments table).
 4. Approve it, and every table it fills is changed at once. Then **Publish**, as below.
+
+If a formula or one of its tables changes later, click **Work it out again** in the same
+place. It works the tables out again from the last approved file, with the formulas as they
+are now, and shows the preview as an upload does, without anyone uploading the file again.
 
 Each of its tables has a **Power BI's formulas** box in the Transformation column: its inputs
 (the file's columns it reads), the function (how each of the table's columns is worked out, with
@@ -136,8 +161,9 @@ where that is in the Power BI file), and the table. To add another source file, 
    are approved but not published, so several can be approved and then published at once.
 
 Each upload replaces the whole table, so always start from a fresh download. Every uploaded
-file is kept (in `imports/raw/<table>/`) and listed under its Upload data: to go back to an
-earlier version, download its file and upload it again.
+file is kept in the database (the uploads table's `file` column, so it's in the database's
+backups) and listed under its Upload data: to go back to an earlier version, download its file
+and upload it again.
 
 To make another table uploadable, add `filled_by: excel` to it in `schema.yaml` and run
 `schema apply`. It then appears in the admin page, with no code to write. (Its columns must
